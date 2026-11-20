@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shorts Animados v3</title>
+<title>Shorts Animados v2</title>
 <style>
 body{font-family:system-ui,sans-serif;background:#14131a;color:#eee;margin:0;padding:20px}
 .wrap{display:flex;gap:24px;flex-wrap:wrap;max-width:1100px;margin:auto}
@@ -13,12 +13,12 @@ pre{background:#1e1c28;border-radius:8px;padding:10px;white-space:pre-wrap;margi
 details{font-size:12px;background:#1e1c28;border-radius:8px;padding:8px}progress{width:100%}
 </style></head><body>
 <div class="wrap"><canvas id="cv"></canvas>
-<div class="col"><h2 style="margin:0">Shorts Animados v2 <small style="opacity:.55;font-size:12px">build 5 · car/tree</small></h2>
+<div class="col"><h2 style="margin:0">Shorts Animados v2 <small style="opacity:.55;font-size:12px">build 6 · estilos</small></h2>
 <label>1. Voz (mp3/wav/m4a): <input type="file" id="audio" accept="audio/*"></label>
 <label>2. História (.json): <input type="file" id="jf" accept=".json,application/json"></label>
 <textarea id="story" spellcheck="false"></textarea>
 <div style="display:flex;gap:8px;flex-wrap:wrap">
-<select id="res"><option value="720">720p (rápido)</option><option value="1080">1080p Full HD</option></select><select id="fps"><option>30</option><option>60</option></select><button class="sec" id="fit">Ajustar ao áudio</button><button class="sec" id="pauses">Detectar pausas</button>
+<select id="look"><option value="cartoon">Estilo: Cartoon</option><option value="sketch">Desenho a lápis</option><option value="comic">Quadrinhos</option><option value="noir">Preto e branco</option><option value="neon">Neon</option><option value="retro">Retrô VHS</option><option value="pixel">Pixel art</option><option value="blueprint">Planta azul</option><option value="pastel">Pastel</option><option value="vintage">Filme antigo</option></select><select id="res"><option value="720">720p (rápido)</option><option value="1080">1080p Full HD</option></select><select id="fps"><option>30</option><option>60</option></select><button class="sec" id="fit">Ajustar ao áudio</button><button class="sec" id="pauses">Detectar pausas</button>
 <button class="sec" id="prev">Prévia</button><button id="gen">Gerar vídeo</button></div>
 <progress id="bar" value="0" max="100"></progress><pre id="log">Escolha a voz e clique em Gerar vídeo. Aba aberta e visível. Chrome/Edge.</pre>
 <details><summary>Campos do JSON</summary><pre>
@@ -41,7 +41,7 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
 </pre></details></div></div>
 <script src="audio.js"></script>
 <script>
-const W=1080,H=1920,$=i=>document.getElementById(i),K='#181622';
+const W=1080,H=1920,$=i=>document.getElementById(i);let K='#181622';
 const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t,eio=t=>(t=clamp(t))*t*(3-2*t);
 const back=t=>{t=clamp(t);return 1+2.9*Math.pow(t-1,3)+1.9*Math.pow(t-1,2)};
 function mulberry32(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -140,6 +140,34 @@ function weather(n,t){
  if(n==='snow'){const r=mulberry32(9);c.fillStyle='rgba(255,255,255,.85)';for(let i=0;i<90;i++){const sp=120+r()*200,y=((t*sp+r()*H)%(H+60))-30,x=r()*W+Math.sin(t*1.5+i)*40;c.beginPath();c.arc(x,y,4+r()*6,0,7);c.fill()}}
  if(n==='fog')for(let i=0;i<3;i++){const x=((t*20*(i+1)+i*500)%1600)-500,g=c.createLinearGradient(x,0,x+900,0);g.addColorStop(0,'rgba(255,255,255,0)');g.addColorStop(.5,'rgba(255,255,255,.18)');g.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=g;c.fillRect(x,600+i*250,900,420)}
  if(n==='sparks'){const r=mulberry32(12);c.fillStyle='#ffd23b';for(let i=0;i<40;i++){const a=r()*7,sp=200+r()*500,k=(t*.8+r())%1;c.globalAlpha=1-k;c.beginPath();c.arc(W/2+Math.cos(a)*sp*k,H/2+Math.sin(a)*sp*k,5+r()*5,0,7);c.fill()}c.globalAlpha=1}}
+
+const LOOKS={cartoon:{},
+ sketch:{ink:'#33333a',boil:1.2,ops:[['gray',.6],['mul','#f2e8cc'],['grain',.25],['vig',.3]]},
+ comic:{ink:'#000000',ops:[['dots',.28],['mul','#fff3d6',.5],['vig',.15]]},
+ noir:{ink:'#000000',boil:.6,ops:[['gray',1],['ovl','#303030',.45],['grain',.3],['vig',.55]]},
+ neon:{ink:'#05051a',ops:[['mul','#7a7ab8'],['ovl','#2010a0',.35],['glow',.8],['scan',.18],['vig',.4]]},
+ retro:{ink:'#2a1030',boil:.5,ops:[['tint','#ff8a5a',.3],['glow',.35],['scan',.3],['grain',.28],['vig',.4]]},
+ pixel:{ops:[['pix',7]]},
+ blueprint:{ops:[['gray',1],['inv',1],['tint','#2a6cff',.9],['grid',.16]]},
+ pastel:{ink:'#4a3f5c',ops:[['scr','#ffe0ef',.4],['gray',.2]]},
+ vintage:{ink:'#3a2a1a',boil:.6,ops:[['gray',.4],['tint','#b98b55',.85],['grain',.3],['vig',.5]]}};
+const OFF=document.createElement('canvas'),OC=OFF.getContext('2d'),TILES={};
+function tile(k,w,h,fn){if(!TILES[k]){const q=document.createElement('canvas');q.width=w;q.height=h;fn(q.getContext('2d'),w,h);TILES[k]=c.createPattern(q,'repeat')}return TILES[k]}
+function postFx(LK,t){
+  if(!LK.ops)return;const cw=cv.width,ch=cv.height;
+  for(const[op,a,b]of LK.ops){c.save();
+    if(op==='gray'){c.globalCompositeOperation='saturation';c.globalAlpha=a;c.fillStyle='#808080';c.fillRect(0,0,W,H)}
+    else if(op==='mul'||op==='scr'||op==='ovl'||op==='tint'){c.globalCompositeOperation={mul:'multiply',scr:'screen',ovl:'overlay',tint:'color'}[op];c.globalAlpha=b??1;c.fillStyle=a;c.fillRect(0,0,W,H)}
+    else if(op==='inv'){c.globalCompositeOperation='difference';c.globalAlpha=a;c.fillStyle='#fff';c.fillRect(0,0,W,H)}
+    else if(op==='grain'){const r=mulberry32(Math.floor(t*24)+1);c.globalCompositeOperation='overlay';c.globalAlpha=a;c.translate(r()*128,r()*128);
+      c.fillStyle=tile('g',128,128,(x)=>{const q=mulberry32(4);for(let i=0;i<1100;i++){const v=Math.floor(q()*255);x.fillStyle=`rgb(${v},${v},${v})`;x.fillRect(q()*128,q()*128,2,2)}});c.fillRect(-128,-128,W+256,H+256)}
+    else if(op==='scan'){c.globalCompositeOperation='multiply';c.globalAlpha=1-a;c.fillStyle=tile('s',2,6,(x)=>{x.fillStyle='#fff';x.fillRect(0,0,2,6);x.fillStyle='#000';x.fillRect(0,0,2,2)});c.globalAlpha=a*2;c.fillRect(0,0,W,H)}
+    else if(op==='dots'){c.globalCompositeOperation='multiply';c.globalAlpha=1;c.fillStyle=tile('d',14,14,(x)=>{x.fillStyle='#fff';x.fillRect(0,0,14,14);x.fillStyle=`rgba(0,0,0,${a*3})`;x.beginPath();x.arc(7,7,3.2,0,7);x.fill()});c.fillRect(0,0,W,H)}
+    else if(op==='pix'){OFF.width=Math.ceil(cw/a);OFF.height=Math.ceil(ch/a);OC.drawImage(cv,0,0,OFF.width,OFF.height);c.setTransform(1,0,0,1,0,0);c.imageSmoothingEnabled=false;c.drawImage(OFF,0,0,cw,ch)}
+    else if(op==='glow'){OFF.width=Math.ceil(cw/7);OFF.height=Math.ceil(ch/7);OC.drawImage(cv,0,0,OFF.width,OFF.height);c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='lighter';c.globalAlpha=a;c.imageSmoothingEnabled=true;c.drawImage(OFF,0,0,cw,ch)}
+    else if(op==='vig'){const g=c.createRadialGradient(W/2,H/2,H*.25,W/2,H/2,H*.75);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(0,0,0,${a})`);c.fillStyle=g;c.fillRect(0,0,W,H)}
+    else if(op==='grid'){c.strokeStyle=`rgba(255,255,255,${a})`;c.lineWidth=2;c.beginPath();for(let x=0;x<=W;x+=90){c.moveTo(x,0);c.lineTo(x,H)}for(let y=0;y<=H;y+=90){c.moveTo(0,y);c.lineTo(W,y)}c.stroke()}
+    c.restore()}}
 function track(a,t){
   let x=a.x,y=a.y,dist=0,mv=false,dir=1,px=a.x,py=a.y,t0=a.move||0;
   const w=a.to?(Array.isArray(a.to)?a.to:[{...a.to,dur:a.dur||2,move:a.move||0}]):[];
@@ -252,13 +280,13 @@ function drawFrame(st,t){
   const sc=st.scenes,s=sc.find(q=>t>=q.t0&&t<q.t1)||sc[sc.length-1],tt=Math.max(0,t-s.t0),dur=s.t1-s.t0,e=eio(tt/dur),cm=s.cam||{},CK=camAt(cm,tt,e);if(cm.follow!=null&&(s.actors||[])[cm.follow]){const fa=track(s.actors[cm.follow],tt),fk=cm.fk??.85;CK.x=lerp(CK.x,fa.x+(cm.fx||0),fk);CK.y=lerp(CK.y,fa.y-(cm.fy??380),fk)}
   c.setTransform(1,0,0,1,0,0);c.fillStyle='#000';c.fillRect(0,0,cv.width,cv.height);
   let shx=0,shy=0;if(s.shake&&tt<s.shake){const q=1-tt/s.shake;shx=Math.sin(tt*90)*22*q;shy=Math.cos(tt*77)*16*q}
-  c.setTransform(S,0,0,S,0,0);c.translate(W/2+shx,H/2+shy);const z=CK.z;c.scale(z,z);c.rotate(CK.r*Math.PI/180);
+  const LK=LOOKS[s.look||(st.style||{}).look]||LOOKS.cartoon;K=LK.ink||'#181622';c.setTransform(S,0,0,S,0,0);c.translate(W/2+shx,H/2+shy);if(LK.boil){const rb=mulberry32(Math.floor(t*9)+3);c.translate((rb()-.5)*LK.boil*3,(rb()-.5)*LK.boil*3);c.rotate((rb()-.5)*.004*LK.boil)}const z=CK.z;c.scale(z,z);c.rotate(CK.r*Math.PI/180);
   c.translate(-CK.x,-CK.y);
   CUR=s;scenery(s,tt);
   [...(s.props||[]).filter(p=>!p.front).map(p=>[p.y,()=>prop(p,tt)]),...(s.actors||[]).map(a=>[track(a,tt).y,()=>figure(a,tt)])].sort((a,b)=>a[0]-b[0]).forEach(q=>q[1]());
   (s.props||[]).filter(p=>p.front).forEach(p=>prop(p,tt));
   (s.fx||[]).forEach(n=>fxDraw(n,tt));
-  c.setTransform(S,0,0,S,0,0);vign();if(s.tint){c.fillStyle=s.tint;c.fillRect(0,0,W,H)}
+  c.setTransform(S,0,0,S,0,0);vign();if(s.tint){c.fillStyle=s.tint;c.fillRect(0,0,W,H)}postFx(LK,t);
   if(s.text)caption(s.text,tt);
   if(s.caption)caption2(s,tt,dur);
   const tr=s.tr||'fade',ta=tr==='flash'?clamp(1-tt/.18):clamp(1-tt/.25);
@@ -291,6 +319,7 @@ function validate(st){const ok=new Set([...Object.keys(PR),...Object.keys(PX),'e
   return bad.size?`\nAviso: tipo(s) de objeto desconhecido(s): ${[...bad].join(', ')} (não serão desenhados). Se for car/tree, seu index.html está desatualizado: use o do zip novo.`:''}
 const readStory=()=>{try{story=JSON.parse($('story').value);WARN=validate(story);return true}catch(e){log('JSON inválido: '+e.message);return false}};
 show();drawFrame(story,2.5);
+$('look').onchange=()=>{if(!readStory())return;story.style=story.style||{};story.style.look=$('look').value;show();drawFrame(story,Math.min(2.5,story.total-.1))};
 $('jf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('story').value=await f.text();if(readStory()){drawFrame(story,.5);log('História carregada.'+WARN)}};
 $('audio').onchange=async e=>{const f=e.target.files[0];if(!f)return;ac=new(window.AudioContext||window.webkitAudioContext)({sampleRate:SR});
   try{voiceBuf=await ac.decodeAudioData(await f.arrayBuffer());log(`Áudio: ${voiceBuf.duration.toFixed(1)} s`)}catch(x){log('Áudio inválido: '+x.message)}};
