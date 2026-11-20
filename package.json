@@ -1,0 +1,7 @@
+{
+  "name": "shorts-animados",
+  "version": "0.1.0",
+  "description": "Gera shorts animados verticais no navegador, sem dependências e sem API paga.",
+  "scripts": { "start": "node server.js" },
+  "license": "MIT"
+}
