@@ -13,7 +13,7 @@ pre{background:#1e1c28;border-radius:8px;padding:10px;white-space:pre-wrap;margi
 details{font-size:12px;background:#1e1c28;border-radius:8px;padding:8px}progress{width:100%}
 </style></head><body>
 <div class="wrap"><canvas id="cv"></canvas>
-<div class="col"><h2 style="margin:0">Shorts Animados v2</h2>
+<div class="col"><h2 style="margin:0">Shorts Animados v2 <small style="opacity:.55;font-size:12px">build 5 · car/tree</small></h2>
 <label>1. Voz (mp3/wav/m4a): <input type="file" id="audio" accept="audio/*"></label>
 <label>2. História (.json): <input type="file" id="jf" accept=".json,application/json"></label>
 <textarea id="story" spellcheck="false"></textarea>
@@ -30,7 +30,7 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
   actor extra: outfit:suit|hoodie|leather|shirt|blazer, hair:short|swept|bob|grey, glasses, nerv, look, skin; anim também: nervous|cheer
   extras: actors[].bubbles:[{t,end,say:"texto" | mark:!|?|idea|heart|zzz}], hold:phone|book|cup|box|key|sign(+holdT), end
   cena: tint:"#rrggbbaa", fx:rain|snow|fog|sparks, tr:wipe|iris, cs:{size,y,color,alt,stroke,upper} | cam.follow:índice do ator (+fx,fy,fk)
-  story.style.caption (padrão de todas as legendas) | props: arrow|ring|text|bar, alpha, end, v(bar 0-1)
+  story.style.caption (padrão de todas as legendas) | props: car(+flip)|tree|arrow|ring|text|bar, actor still:true (não anda ao se mover), alpha, end, v(bar 0-1)
   actors[]: seq:[{t,anim,mood,look}] (troca de animação/humor no tempo) | to pode ser lista de trajetos [{x,y,dur,move}]
   cam:{keys:[{t,z,x,y,r}]} (câmera com vários pontos)
   anims novas: think|laugh|facepalm|dance|crouch (andar é automático quando há "to")
@@ -126,6 +126,10 @@ function holdItem(n,p,u,txt){c.save();c.translate(p[0],p[1]);c.lineWidth=u*.2;c.
   else if(n==='sign'){c.fillStyle='#fff';c.beginPath();c.roundRect(-1.4*u,-2.2*u,2.8*u,1.4*u,u*.2);c.fill();c.stroke();c.fillStyle=K;c.font=`900 ${u*.9}px "Arial Black",sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(txt||'',0,-1.5*u,2.5*u)}
   c.restore()}
 const PX={
+ car:(p,s)=>{if(p.flip)c.scale(-1,1);c.fillStyle=p.color||'#e23b3b';c.beginPath();c.roundRect(-s*.8,-s*.3,s*1.6,s*.4,s*.1);c.fill();c.stroke();
+  c.fillStyle='rgba(191,227,255,.35)';c.beginPath();c.moveTo(-s*.4,-s*.3);c.lineTo(-s*.25,-s*.62);c.lineTo(s*.3,-s*.62);c.lineTo(s*.5,-s*.3);c.closePath();c.fill();c.stroke();
+  c.fillStyle='#ffe38a';c.fillRect(s*.68,-s*.2,s*.1,s*.1);for(const x of[-.45,.45]){c.fillStyle='#222';c.beginPath();c.arc(x*s,s*.1,s*.17,0,7);c.fill();c.stroke();c.fillStyle='#bbb';c.beginPath();c.arc(x*s,s*.1,s*.06,0,7);c.fill()}},
+ tree:(p,s)=>{c.fillStyle='#7a4a2a';c.fillRect(-s*.08,-s*.5,s*.16,s*.5);c.strokeRect(-s*.08,-s*.5,s*.16,s*.5);c.fillStyle=p.color||'#3fa34d';for(const[x,y,r]of[[-.22,-.62,.26],[.22,-.62,.26],[0,-.8,.34]]){c.beginPath();c.arc(x*s,y*s,r*s,0,7);c.fill();c.stroke()}},
  arrow:(p,s)=>{c.beginPath();c.moveTo(-s*.5,-s*.18);c.lineTo(s*.1,-s*.18);c.lineTo(s*.1,-s*.4);c.lineTo(s*.55,0);c.lineTo(s*.1,s*.4);c.lineTo(s*.1,s*.18);c.lineTo(-s*.5,s*.18);c.closePath();c.fill();c.stroke()},
  ring:(p,s)=>{c.lineWidth=s*.08;c.strokeStyle=p.color||'#ffd23b';c.beginPath();c.arc(0,0,s/2,0,7);c.stroke()},
  text:(p,s)=>{c.font=`900 ${s*.4}px "Arial Black",Impact,sans-serif`;c.textAlign='center';c.textBaseline='middle';c.lineWidth=s*.07;c.lineJoin='round';c.strokeText(p.t||'',0,0);c.fillStyle=p.color||'#fff';c.fillText(p.t||'',0,0)},
@@ -170,7 +174,7 @@ function figure(a,t){
   const h=(a.h||460)*(a.floor===false?1:dS(y)),u=h/10;
   const ks=[{t:0,anim:a.anim||'idle',mood:a.mood,look:a.look},...(a.seq||[])].sort((p,q)=>p.t-q.t);
   let k=0,mood0=null,lkv=a.look||0;ks.forEach((q,n)=>{if(t>=q.t){k=n;if(q.mood)mood0=q.mood;if(q.look!==undefined)lkv=q.look}});
-  const cu=ks[k],pv=ks[k-1],w=pv?eio((t-cu.t)/.3):1,fix=n=>(n==='walk'||n==='run')&&!mv?'idle':(n==='idle'&&mv?'walk':n);
+  const cu=ks[k],pv=ks[k-1],w=pv?eio((t-cu.t)/.3):1,fix=n=>(n==='walk'||n==='run')&&!mv?'idle':(n==='idle'&&mv&&!a.still?'walk':n);
   const an=fix(cu.anim||'idle'),talk=a.talk&&t>=a.talk[0]&&t<=a.talk[1],o1=pose2(an,t,u,mv,pp.dist,talk);let o=o1;
   if(pv&&w<1){const o0=pose2(fix(pv.anim||'idle'),t,u,mv,pp.dist,talk),mix={};for(const n in o1)mix[n]=typeof o1[n]==='number'?lerp(o0[n],o1[n],w):o1[n];o=mix}
   let{bob,L,R,AL,AR,lean,sq,sx,hun}=o,mood=mood0||o.mood||'smile';if(mood==='happy')mood='smile';if(mood==='sad')mood='worry';
@@ -281,9 +285,13 @@ function demo(){
 }
 let story=demo(),voiceBuf=null,ac=null,busy=false;
 const log=m=>{$('log').textContent=m},show=()=>{$('story').value=JSON.stringify(story,null,1)};
-const readStory=()=>{try{story=JSON.parse($('story').value);return true}catch(e){log('JSON inválido: '+e.message);return false}};
+let WARN='';
+function validate(st){const ok=new Set([...Object.keys(PR),...Object.keys(PX),'emoji','circle','rect','star']),bad=new Set();
+  (st.scenes||[]).forEach(sc=>(sc.props||[]).forEach(p=>{if(!ok.has(p.type))bad.add(p.type)}));
+  return bad.size?`\nAviso: tipo(s) de objeto desconhecido(s): ${[...bad].join(', ')} (não serão desenhados). Se for car/tree, seu index.html está desatualizado: use o do zip novo.`:''}
+const readStory=()=>{try{story=JSON.parse($('story').value);WARN=validate(story);return true}catch(e){log('JSON inválido: '+e.message);return false}};
 show();drawFrame(story,2.5);
-$('jf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('story').value=await f.text();if(readStory()){drawFrame(story,.5);log('História carregada.')}};
+$('jf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('story').value=await f.text();if(readStory()){drawFrame(story,.5);log('História carregada.'+WARN)}};
 $('audio').onchange=async e=>{const f=e.target.files[0];if(!f)return;ac=new(window.AudioContext||window.webkitAudioContext)({sampleRate:SR});
   try{voiceBuf=await ac.decodeAudioData(await f.arrayBuffer());log(`Áudio: ${voiceBuf.duration.toFixed(1)} s`)}catch(x){log('Áudio inválido: '+x.message)}};
 $('fit').onclick=()=>{if(!voiceBuf)return log('Escolha o áudio.');if(!readStory())return;const f=voiceBuf.duration/story.total,r=v=>+(v*f).toFixed(2);
