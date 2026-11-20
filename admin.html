@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin · Shorts Animados</title>
+<link rel="stylesheet" href="ui.css">
+<style>
+.login{max-width:380px;margin:8vh auto 0}
+.login h1{font-size:22px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:20px;overflow-x:auto}
+.tabs button{background:none;color:var(--muted);border-radius:8px 8px 0 0;border:0;border-bottom:2px solid transparent;padding:10px 16px;font-weight:700;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);background:var(--panel)}
+.tabs button:hover{filter:none;color:var(--text)}
+.tabs .sp{flex:1}
+.kpi{padding:16px}
+.kpi .n{font-size:30px;font-weight:800;letter-spacing:-.5px}
+.kpi .l{color:var(--muted);font-size:13px}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:110px 1fr 34px;gap:10px;align-items:center;font-size:13px}
+.bar i{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--accent),#ff7a3b)}
+.bar .tr{background:#12111a;border-radius:6px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.sb{justify-content:space-between}
+.pv{width:200px;aspect-ratio:9/16;border-radius:12px;background:linear-gradient(#7ec8ff,#eaf7ff);position:relative;overflow:hidden;box-shadow:0 8px 30px #0008;flex:none}
+.pv span{position:absolute;left:0;right:0;text-align:center;font:900 22px "Arial Black",Impact,sans-serif;transform:translateY(-50%)}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:24px}
+@media(max-width:760px){.cols{grid-template-columns:1fr}.pv{margin:auto}}
+.issues{max-height:240px;overflow:auto;margin:10px 0 0;padding:0;list-style:none;font-size:13px}
+.issues li{padding:5px 0;border-bottom:1px solid #2a2840;display:flex;gap:8px;align-items:baseline}
+.issues code{white-space:nowrap}
+.hidden{display:none!important}
+td .acts{display:flex;gap:6px;flex-wrap:wrap}
+textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
+.ok-dot,.bad-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px}
+.ok-dot{background:var(--ok)}.bad-dot{background:var(--bad)}
+</style></head>
+<body class="page"><div class="shell">
+<nav class="topnav"><a class="brand" href="/"><i></i>Shorts Animados</a><a class="nl" href="/">Gerador</a><a class="nl" href="/ajuda">Ajuda</a><a class="nl" href="/admin" aria-current="page">Admin</a></nav>
+
+<!-- LOGIN -->
+<div id="login" class="login hidden">
+  <div class="card">
+    <h1>Painel administrativo</h1>
+    <p class="muted">Entre com a senha do administrador. Na primeira execução, ela é mostrada no terminal onde você rodou <code>node server.js</code>.</p>
+    <form id="lf">
+      <label class="f">Senha<input id="pw" type="password" autocomplete="current-password" required autofocus></label>
+      <div id="lerr" class="notice bad hidden" role="alert"></div>
+      <button type="submit" style="width:100%;justify-content:center">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <div class="row sb" style="margin-bottom:14px"><div><h1>Admin</h1><div class="muted">Configurações, biblioteca de histórias e histórico de vídeos.</div></div><button class="sec" id="logout">Sair</button></div>
+  <div class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-t="painel" aria-selected="true">Painel</button>
+    <button role="tab" data-t="biblioteca" aria-selected="false">Biblioteca</button>
+    <button role="tab" data-t="padroes" aria-selected="false">Padrões</button>
+    <button role="tab" data-t="historico" aria-selected="false">Histórico</button>
+    <button role="tab" data-t="seguranca" aria-selected="false">Segurança</button>
+  </div>
+
+  <!-- PAINEL -->
+  <section id="t-painel">
+    <div class="grid g4" id="kpis"></div>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card"><h3 style="margin-top:0">Vídeos por estilo</h3><div class="bars" id="bars"></div></div>
+      <div class="card"><h3 style="margin-top:0">Sistema</h3><div id="sys"></div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Arquivos do projeto</h3><div class="grid g3" id="files"></div></div>
+    <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Últimos vídeos</h3><div class="tbl-wrap" id="recent"></div></div>
+  </section>
+
+  <!-- BIBLIOTECA -->
+  <section id="t-biblioteca" class="hidden">
+    <div class="card" style="margin-bottom:14px">
+      <h3 style="margin-top:0">Adicionar história</h3>
+      <div class="row" style="margin-bottom:10px">
+        <input id="sname" placeholder="Nome (ex.: A árvore no meio da estrada)" style="flex:1;min-width:220px" aria-label="Nome da história">
+        <label class="btn sec" style="margin:0">Escolher .json<input id="sfile" type="file" accept=".json,application/json" class="hidden"></label>
+      </div>
+      <textarea id="sjson" class="json" spellcheck="false" placeholder='Cole o JSON da história aqui…' aria-label="JSON da história"></textarea>
+      <div class="row" style="margin-top:10px"><button class="sec" id="svalidate">Validar</button><button id="ssave">Salvar na biblioteca</button></div>
+      <div id="sres" class="hidden" style="margin-top:12px"></div>
+    </div>
+    <div class="card"><div class="tbl-wrap" id="stories"></div></div>
+  </section>
+
+  <!-- PADRÕES -->
+  <section id="t-padroes" class="hidden">
+    <div class="card"><div class="cols">
+      <form id="setf">
+        <h3 style="margin-top:0">Padrões do gerador</h3>
+        <p class="muted">Valem para quem abrir o gerador. A legenda é aplicada quando a história não define <code>style.caption</code>.</p>
+        <div class="grid g3">
+          <label class="f">Estilo inicial<select id="s-look"></select></label>
+          <label class="f">Resolução<select id="s-res"><option value="720">720p (rápido)</option><option value="1080">1080p Full HD</option></select></label>
+          <label class="f">Quadros por segundo<select id="s-fps"><option>30</option><option>60</option></select></label>
+        </div>
+        <h3>Legenda padrão</h3>
+        <div class="grid g3">
+          <label class="f">Tamanho (50–200)<input id="c-size" type="number" min="50" max="200"></label>
+          <label class="f">Altura (0.05–0.95)<input id="c-y" type="number" step="0.01" min="0.05" max="0.95"></label>
+          <label class="f">Histórico (máx. itens)<input id="s-hl" type="number" min="10" max="2000"></label>
+        </div>
+        <div class="row" style="margin-bottom:12px">
+          <label class="f" style="margin:0">Cor<br><input id="c-color" type="color"></label>
+          <label class="f" style="margin:0">Alternada<br><input id="c-alt" type="color"></label>
+          <label class="f" style="margin:0">Contorno<br><input id="c-stroke" type="color"></label>
+          <label class="f" style="margin:0;display:flex;gap:8px;align-items:center;align-self:end;height:38px"><input id="c-upper" type="checkbox"> Maiúsculas</label>
+        </div>
+        <button type="submit">Salvar padrões</button>
+      </form>
+      <div><div class="muted" style="font-size:13px;margin-bottom:6px">Pré-visualização</div><div class="pv" id="pv"><span id="pvt"></span></div></div>
+    </div></div>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section id="t-historico" class="hidden">
+    <div class="card">
+      <div class="row sb" style="margin-bottom:12px">
+        <div class="row"><select id="hf" style="width:auto" aria-label="Filtrar por estilo"><option value="">Todos os estilos</option></select><span class="muted" id="hcount"></span></div>
+        <div class="row"><button class="sec" id="hcsv">Exportar CSV</button><button class="danger" id="hclear">Limpar tudo</button></div>
+      </div>
+      <div class="tbl-wrap" id="hist"></div>
+    </div>
+  </section>
+
+  <!-- SEGURANÇA -->
+  <section id="t-seguranca" class="hidden">
+    <div class="grid g2">
+      <div class="card">
+        <h3 style="margin-top:0">Trocar senha</h3>
+        <div id="envnote" class="notice warn hidden">A senha vem da variável de ambiente <code>ADMIN_PASSWORD</code>. Para trocar, altere-a e reinicie o servidor.</div>
+        <form id="pwf">
+          <label class="f">Senha atual<input id="p-cur" type="password" autocomplete="current-password" required></label>
+          <label class="f">Nova senha (mín. 8 caracteres)<input id="p-new" type="password" autocomplete="new-password" minlength="8" required></label>
+          <label class="f">Repita a nova senha<input id="p-new2" type="password" autocomplete="new-password" minlength="8" required></label>
+          <button type="submit">Trocar senha</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Boas práticas</h3>
+        <ul style="padding-left:18px;margin:0">
+          <li>A sessão expira em 8 horas e é cancelada ao sair.</li>
+          <li>Após 5 senhas erradas, o login trava por 1 minuto.</li>
+          <li>Trocar a senha encerra as outras sessões.</li>
+          <li>Se expuser o servidor na rede, use uma senha forte e não compartilhe o <code>dados.json</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="toasts" aria-live="polite"></div>
+</div>
+
+<script src="schema.js"></script>
+<script>
+const $=i=>document.getElementById(i),S=SCHEMA;
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LOOKN=Object.fromEntries(S.LOOKS.map(l=>[l.id,l.label]));
+const fmtDur=s=>s>=3600?(s/3600).toFixed(1)+' h':s>=60?Math.floor(s/60)+' min '+Math.round(s%60)+' s':Math.round(s)+' s';
+const fmtBytes=b=>b>=1e6?(b/1e6).toFixed(1)+' MB':b>=1e3?Math.round(b/1e3)+' KB':b+' B';
+const fmtDate=d=>new Date(d).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+function toast(m,bad){const t=document.createElement('div');t.className='toast'+(bad?' bad':'');t.textContent=m;$('toasts').appendChild(t);setTimeout(()=>t.remove(),3800)}
+async function api(path,method='GET',data){
+  const r=await fetch(path,{method,headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});
+  let j={};try{j=await r.json()}catch{}
+  if(r.status===401&&path.startsWith('/api/admin/')){showLogin();throw new Error('Sessão expirada.')}
+  if(!r.ok){const e=new Error(j.error||'Erro '+r.status);e.data=j;throw e}
+  return j}
+const run=async(f)=>{try{await f()}catch(e){if(e.message!=='Sessão expirada.')toast(e.message,true)}};
+
+/* ---- login / sessão ---- */
+function showLogin(){$('app').classList.add('hidden');$('login').classList.remove('hidden');$('pw').focus()}
+function showApp(){$('login').classList.add('hidden');$('app').classList.remove('hidden');loadAll()}
+$('lf').onsubmit=async e=>{e.preventDefault();$('lerr').classList.add('hidden');
+  try{await api('/api/login','POST',{password:$('pw').value});$('pw').value='';showApp()}catch(x){$('lerr').textContent=x.message;$('lerr').classList.remove('hidden')}};
+$('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});showLogin()};
+(async()=>{try{const s=await api('/api/session');s.admin?showApp():showLogin()}catch{showLogin()}})();
+
+/* ---- abas ---- */
+const TABS=['painel','biblioteca','padroes','historico','seguranca'];
+function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{location.hash=n}catch{}}
+$('tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.t)};
+$('tabs').onkeydown=e=>{const bs=[...document.querySelectorAll('#tabs button')],i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true');
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){const n=bs[(i+(e.key==='ArrowRight'?1:bs.length-1))%bs.length];tab(n.dataset.t);n.focus()}};
+if(TABS.includes(location.hash.slice(1)))tab(location.hash.slice(1));
+
+let HIST=[];
+async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadStories(),loadSettings()])})}
+
+/* ---- painel ---- */
+async function loadStatus(){const s=await api('/api/admin/status');
+  const k=[[s.counts.videos,'Vídeos gerados'],[fmtDur(s.counts.seconds),'Tempo total de vídeo'],[s.counts.stories,'Histórias na biblioteca'],[fmtDur(s.uptime),'Servidor ligado há']];
+  $('kpis').innerHTML=k.map(([n,l])=>`<div class="card kpi"><div class="n">${esc(n)}</div><div class="l">${l}</div></div>`).join('');
+  const mx=Math.max(1,...Object.values(s.byLook)),ent=Object.entries(s.byLook).sort((a,b)=>b[1]-a[1]);
+  $('bars').innerHTML=ent.length?ent.map(([k,v])=>`<div class="bar"><span>${esc(LOOKN[k]||k)}</span><div class="tr"><i style="width:${v/mx*100}%"></i></div><b>${v}</b></div>`).join(''):'<p class="muted">Ainda não há vídeos. Eles aparecem aqui assim que você gerar o primeiro.</p>';
+  $('sys').innerHTML=`<table class="tbl"><tbody><tr><td class="muted">Build</td><td>${s.build}</td></tr><tr><td class="muted">Node.js</td><td>${esc(s.node)} (${esc(s.platform)})</td></tr><tr><td class="muted">Porta</td><td>${s.port}</td></tr><tr><td class="muted">dados.json</td><td>${fmtBytes(s.dataBytes)}</td></tr><tr><td class="muted">Senha</td><td>${s.passwordFromEnv?'<span class="badge info">variável de ambiente</span>':'<span class="badge ok">armazenada com hash</span>'}</td></tr></tbody></table>`;
+  $('files').innerHTML=s.files.map(f=>`<div><span class="${f.ok?'ok-dot':'bad-dot'}"></span>${esc(f.name)} <span class="muted">${f.ok?fmtBytes(f.bytes):'ausente'}</span></div>`).join('');
+  $('envnote').classList.toggle('hidden',!s.passwordFromEnv);$('pwf').classList.toggle('hidden',s.passwordFromEnv)}
+function histTable(rows,del){return rows.length?`<table class="tbl"><thead><tr><th>Data</th><th>Título</th><th>Duração</th><th>Estilo</th><th>Qualidade</th><th>Arquivo</th>${del?'<th></th>':''}</tr></thead><tbody>${rows.map(h=>`<tr><td>${fmtDate(h.at)}</td><td>${esc(h.name)}</td><td>${fmtDur(h.duration)}</td><td>${esc(LOOKN[h.look]||h.look)}</td><td>${h.res}p · ${h.fps} fps</td><td>${h.format.toUpperCase()} · ${fmtBytes(h.bytes)}</td>${del?`<td><button class="danger sm" data-del="${esc(h.id)}" aria-label="Remover do histórico">Remover</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<p class="muted">Nenhum vídeo registrado ainda.</p>'}
+
+/* ---- histórico ---- */
+async function loadHistory(){HIST=await api('/api/admin/history');
+  const cur=$('hf').value,ls=[...new Set(HIST.map(h=>h.look))];
+  $('hf').innerHTML='<option value="">Todos os estilos</option>'+ls.map(l=>`<option value="${esc(l)}">${esc(LOOKN[l]||l)}</option>`).join('');$('hf').value=ls.includes(cur)?cur:'';
+  renderHist();$('recent').innerHTML=histTable(HIST.slice(0,5),false)}
+function renderHist(){const f=$('hf').value,rows=f?HIST.filter(h=>h.look===f):HIST;$('hist').innerHTML=histTable(rows,true);$('hcount').textContent=rows.length+' vídeo(s)'}
+$('hf').onchange=renderHist;
+$('hist').onclick=e=>{const b=e.target.closest('[data-del]');if(b)run(async()=>{await api('/api/admin/history/'+b.dataset.del,'DELETE');toast('Removido.');await Promise.all([loadHistory(),loadStatus()])})};
+$('hclear').onclick=()=>{if(HIST.length&&confirm('Apagar TODO o histórico? Isso não apaga seus arquivos de vídeo.'))run(async()=>{await api('/api/admin/history','DELETE');toast('Histórico limpo.');await Promise.all([loadHistory(),loadStatus()])})};
+$('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['data','titulo','duracao_s','estilo','resolucao','fps','formato','bytes','cenas'];
+  const csv=[head.join(','),...HIST.map(h=>[h.at,h.name,h.duration,h.look,h.res,h.fps,h.format,h.bytes,h.scenes].map(q).join(','))].join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));a.download='historico-shorts.csv';a.click()};
+
+/* ---- biblioteca ---- */
+async function loadStories(){const ss=await api('/api/admin/stories');
+  $('stories').innerHTML=ss.length?`<table class="tbl"><thead><tr><th>Nome</th><th>Resumo</th><th>Estilo</th><th>Validação</th><th>Atualizada</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td class="muted">${fmtDur(s.summary.total)} · ${s.summary.scenes} cenas · ${s.summary.actors} personagens</td><td>${esc(LOOKN[s.summary.look]||s.summary.look)}</td><td>${s.issues?`<span class="badge warn">${s.issues} aviso(s)</span>`:'<span class="badge ok">ok</span>'}</td><td>${fmtDate(s.updatedAt)}</td><td><div class="acts"><button class="sm" data-open="${s.id}">Abrir no gerador</button><button class="sec sm" data-dl="${s.id}">Baixar</button><button class="sec sm" data-ren="${s.id}" data-name="${esc(s.name)}">Renomear</button><button class="danger sm" data-rm="${s.id}">Excluir</button></div></td></tr>`).join('')}</tbody></table>`:'<p class="muted">Biblioteca vazia. Adicione uma história acima ou use "Salvar na biblioteca" no gerador.</p>'}
+$('stories').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.open)run(async()=>{const s=await api('/api/admin/stories/'+b.dataset.open);try{localStorage.setItem('shorts.pendingStory',JSON.stringify({name:s.name,story:s.story}))}catch{toast('Não foi possível passar a história ao gerador.',true);return}location.href='/'});
+  if(b.dataset.dl)run(async()=>{const s=await api('/api/admin/stories/'+b.dataset.dl),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(s.story,null,1)],{type:'application/json'}));a.download=(s.name.replace(/[^\w\-]+/g,'_')||'historia')+'.json';a.click()});
+  if(b.dataset.ren){const n=prompt('Novo nome:',b.dataset.name);if(n&&n.trim())run(async()=>{await api('/api/admin/stories/'+b.dataset.ren,'PUT',{name:n});toast('Renomeada.');loadStories()})}
+  if(b.dataset.rm&&confirm('Excluir esta história da biblioteca?'))run(async()=>{await api('/api/admin/stories/'+b.dataset.rm,'DELETE');toast('Excluída.');await Promise.all([loadStories(),loadStatus()])})};
+$('sfile').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('sjson').value=await f.text();if(!$('sname').value)$('sname').value=f.name.replace(/\.json$/i,'');e.target.value=''};
+function parseStory(){try{return JSON.parse($('sjson').value)}catch(e){showRes(null,'JSON inválido: '+e.message);return null}}
+function showRes(issues,err){const el=$('sres');el.classList.remove('hidden');
+  if(err){el.innerHTML=`<div class="notice bad">${esc(err)}</div>`;return}
+  const er=issues.filter(i=>i.level==='erro').length,aw=issues.length-er;
+  el.innerHTML=(!issues.length?'<div class="notice ok">Tudo certo: nenhum problema encontrado.</div>':`<div class="notice ${er?'bad':'warn'}">${er} erro(s) e ${aw} aviso(s).${er?' Corrija os erros para salvar.':''}</div><ul class="issues">${issues.map(i=>`<li><span class="badge ${i.level==='erro'?'bad':'warn'}">${i.level}</span><code>${esc(i.path||'raiz')}</code><span>${esc(i.msg)}</span></li>`).join('')}</ul>`)}
+$('svalidate').onclick=()=>{const st=parseStory();if(st)showRes(S.validateStory(st))};
+$('ssave').onclick=()=>{const st=parseStory();if(!st)return;run(async()=>{
+  try{const r=await api('/api/admin/stories','POST',{name:$('sname').value,story:st});toast('História salva.');showRes(r.issues);$('sjson').value='';$('sname').value='';await Promise.all([loadStories(),loadStatus()])}
+  catch(e){if(e.data&&e.data.issues)showRes(e.data.issues);else throw e}})};
+
+/* ---- padrões ---- */
+function fillLooks(){$('s-look').innerHTML=S.LOOKS.map(l=>`<option value="${l.id}">${esc(l.label)}</option>`).join('')}fillLooks();
+function pv(){const c=$('c-color').value,a=$('c-alt').value,k=$('c-stroke').value,sz=+$('c-size').value||110,up=$('c-upper').checked,y=+$('c-y').value||.69;
+  const t=up?'ELE VIU A ÁRVORE':'Ele viu a árvore',el=$('pvt');el.style.top=(y*100)+'%';el.style.fontSize=Math.max(10,sz/110*20)+'px';
+  el.style.webkitTextStroke='5px '+k;el.style.paintOrder='stroke fill';
+  el.innerHTML=t.split(' ').map((w,i)=>`<span style="position:static;transform:none;display:inline;font-size:inherit;-webkit-text-stroke:inherit;paint-order:stroke fill;color:${i%2?a:c}">${esc(w)} </span>`).join('')}
+['c-size','c-y','c-color','c-alt','c-stroke','c-upper'].forEach(i=>$(i).addEventListener('input',pv));
+async function loadSettings(){const s=await api('/api/admin/settings');
+  $('s-look').value=s.look;$('s-res').value=s.res;$('s-fps').value=s.fps;$('s-hl').value=s.historyLimit;
+  $('c-size').value=s.caption.size;$('c-y').value=s.caption.y;$('c-color').value=s.caption.color;$('c-alt').value=s.caption.alt;$('c-stroke').value=s.caption.stroke;$('c-upper').checked=s.caption.upper;pv()}
+$('setf').onsubmit=e=>{e.preventDefault();run(async()=>{
+  await api('/api/admin/settings','PUT',{look:$('s-look').value,res:$('s-res').value,fps:$('s-fps').value,historyLimit:+$('s-hl').value,caption:{size:+$('c-size').value,y:+$('c-y').value,color:$('c-color').value,alt:$('c-alt').value,stroke:$('c-stroke').value,upper:$('c-upper').checked}});
+  toast('Padrões salvos.');await loadSettings()})};
+
+/* ---- segurança ---- */
+$('pwf').onsubmit=e=>{e.preventDefault();
+  if($('p-new').value!==$('p-new2').value)return toast('As senhas novas não conferem.',true);
+  run(async()=>{await api('/api/admin/password','POST',{current:$('p-cur').value,next:$('p-new').value});$('pwf').reset();toast('Senha alterada.')})};
+</script>
+</body></html>
