@@ -26,8 +26,8 @@ STORY (o gerador é 2D, personagens-palito expressivos; tempos em segundos, posi
 - cam: {"z0":1,"z1":1.2,"x0":540,"x1":600,"y0":960,"y1":1050} (zoom 1–1.6, x 400–680, y 900–1150) ou {"keys":[{"t":0,"z":1,"x":540,"y":960,"r":0},...]} (preencha z,x,y,r em todos). Varie a câmera a cada cena; aproxime em tensão, afaste no final.
 - actors[]: {"x","y"(pés),"h"(altura),"outfit":${ids(SCHEMA.OUTFITS)},"hair":${ids(SCHEMA.HAIRS)},"hat":${ids(SCHEMA.HATS)} (opcional),"glasses":true|false,"anim":${ids(SCHEMA.ANIMS)},"mood":${ids(SCHEMA.MOODS)},"talk":[ini,fim],"seq":[{"t","anim","mood","look"(-1 a 1)}],"to":{"x":..,"dur":..,"move":..} ou lista de trechos,"bubbles":[{"t","end","say":"até 4 palavras"} ou {"t","end","mark":${SCHEMA.MARKS.join('|')}}],"hold":${ids(SCHEMA.HOLDS)},"flip":true,"at","end"}.
   Valores típicos: y 1350–1560 (pés), h 420–560, x 150–930. Se o personagem tem "to", ele anda sozinho (não use walk).
-- props[]: {"type":${ids(SCHEMA.PROPS)},"x","y","s"(tamanho),"color","t"(texto de sign/text/emoji),"at"(quando entra),"anim":${ids(SCHEMA.PROP_ANIMS)},"alpha","front","rot","to"}.
-  Em room: window/frame/shelf na parede (y 430–600, s 220–380); desk/monitor/plant/lamp/door/box no chão (y 1250–1330, s 300–420). "sign" e "text" com no máximo 2 palavras curtas (letras grandes estouram a tela): sign s≥300; text s≤300. "emoji" é ótimo para ilustrar ideias (t:"🧠", s 200–300, anim float/pop).
+- props[]: {"type":${ids(SCHEMA.PROPS.filter(p => p.id !== 'emoji'))},"x","y","s"(tamanho),"color","t"(texto de sign/text),"at"(quando entra),"anim":${ids(SCHEMA.PROP_ANIMS)},"alpha","front","rot","to"}.
+  Em room: window/frame/shelf na parede (y 430–600, s 220–380); desk/monitor/plant/lamp/door/box no chão (y 1250–1330, s 300–420). "sign" e "text" com no máximo 2 palavras curtas (letras grandes estouram a tela): sign s≥300; text s≤300. NUNCA use props do tipo "emoji": ilustre ideias com os objetos prontos, formas (circle, rect, star), setas, anéis e placas curtas.
 - Mantenha tudo dentro da tela. Deixe a região y 1250–1450 livre de sign/text: a legenda do vídeo fica por ali.
 - Todos os tempos "at", "t", "end", "move" dentro de uma cena são relativos ao início da cena e devem ser menores que a duração dela.
 - Ritmo: a cada 2–3 s algo muda (animação, humor, olhar, câmera ou objeto entrando). Cada ideia nova da narração ganha um elemento visual novo. Alterne transições (fade, flash, wipe, iris).
@@ -47,7 +47,7 @@ function fixStory(st, look) {
     let d = (typeof s.t0 === 'number' && typeof s.t1 === 'number' ? s.t1 - s.t0 : 0);
     if (!(d > 0.5)) d = 4;
     s.t0 = +cur.toFixed(2); s.t1 = +(cur + d).toFixed(2); cur = s.t1;
-    if (s.props) s.props = s.props.filter(p => p && SCHEMA.SET.prop.has(p.type) && typeof p.x === 'number' && typeof p.y === 'number');
+    if (s.props) s.props = s.props.filter(p => p && p.type !== 'emoji' && SCHEMA.SET.prop.has(p.type) && typeof p.x === 'number' && typeof p.y === 'number');
     if (s.actors) s.actors = s.actors.filter(a => a && typeof a.x === 'number' && typeof a.y === 'number');
     if (s.look && !SCHEMA.SET.look.has(s.look)) delete s.look;
     if (s.tr && !SCHEMA.SET.tr.has(s.tr)) delete s.tr;

@@ -20,7 +20,7 @@ Pasta única, sem subpastas e sem dependências (não precisa de npm install).
 
 1. Instale o Node.js **18 ou mais novo**.
 2. Na pasta, rode: `node server.js` (o terminal mostra os endereços, a senha inicial do painel e o endereço secreto).
-3. Abra http://localhost:3000 no Chrome ou Edge (PC) e aperte Ctrl+F5. O título deve mostrar "build 8".
+3. Abra http://localhost:3000 no Chrome ou Edge (PC) e aperte Ctrl+F5. O rodapé deve mostrar "build 8".
 4. **Criar com IA**: descreva a ideia; a Groq escreve o roteiro e o JSON. Grave a voz, carregue o áudio, "Ajustar ao áudio", "Prévia" e "Gerar vídeo" (aba aberta e visível: a gravação é em tempo real).
 5. O arquivo é baixado sozinho (short.mp4 ou short.webm).
 
