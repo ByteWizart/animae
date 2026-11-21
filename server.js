@@ -23,7 +23,7 @@ const DEFAULTS = () => ({
   },
   auth: null,
   adminPath: null,
-  ai: { enabled: true, model: 'llama-3.3-70b-versatile', key: '', perHour: 8, maxTokens: 8000 },
+  ai: { enabled: true, model: 'openai/gpt-oss-120b', key: '', perHour: 8, maxTokens: 12000 },
   history: [],
 });
 let db = DEFAULTS();
@@ -32,6 +32,9 @@ function load() {
     const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')), base = DEFAULTS();
     db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } }, ai: { ...base.ai, ...(d.ai || {}) } };
     delete db.stories; // a biblioteca agora fica no navegador de cada usuário
+    // migração: o antigo padrão (llama) passa para o novo padrão
+    if (db.ai.model === 'llama-3.3-70b-versatile') db.ai.model = base.ai.model;
+    if (db.ai.maxTokens < 12000) db.ai.maxTokens = 12000;
   } catch (e) { if (e.code !== 'ENOENT') console.warn('Aviso: dados.json ilegível, começando vazio (' + e.message + ')'); }
 }
 function save() {

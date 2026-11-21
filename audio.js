@@ -23,8 +23,8 @@ function synthBed(story) {
     thud(c) { const m = Math.floor((c.len || .6) * SR), f = c.f || 70, o = new Float32Array(m);
       for (let i = 0; i < m; i++) { const x = i / SR; o[i] = Math.sin(2 * Math.PI * (f + 60 * Math.exp(-x * 25)) * x) * Math.exp(-x * 7) * 1.4; } return o; },
     ping(c) { const m = Math.floor((c.len || .25) * SR), o = new Float32Array(m);
-      for (let i = 0; i < m; i++) { const x = i / SR; o[i] = Math.sin(2 * Math.PI * c.f * x) * Math.exp(-x * 14) * 0.6; } return o; },
-    rumble(c) { const m = Math.floor(c.len * SR), w = new Float32Array(m); for (let i = 0; i < m; i++) w[i] = gauss();
+      for (let i = 0; i < m; i++) { const x = i / SR; o[i] = Math.sin(2 * Math.PI * (c.f || 880) * x) * Math.exp(-x * 14) * 0.6; } return o; },
+    rumble(c) { const m = Math.floor((c.len || 1.5) * SR), w = new Float32Array(m); for (let i = 0; i < m; i++) w[i] = gauss();
       const lp = box(w, 400), o = new Float32Array(m), A = Math.floor(.4 * SR), R = Math.floor(.5 * SR);
       for (let i = 0; i < m; i++) { let e = 1; if (i < A) e = i / A; if (m - i < R) e = Math.min(e, (m - i) / R);
         o[i] = lp[i] * 12 * (0.6 + 0.4 * Math.sin(2 * Math.PI * 9 * i / SR)) * e; } return o; },
@@ -33,9 +33,11 @@ function synthBed(story) {
   };
   for (const c of story.sfx || []) {
     const fn = gen[c.type]; if (!fn) continue;
-    const x = fn(c), s = Math.floor(c.t * SR), a = c.amp == null ? 1 : c.amp;
+    if (!isFinite(c.t)) continue;
+    const x = fn(c), s = Math.floor(c.t * SR), a = isFinite(c.amp) && c.amp != null ? c.amp : 1;
     for (let i = 0; i < x.length && s + i < n; i++) sfx[s + i] += x[i] * a;
   }
+  for (let i = 0; i < n; i++) if (!isFinite(sfx[i])) sfx[i] = 0;
   mx = 1e-9; for (let i = 0; i < n; i++) mx = Math.max(mx, Math.abs(sfx[i]));
   for (let i = 0; i < n; i++) sfx[i] = sfx[i] / mx * 0.6;
   const mix = new Float32Array(n); mx = 1e-9;

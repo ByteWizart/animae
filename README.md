@@ -29,7 +29,7 @@ Pasta única, sem subpastas e sem dependências (não precisa de npm install).
 - Crie uma chave em https://console.groq.com e informe de um destes jeitos:
   - variável de ambiente: `GROQ_API_KEY=gsk_... node server.js` (prioridade), ou
   - no painel, aba **IA (Groq)**.
-- A chave fica só no servidor. O modelo padrão é `llama-3.3-70b-versatile` (pode trocar no painel).
+- A chave fica só no servidor. O modelo padrão é `openai/gpt-oss-120b` (pode trocar no painel).
 - Há limite de gerações por hora por IP (padrão 8, ajustável) para proteger sua cota.
 - O servidor valida o JSON da IA e pede uma correção automática se vier com erro.
 

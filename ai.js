@@ -39,21 +39,44 @@ EXEMPLO DE UMA CENA (apenas formato, crie as suas):
 {"t0":0,"t1":5,"scenery":"room","wall":"#e8a05a","floor":"#7a4a2a","tex":"plank","tr":"fade","cam":{"z0":1,"z1":1.2,"x0":540,"x1":640,"y0":1000,"y1":1060},"caption":"Você levanta do sofá e esquece o que ia buscar.","props":[{"type":"window","x":800,"y":480,"s":380},{"type":"lamp","x":110,"y":1280,"s":300}],"actors":[{"x":260,"y":1480,"h":520,"outfit":"hoodie","hair":"short","glasses":true,"anim":"idle","mood":"smile","to":[{"x":820,"dur":3,"move":0.6}],"seq":[{"t":3.8,"anim":"think","mood":"worry"}],"bubbles":[{"t":3.8,"end":5,"mark":"?"}]}]}`;
 }
 
+// Modelos às vezes devolvem números como texto ("540") ou listas como valor único; o gerador espera tipos exatos.
+const NUMK = new Set(['x', 'y', 's', 'h', 't', 't0', 't1', 'at', 'end', 'dur', 'move', 'z', 'z0', 'z1', 'x0', 'x1', 'y0', 'y1', 'r', 'r0', 'r1', 'rot', 'alpha', 'v', 'look', 'f', 'len', 'amp', 'open', 'shake', 'hy', 'gy', 'total', 'size']);
+function coerceNums(o) {
+  if (Array.isArray(o)) { o.forEach((v, i) => { if (v && typeof v === 'object') coerceNums(v); else if (typeof v === 'string' && v.trim() !== '' && isFinite(+v) && o.length <= 2) o[i] = +v; }); return; }
+  if (!o || typeof o !== 'object') return;
+  for (const k of Object.keys(o)) {
+    const v = o[k];
+    if (v && typeof v === 'object') coerceNums(v);
+    else if (NUMK.has(k) && typeof v === 'string' && v.trim() !== '' && isFinite(+v)) o[k] = +v;
+  }
+}
+const asArr = v => (Array.isArray(v) ? v : v == null ? [] : [v]);
+
 // Garante tempos contínuos, total coerente e remove o que o gerador não sabe desenhar.
 function fixStory(st, look) {
   if (!st || typeof st !== 'object' || !Array.isArray(st.scenes)) return st;
+  coerceNums(st);
   let cur = 0;
   st.scenes = st.scenes.filter(s => s && typeof s === 'object').map(s => {
     let d = (typeof s.t0 === 'number' && typeof s.t1 === 'number' ? s.t1 - s.t0 : 0);
     if (!(d > 0.5)) d = 4;
     s.t0 = +cur.toFixed(2); s.t1 = +(cur + d).toFixed(2); cur = s.t1;
-    if (s.props) s.props = s.props.filter(p => p && p.type !== 'emoji' && SCHEMA.SET.prop.has(p.type) && typeof p.x === 'number' && typeof p.y === 'number');
-    if (s.actors) s.actors = s.actors.filter(a => a && typeof a.x === 'number' && typeof a.y === 'number');
+    s.props = asArr(s.props).filter(p => p && p.type !== 'emoji' && SCHEMA.SET.prop.has(p.type) && typeof p.x === 'number' && typeof p.y === 'number');
+    s.actors = asArr(s.actors).filter(a => a && typeof a.x === 'number' && typeof a.y === 'number');
+    s.actors.forEach(a => {
+      a.seq = asArr(a.seq).filter(q => q && typeof q === 'object' && typeof q.t === 'number');
+      a.bubbles = asArr(a.bubbles).filter(q => q && typeof q === 'object');
+      if (!(Array.isArray(a.talk) && a.talk.length === 2 && a.talk.every(n => typeof n === 'number'))) delete a.talk;
+      if (a.to && typeof a.to !== 'object') delete a.to;
+      if (typeof a.h !== 'number') a.h = 520;
+    });
+    if (s.cam && (typeof s.cam !== 'object' || Array.isArray(s.cam))) delete s.cam;
     if (s.look && !SCHEMA.SET.look.has(s.look)) delete s.look;
     if (s.tr && !SCHEMA.SET.tr.has(s.tr)) delete s.tr;
-    if (s.fx) s.fx = s.fx.filter(f => SCHEMA.SET.fx.has(f));
-    if (s.caption != null) s.caption = String(s.caption);
-    if (s.scenery !== 'room' && !Array.isArray(s.bg)) s.bg = ['#7ec8ff', '#eaf7ff'];
+    s.fx = asArr(s.fx).filter(f => SCHEMA.SET.fx.has(f));
+    if (s.caption == null) delete s.caption; else s.caption = String(s.caption);
+    if (s.scenery !== 'room' && !(Array.isArray(s.bg) && s.bg.length >= 2)) s.bg = ['#7ec8ff', '#eaf7ff'];
+    s.props.forEach(p => { if (typeof p.s !== 'number') p.s = 240; });
     return s;
   });
   st.total = +cur.toFixed(2);
@@ -61,13 +84,16 @@ function fixStory(st, look) {
   delete st.style.caption;
   if (look && SCHEMA.SET.look.has(look)) st.style.look = look;
   else if (!SCHEMA.SET.look.has(st.style.look)) st.style.look = 'cartoon';
-  st.sfx = (st.sfx || []).filter(x => x && typeof x.t === 'number' && x.t <= st.total && SCHEMA.SET.sfx.has(x.type));
+  st.sfx = asArr(st.sfx).filter(x => x && typeof x.t === 'number' && x.t >= 0 && x.t <= st.total && SCHEMA.SET.sfx.has(x.type));
+  st.sfx.forEach(x => { if (x.type === 'ping' && !(x.f > 0)) x.f = 880; if (x.type === 'thud' && !(x.f > 0)) x.f = 70; if (x.type === 'rumble' && !(x.len > 0)) x.len = 1.5; });
   return st;
 }
 
 async function callGroq({ key, model, messages, maxTokens }) {
   const body = { model, messages, temperature: 0.7, max_tokens: maxTokens, response_format: { type: 'json_object' } };
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Modelos de raciocínio (gpt-oss) gastam tokens pensando: pedimos pouco raciocínio e escondemos o texto dele.
+  if (/gpt-oss/i.test(model)) { body.reasoning_effort = 'low'; body.include_reasoning = false; }
+  for (let attempt = 0; attempt < 3; attempt++) {
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 90e3);
     let r, j = {};
     try {
@@ -79,6 +105,7 @@ async function callGroq({ key, model, messages, maxTokens }) {
     if (r.ok) return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
     const msg = (j.error && j.error.message) || '';
     if (r.status === 400 && /response_format|json/i.test(msg) && body.response_format) { delete body.response_format; continue; } // modelo sem modo JSON
+    if (r.status === 400 && /reasoning|include_reasoning/i.test(msg) && body.reasoning_effort) { delete body.reasoning_effort; delete body.include_reasoning; continue; }
     if (r.status === 401) throw httpErr(502, 'A chave da Groq foi recusada. Peça ao administrador para conferir a chave.');
     if (r.status === 404 || (r.status === 400 && /model/i.test(msg))) throw httpErr(502, 'Modelo da Groq indisponível: ' + msg);
     if (r.status === 429) throw httpErr(429, 'A Groq atingiu o limite de uso. Tente novamente em instantes.');

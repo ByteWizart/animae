@@ -83,7 +83,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
           <label class="f">Chave da API da Groq<input id="ai-key" type="password" autocomplete="off" placeholder="gsk_… (deixe vazio para manter a atual)"></label>
           <div id="ai-hint" class="muted" style="margin:-6px 0 12px"></div>
           <div class="grid g2">
-            <label class="f">Modelo<input id="ai-model" list="ai-models" autocomplete="off"><datalist id="ai-models"><option value="llama-3.3-70b-versatile"><option value="openai/gpt-oss-120b"><option value="openai/gpt-oss-20b"><option value="llama-3.1-8b-instant"></datalist></label>
+            <label class="f">Modelo<input id="ai-model" list="ai-models" autocomplete="off"><datalist id="ai-models"><option value="openai/gpt-oss-120b"><option value="llama-3.3-70b-versatile"><option value="openai/gpt-oss-20b"><option value="llama-3.1-8b-instant"></datalist></label>
             <label class="f">Limite por IP / hora<input id="ai-ph" type="number" min="1" max="1000"></label>
           </div>
           <div class="row"><button type="submit">Salvar</button><button type="button" class="danger" id="ai-clear">Remover chave</button></div>
@@ -96,7 +96,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
           <li>Alternativa: defina a variável <code>GROQ_API_KEY</code> ao iniciar o servidor; ela tem prioridade.</li>
           <li>O limite por hora protege sua cota gratuita contra abuso.</li>
           <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
-          <li>Modelo recomendado: <code>llama-3.3-70b-versatile</code>.</li>
+          <li>Modelo padrão: <code>openai/gpt-oss-120b</code>.</li>
         </ul>
       </div>
     </div>
