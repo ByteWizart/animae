@@ -12,17 +12,41 @@ button.sec{background:#3a3850;color:#eee}button:disabled{opacity:.5}
 textarea{height:260px;background:#1e1c28;color:#cfe;border:1px solid #3a3850;border-radius:8px;padding:8px;font:12px monospace}
 pre{background:#1e1c28;border-radius:8px;padding:10px;white-space:pre-wrap;margin:0;font-size:13px}
 details{font-size:12px;background:#1e1c28;border-radius:8px;padding:8px}progress{width:100%}
+.panel{background:#1e1c28;border:1px solid #33314a;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.panel>summary{cursor:pointer;font-weight:700;font-size:14px}
+.panel input[type=text],.panel select,.panel textarea{background:#14131a;color:#eee;border:1px solid #3a3850;border-radius:8px;padding:8px;font:13px system-ui,sans-serif}
+.panel textarea{height:90px;font-family:system-ui,sans-serif;color:#eee;width:100%;box-sizing:border-box}
+.panel label{display:flex;flex-direction:column;gap:4px}
+.panel label input[type=file]{font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lib-item{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-top:1px solid #2e2c3f;padding:8px 0;font-size:13px}
+.lib-item small{color:#9a97ad;display:block}
+.lib-item button{padding:5px 10px;font-size:12px}
+button.danger{background:transparent;color:#ff6b6b;border:1px solid #5a2e38}
+.muted{color:#9a97ad;font-size:12px}
 </style></head><body>
-<nav class="topnav"><a class="brand" href="/"><i></i>Shorts Animados</a><a class="nl" href="/" aria-current="page">Gerador</a><a class="nl" href="/ajuda">Ajuda</a><a class="nl" href="/admin">Admin</a></nav>
+<nav class="topnav"><a class="brand" href="/"><i></i>Shorts Animados</a><a class="nl" href="/" aria-current="page">Gerador</a><a class="nl" href="/ajuda">Ajuda</a></nav>
 <div class="wrap"><canvas id="cv"></canvas>
-<div class="col"><h2 style="margin:0">Shorts Animados v2 <small style="opacity:.55;font-size:12px">build 7 · admin e ajuda</small></h2>
+<div class="col"><h2 style="margin:0">Shorts Animados v2 <small style="opacity:.55;font-size:12px">build 8 · IA e biblioteca</small></h2>
+<details class="panel" id="aip" open><summary>✨ Criar com IA (roteiro + história)</summary>
+<div class="muted" id="aist">Descreva a ideia; a IA escreve o roteiro e monta o JSON da animação.</div>
+<textarea id="idea" maxlength="1500" placeholder="Ex.: um vídeo curioso sobre por que esquecemos o que íamos fazer quando passamos por uma porta. Tom bem-humorado."></textarea>
+<div class="row"><select id="aisec" title="Duração aproximada"><option value="20">~20 s</option><option value="30" selected>~30 s</option><option value="45">~45 s</option><option value="60">~60 s</option></select>
+<select id="ailook" title="Estilo visual"><option value="">Estilo: a IA escolhe</option></select>
+<button id="aigo">Gerar roteiro e JSON</button></div>
+<label class="muted">Roteiro (narração para você gravar a voz):<textarea id="script" placeholder="O roteiro aparece aqui. Você também pode escrever ou editar."></textarea></label>
+<div class="row"><button class="sec" id="cpscript">Copiar roteiro</button></div></details>
 <label>1. Voz (mp3/wav/m4a): <input type="file" id="audio" accept="audio/*"></label>
 <label>2. História (.json): <input type="file" id="jf" accept=".json,application/json"></label>
 <textarea id="story" spellcheck="false"></textarea>
 <div style="display:flex;gap:8px;flex-wrap:wrap">
 <select id="look"><option value="cartoon">Estilo: Cartoon</option><option value="sketch">Desenho a lápis</option><option value="comic">Quadrinhos</option><option value="noir">Preto e branco</option><option value="neon">Neon</option><option value="retro">Retrô VHS</option><option value="pixel">Pixel art</option><option value="blueprint">Planta azul</option><option value="pastel">Pastel</option><option value="vintage">Filme antigo</option></select><select id="res"><option value="720">720p (rápido)</option><option value="1080">1080p Full HD</option></select><select id="fps"><option>30</option><option>60</option></select><button class="sec" id="fit">Ajustar ao áudio</button><button class="sec" id="pauses">Detectar pausas</button>
-<button class="sec" id="prev">Prévia</button><button class="sec" id="lib" title="Guarda esta história na biblioteca do Admin">Salvar na biblioteca</button><button id="gen">Gerar vídeo</button></div>
+<button class="sec" id="prev">Prévia</button><button class="sec" id="lib" title="Guarda esta história e o roteiro na biblioteca deste navegador">Salvar na biblioteca</button><button id="gen">Gerar vídeo</button></div>
 <progress id="bar" value="0" max="100"></progress><pre id="log">Escolha a voz e clique em Gerar vídeo. Aba aberta e visível. Chrome/Edge.</pre>
+<details class="panel" id="libp"><summary>📚 Minha biblioteca <span class="muted" id="libn"></span></summary>
+<div class="muted">Fica salva só neste navegador (localStorage). Exporte um backup para não perder se limpar os dados do navegador.</div>
+<div id="libl"></div>
+<div class="row"><button class="sec" id="libexp">Exportar backup</button><label class="muted">Importar backup: <input type="file" id="libimp" accept=".json,application/json"></label></div></details>
 <details><summary>Campos do JSON (resumo; veja a <a href="/ajuda#json" style="color:#6ab0ff">Ajuda</a> completa)</summary><pre>
 total: duração (s) | sfx: [{t,type:whoosh|thud|ping|rumble|slide,f,len,amp}]
 scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor,
@@ -42,6 +66,7 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
     anim:pop|float|spin|shake|pulse|fall|none, to:{x,y}, dur, front:true
 </pre></details></div></div>
 <script src="audio.js"></script>
+<script src="schema.js"></script>
 <script>
 const W=1080,H=1920,$=i=>document.getElementById(i);let K='#181622';
 const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t,eio=t=>(t=clamp(t))*t*(3-2*t);
@@ -356,24 +381,60 @@ async function run(rec_){
 }
 $('prev').onclick=()=>run(false);$('gen').onclick=()=>run(true);
 
-/* ---- integração com Admin (tudo opcional: sem servidor/API o gerador funciona igual) ---- */
-let storyName='';
+/* ---- integração com o servidor (opcional: sem servidor o gerador funciona igual) ---- */
+let storyName='',openId=null;
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const jpost=(u,d)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
 function registerHistory(h){jpost('/api/history',h).catch(()=>{})}
 async function applyDefaults(){
   try{const r=await fetch('/api/settings');if(!r.ok)return;const s=await r.json();
     $('look').value=s.look;$('res').value=s.res;$('fps').value=s.fps;
     DEFCAP=s.caption;DEFLOOK=s.look;drawFrame(story,Math.min(2.5,story.total-.1))}catch{}}
-function takePending(){
-  try{const raw=localStorage.getItem('shorts.pendingStory');if(!raw)return false;localStorage.removeItem('shorts.pendingStory');
-    const p=JSON.parse(raw);$('story').value=JSON.stringify(p.story,null,1);storyName=p.name||'';
-    if(readStory()){if(story.style&&story.style.look)$('look').value=story.style.look;drawFrame(story,.5);log('História "'+storyName+'" aberta a partir da biblioteca.'+WARN);return true}}catch{}return false}
-$('jf').addEventListener('change',e=>{const f=e.target.files[0];if(f)storyName=f.name.replace(/\.json$/i,'')});
-$('lib').onclick=async()=>{if(!readStory())return;
-  const name=prompt('Nome da história na biblioteca:',storyName||'')||'';if(!name.trim())return;
-  try{const r=await jpost('/api/admin/stories',{name,story});const j=await r.json();
-    if(r.status===401)return log('Para salvar na biblioteca, entre primeiro em Admin (/admin) e volte aqui.');
-    if(!r.ok)return log('Não salvou: '+(j.error||r.status)+(j.issues?'\n'+j.issues.filter(i=>i.level==='erro').map(i=>' - '+i.path+': '+i.msg).join('\n'):''));
-    storyName=name;log('Salva na biblioteca.'+(j.issues&&j.issues.length?` (${j.issues.length} aviso(s): veja no Admin)`:''))}catch{log('Servidor indisponível: rode node server.js.')}};
-if(!takePending())applyDefaults();
+$('jf').addEventListener('change',e=>{const f=e.target.files[0];if(f){storyName=f.name.replace(/\.json$/i,'');openId=null}});
+
+/* ---- biblioteca do usuário (localStorage) ---- */
+const LIBK='shorts.library.v1';
+const libGet=()=>{try{const a=JSON.parse(localStorage.getItem(LIBK));return Array.isArray(a)?a:[]}catch{return[]}};
+const libSet=a=>{try{localStorage.setItem(LIBK,JSON.stringify(a));return true}catch{log('Não consegui salvar: o armazenamento do navegador está cheio ou bloqueado. Exporte um backup e apague itens antigos.');return false}};
+const fmtD=d=>new Date(d).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+function libRender(){const a=libGet();$('libn').textContent=a.length?`(${a.length})`:'';
+  $('libl').innerHTML=a.length?a.map(i=>{const sm=(window.SCHEMA?SCHEMA.summarize(i.story):{total:i.story.total,scenes:(i.story.scenes||[]).length});
+    return `<div class="lib-item"><div><b>${esc(i.name)}</b><small>${Math.round(sm.total)} s · ${sm.scenes} cenas · ${fmtD(i.updatedAt)}${i.script?' · com roteiro':''}</small></div><div class="row"><button data-o="${i.id}">Abrir</button><button class="sec" data-d="${i.id}">Baixar JSON</button><button class="sec" data-r="${i.id}">Renomear</button><button class="danger" data-x="${i.id}">Excluir</button></div></div>`}).join(''):'<div class="muted">Vazia. Clique em "Salvar na biblioteca" para guardar a história atual.</div>'}
+function loadItem(i){if(busy)return;$('story').value=JSON.stringify(i.story,null,1);$('script').value=i.script||'';storyName=i.name;openId=i.id;
+  if(readStory()){if(story.style&&story.style.look)$('look').value=story.style.look;drawFrame(story,.5);log('Aberta: "'+i.name+'".'+WARN)}}
+$('libl').onclick=e=>{const b=e.target.closest('button');if(!b)return;const a=libGet();
+  if(b.dataset.o){const i=a.find(x=>x.id===b.dataset.o);if(i)loadItem(i)}
+  if(b.dataset.d){const i=a.find(x=>x.id===b.dataset.d);if(i){const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([JSON.stringify(i.story,null,1)],{type:'application/json'}));l.download=(i.name.replace(/[^\w\-]+/g,'_')||'historia')+'.json';l.click()}}
+  if(b.dataset.r){const i=a.find(x=>x.id===b.dataset.r),n=i&&prompt('Novo nome:',i.name);if(n&&n.trim()){i.name=n.trim().slice(0,80);i.updatedAt=Date.now();libSet(a)&&libRender()}}
+  if(b.dataset.x&&confirm('Excluir esta história da sua biblioteca?')){libSet(a.filter(x=>x.id!==b.dataset.x))&&libRender()}};
+$('lib').onclick=()=>{if(!readStory())return;const a=libGet(),cur=a.find(x=>x.id===openId);
+  const name=(prompt('Nome da história:',storyName||(cur&&cur.name)||'')||'').trim().slice(0,80);if(!name)return;
+  let it=a.find(x=>x.name===name&&(x.id===openId||confirm('Já existe "'+name+'". Substituir?')));
+  if(!it&&a.some(x=>x.name===name))return;
+  const now=Date.now();if(it){it.story=story;it.script=$('script').value;it.updatedAt=now}else{it={id:now.toString(36)+Math.random().toString(36).slice(2,6),name,createdAt:now,updatedAt:now,story,script:$('script').value};a.unshift(it)}
+  if(libSet(a)){storyName=name;openId=it.id;libRender();log('Salva na sua biblioteca.')}};
+$('libexp').onclick=()=>{const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([JSON.stringify({app:'shorts-animados',version:1,items:libGet()},null,1)],{type:'application/json'}));l.download='biblioteca-shorts.json';l.click()};
+$('libimp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{const d=JSON.parse(await f.text()),inc=(d.items||[]).filter(i=>i&&i.story&&Array.isArray(i.story.scenes)&&i.name),a=libGet(),ids=new Set(a.map(x=>x.id));
+    inc.forEach(i=>{if(!ids.has(i.id))a.push({id:i.id||Date.now().toString(36),name:String(i.name).slice(0,80),createdAt:i.createdAt||Date.now(),updatedAt:i.updatedAt||Date.now(),story:i.story,script:i.script||''})});
+    if(libSet(a)){libRender();log(inc.length+' item(ns) lido(s) do backup.')}}catch{log('Arquivo de backup inválido.')}};
+libRender();
+
+/* ---- criar com IA (Groq, via servidor) ---- */
+const LOOKL={cartoon:'Cartoon',sketch:'Lápis',comic:'Quadrinhos',noir:'Preto e branco',neon:'Neon',retro:'Retrô VHS',pixel:'Pixel art',blueprint:'Planta azul',pastel:'Pastel',vintage:'Filme antigo'};
+$('ailook').insertAdjacentHTML('beforeend',Object.entries(LOOKL).map(([k,v])=>`<option value="${k}">${v}</option>`).join(''));
+$('cpscript').onclick=async()=>{try{await navigator.clipboard.writeText($('script').value);log('Roteiro copiado.')}catch{$('script').select();log('Selecione e copie (Ctrl+C).')}};
+let aiOk=false;
+(async()=>{try{const r=await fetch('/api/ai/status'),j=await r.json();aiOk=!!j.available;
+  $('aist').textContent=aiOk?`Descreva a ideia; a IA escreve o roteiro e monta o JSON da animação. (limite: ${j.perHour} por hora)`:'A criação com IA não está ativada neste site. Você ainda pode colar um JSON abaixo ou usar a biblioteca.';$('aigo').disabled=!aiOk}
+  catch{$('aist').textContent='Servidor indisponível: rode node server.js para usar a IA.';$('aigo').disabled=true}})();
+$('aigo').onclick=async()=>{if(busy)return;const idea=$('idea').value.trim();if(idea.length<8)return log('Descreva melhor a ideia do vídeo.');
+  $('aigo').disabled=true;const t0=Date.now(),tm=setInterval(()=>log('Gerando roteiro e história com a IA… '+Math.round((Date.now()-t0)/1000)+' s'),500);log('Gerando roteiro e história com a IA…');
+  try{const r=await jpost('/api/ai/generate',{idea,seconds:+$('aisec').value,look:$('ailook').value}),j=await r.json();
+    if(!r.ok)throw new Error(j.error||('Erro '+r.status));
+    $('script').value=j.script;$('story').value=JSON.stringify(j.story,null,1);storyName=j.title;openId=null;
+    if(readStory()){if(story.style&&story.style.look)$('look').value=story.style.look;drawFrame(story,.5)}
+    log(`Pronto: "${j.title}" (${Math.round(j.story.total)} s, ${j.story.scenes.length} cenas).\n1) Grave a narração do roteiro.  2) Carregue o áudio.  3) Clique em "Ajustar ao áudio" e depois em "Prévia".`+(j.issues&&j.issues.length?`\n(${j.issues.length} aviso(s) leve(s) no JSON)`:''))}
+  catch(e){log('IA: '+e.message)}finally{clearInterval(tm);$('aigo').disabled=!aiOk}};
+applyDefaults();
 </script></body></html>

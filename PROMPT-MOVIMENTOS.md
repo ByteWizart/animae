@@ -25,3 +25,19 @@
 - Objetos novos: "arrow" (seta, use "rot" em radianos), "ring" (círculo vazado para destacar algo), "text" (rótulo flutuante, "t":"TEXTO", 1 a 2 palavras), "bar" (barra de progresso que enche, "v" de 0 a 1 e "dur"). Qualquer objeto aceita "alpha" de 0 a 1.
 - Estilo da legenda no vídeo todo: "style":{"caption":{"size":120,"color":"#ffffff","alt":"#ffd93b","y":0.69,"stroke":"#000000","upper":false}} no topo do JSON ("alt" alterna a cor a cada palavra). Para mudar só numa cena: "cs":{"y":0.2,"size":100}.
 - Dica de direção: a cada ideia nova da narração, um elemento visual novo (marca, objeto, mudança de câmera ou de animação). Cenas de tensão: tint escuro + fx "rain"/"fog" + câmera aproximando. Cenas de alívio: cores claras, "sparks"/"confetti", câmera abrindo.
+- Objetos de cenário prontos (2D): "car" (carro, use "color" e "flip":true para virar; "x","y" = centro, "s" ~300) e "tree" (árvore, y = base). Em personagem dentro de carro use "still":true para ele não balançar as pernas quando o carro se move.
+
+=== ESTILOS VISUAIS (escolha UM por vídeo, conforme o tema) ===
+No topo do JSON: "style":{"look":"sketch","caption":{...}}. Para mudar só numa cena (ex.: lembrança, sonho, flashback): "look":"noir" dentro da cena.
+Estilos disponíveis em "look":
+- "cartoon": padrão, colorido e limpo (humor, curiosidade leve).
+- "sketch": desenho a lápis em papel antigo, com traço tremendo (histórias, explicações, ar de caderno).
+- "comic": quadrinhos com pontinhos de impressão (ação, super-heróis, humor).
+- "noir": preto e branco com muito contraste e grão (mistério, crime, suspense, terror).
+- "neon": escuro com brilho e linhas de monitor (tecnologia, ficção científica, noite).
+- "retro": fita VHS dos anos 80, tom quente com listras e ruído (nostalgia, curiosidades antigas).
+- "pixel": pixel art de videogame antigo (games, humor, internet).
+- "blueprint": planta azul com grade, traço branco (engenharia, como as coisas funcionam, projetos).
+- "pastel": cores suaves e claras (histórias calmas, infantil, bem-estar).
+- "vintage": filme antigo sépia com grão (história, biografias, fatos do passado).
+Combine o estilo com o clima da narração; use "tint" e "fx" só com moderação nos estilos escuros para não escurecer demais.

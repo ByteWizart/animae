@@ -35,7 +35,7 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 @media(max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}.side{position:static;max-height:none}.side .links{display:flex;flex-wrap:wrap;gap:4px}.side .grp{display:none}}
 </style></head>
 <body class="page"><div class="shell">
-<nav class="topnav"><a class="brand" href="/"><i></i>Shorts Animados</a><a class="nl" href="/">Gerador</a><a class="nl" href="/ajuda" aria-current="page">Ajuda</a><a class="nl" href="/admin">Admin</a></nav>
+<nav class="topnav"><a class="brand" href="/"><i></i>Shorts Animados</a><a class="nl" href="/">Gerador</a><a class="nl" href="/ajuda" aria-current="page">Ajuda</a></nav>
 
 <div class="hero">
   <h1>Central de ajuda</h1>
@@ -54,9 +54,9 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 
 <section class="doc" id="inicio" data-g="Começar"><h2>Início rápido</h2>
 <ol class="steps">
-  <li><div><b>Abra o gerador</b>Rode <code>node server.js</code> nesta pasta e acesse <code>http://localhost:3000</code> no <b>Chrome ou Edge</b> (PC). Aperte <span class="kbd code">Ctrl+F5</span>; o título deve mostrar <code>build 7</code>.</div></li>
-  <li><div><b>Escolha a voz</b>Carregue o áudio da narração (mp3, wav ou m4a). Ele define a duração do vídeo.</div></li>
-  <li><div><b>Carregue a história</b>Envie o arquivo <code>.json</code> ou cole na caixa de texto. Use <b>Ajustar ao áudio</b> para esticar os tempos das cenas à duração da voz.</div></li>
+  <li><div><b>Abra o gerador</b>Rode <code>node server.js</code> nesta pasta e acesse <code>http://localhost:3000</code> no <b>Chrome ou Edge</b> (PC). Aperte <span class="kbd code">Ctrl+F5</span>; o título deve mostrar <code>build 8</code>.</div></li>
+  <li><div><b>Grave e carregue a voz</b>Leia o roteiro e carregue o áudio (mp3, wav ou m4a). Ele define a duração do vídeo.</div></li>
+  <li><div><b>Crie ou carregue a história</b>Descreva a ideia em <b>Criar com IA</b> (a IA escreve o roteiro e o JSON), ou envie/cole um <code>.json</code> seu. Depois de gravar a voz, use <b>Ajustar ao áudio</b> para encaixar as cenas na duração dela.</div></li>
   <li><div><b>Escolha estilo, resolução e gere</b>Clique em <b>Prévia</b> para ver com som, depois em <b>Gerar vídeo</b>. Deixe a aba aberta e visível: a gravação acontece em tempo real. O arquivo <code>short.mp4</code> (ou <code>.webm</code>) baixa sozinho.</div></li>
 </ol>
 <div class="notice warn" style="margin-top:14px"><b>Importante:</b> se você minimizar a aba ou trocar de janela durante a gravação, o navegador reduz a velocidade e o vídeo sai com falhas. Espere terminar.</div>
@@ -64,12 +64,34 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 
 <section class="doc" id="fluxo" data-g="Começar"><h2>Fluxo de trabalho recomendado</h2>
 <div class="grid g4">
-  <div class="card"><b>1. Roteiro</b><p class="muted" style="margin:6px 0 0">Escreva a narração (30–60 s rende bem em short).</p></div>
+  <div class="card"><b>1. Ideia</b><p class="muted" style="margin:6px 0 0">Conte o tema; a IA escreve o roteiro (30–60 s rende bem em short).</p></div>
   <div class="card"><b>2. Voz</b><p class="muted" style="margin:6px 0 0">Grave ou gere o áudio. Ele é a "régua" de tempo.</p></div>
-  <div class="card"><b>3. JSON</b><p class="muted" style="margin:6px 0 0">Peça à sua IA a história usando o <code>PROMPT-MOVIMENTOS.md</code>.</p></div>
+  <div class="card"><b>3. História</b><p class="muted" style="margin:6px 0 0">O JSON já vem pronto da IA. Você pode editar na caixa de texto.</p></div>
   <div class="card"><b>4. Ajuste e gere</b><p class="muted" style="margin:6px 0 0">Ajustar ao áudio, prévia, corrigir, gerar.</p></div>
 </div>
-<p style="margin-top:14px">Dica: guarde as histórias que gostou na <b>biblioteca do Admin</b> (botão "Salvar na biblioteca" no gerador) para reaproveitar depois.</p>
+<p style="margin-top:14px">Dica: guarde o que gostou em <b>Minha biblioteca</b> (botão "Salvar na biblioteca"). Ela fica no seu navegador e guarda a história e o roteiro.</p>
+</section>
+
+<section class="doc" id="ia" data-g="Usar o gerador"><h2>Criar com IA</h2>
+<p>No topo do gerador, o painel <b>Criar com IA</b> transforma sua ideia em um roteiro falado e em uma história animada completa (cenas, personagens, objetos, câmera, legendas e sons).</p>
+<ol>
+<li>Escreva a ideia com tema, tom e público (ex.: <i>"curiosidade sobre por que esquecemos o que íamos fazer ao passar por uma porta, tom bem-humorado"</i>).</li>
+<li>Escolha a duração aproximada e, se quiser, um estilo visual. Deixe em "a IA escolhe" para ela decidir pelo tema.</li>
+<li>Clique em <b>Gerar roteiro e JSON</b>. O roteiro aparece na caixa de roteiro e o JSON na caixa de história.</li>
+<li>Grave a narração, carregue o áudio e use <b>Ajustar ao áudio</b> e <b>Prévia</b>.</li>
+</ol>
+<div class="notice"><b>Se algo não ficou bom:</b> edite o roteiro ou o JSON à mão, ou gere de novo com uma ideia mais específica. Quanto mais detalhe você der (personagens, cenário, humor), melhor o resultado.</div>
+<p class="muted">A geração leva de 10 a 40 segundos. Há um limite de gerações por hora por pessoa. Sua ideia é enviada à Groq para gerar o texto; o áudio e o vídeo nunca saem do seu computador.</p>
+</section>
+
+<section class="doc" id="biblioteca" data-g="Usar o gerador"><h2>Minha biblioteca</h2>
+<p>É a sua coleção pessoal de histórias, guardada <b>apenas neste navegador</b> (localStorage). Ninguém mais vê, e o servidor não guarda nada dela.</p>
+<ul>
+<li><b>Salvar na biblioteca</b> guarda a história atual e o roteiro. Usar o mesmo nome atualiza o item.</li>
+<li>Em cada item: <b>Abrir</b>, <b>Baixar JSON</b>, <b>Renomear</b> e <b>Excluir</b>.</li>
+<li><b>Exportar backup</b> gera um arquivo com tudo; <b>Importar backup</b> traz de volta ou leva para outro computador.</li>
+</ul>
+<div class="notice warn">Limpar os dados do navegador, usar janela anônima ou trocar de navegador apaga/esconde a biblioteca. Exporte um backup de vez em quando.</div>
 </section>
 
 <section class="doc" id="botoes" data-g="Usar o gerador"><h2>O que cada controle faz</h2>
@@ -83,7 +105,7 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 <tr><td><b>Detectar pausas</b></td><td>Lista os silêncios da voz (em segundos) para você alinhar a troca de cenas.</td></tr>
 <tr><td><b>Prévia</b></td><td>Toca no navegador com áudio, sem gravar.</td></tr>
 <tr><td><b>Gerar vídeo</b></td><td>Grava em tempo real e baixa o arquivo. O vídeo dura no máximo a voz + 0,5 s.</td></tr>
-<tr><td><b>Salvar na biblioteca</b></td><td>Guarda a história atual no Admin (exige estar logado lá).</td></tr>
+<tr><td><b>Salvar na biblioteca</b></td><td>Guarda a história e o roteiro na sua biblioteca, neste navegador.</td></tr>
 </tbody></table></div>
 </section>
 
@@ -163,7 +185,7 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 </section>
 
 <section class="doc" id="legendas" data-g="Referência do JSON"><h2>Legendas</h2>
-<p>O padrão de todo o vídeo fica em <code>style.caption</code>: <code>size</code>, <code>color</code>, <code>alt</code> (cor alternada a cada palavra), <code>stroke</code> (contorno), <code>y</code> (altura, 0 a 1) e <code>upper</code> (maiúsculas). O administrador pode definir valores iniciais em <a href="/admin">Admin → Padrões</a>; eles valem quando a história não traz <code>style.caption</code>.</p>
+<p>O padrão de todo o vídeo fica em <code>style.caption</code>: <code>size</code>, <code>color</code>, <code>alt</code> (cor alternada a cada palavra), <code>stroke</code> (contorno), <code>y</code> (altura, 0 a 1) e <code>upper</code> (maiúsculas). Quem administra o site pode definir valores iniciais, que valem quando a história não traz <code>style.caption</code>.</p>
 <p class="muted">Evite colocar a legenda onde cobre o rosto: <code>y</code> perto de 0.69 costuma ser seguro em telas verticais de celular.</p>
 </section>
 
@@ -179,26 +201,28 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 </section>
 
 <section class="doc" id="faq" data-g="Ajuda"><h2>Solução de problemas</h2>
-<details class="faq"><summary>"JSON inválido" ao carregar a história</summary><div class="a">Há um erro de sintaxe (vírgula sobrando, aspas faltando). A mensagem indica a posição. No <a href="/admin">Admin → Biblioteca</a> há um validador que também aponta erros de conteúdo (tempos, nomes desconhecidos).</div></details>
-<details class="faq"><summary>Um objeto não aparece</summary><div class="a">O tipo pode estar escrito errado ou o <code>index.html</code> estar desatualizado. O gerador mostra um aviso com os tipos desconhecidos. Aperte Ctrl+F5 e confira se o título diz <code>build 7</code>.</div></details>
+<details class="faq"><summary>"JSON inválido" ao carregar a história</summary><div class="a">Há um erro de sintaxe (vírgula sobrando, aspas faltando). A mensagem indica a posição. Se o JSON veio da IA e deu erro depois de editar, gere de novo ou volte à versão salva na biblioteca.</div></details>
+<details class="faq"><summary>Um objeto não aparece</summary><div class="a">O tipo pode estar escrito errado ou o <code>index.html</code> estar desatualizado. O gerador mostra um aviso com os tipos desconhecidos. Aperte Ctrl+F5 e confira se o título diz <code>build 8</code>.</div></details>
 <details class="faq"><summary>O vídeo sai travando ou pulando</summary><div class="a">Mantenha a aba visível durante a gravação, feche abas pesadas e use 720p/30 fps. Em computadores fracos, evite 1080p/60.</div></details>
 <details class="faq"><summary>O arquivo baixa como .webm em vez de .mp4</summary><div class="a">Depende do navegador. Chrome e Edge recentes gravam MP4; versões antigas caem para WebM, que a maioria das redes aceita, ou converta com qualquer conversor.</div></details>
 <details class="faq"><summary>"Navegador sem gravação"</summary><div class="a">Use Chrome ou Edge no computador. Celulares e alguns navegadores não oferecem a gravação necessária.</div></details>
 <details class="faq"><summary>A fala não bate com a boca/legenda</summary><div class="a">Use <b>Ajustar ao áudio</b>, depois <b>Detectar pausas</b> e acerte <code>t0</code>/<code>t1</code> das cenas e o <code>talk</code> dos personagens com esses tempos.</div></details>
-<details class="faq"><summary>Esqueci a senha do Admin</summary><div class="a">Apague o arquivo <code>dados.json</code> (isso apaga também biblioteca e histórico) e reinicie o servidor: uma nova senha inicial aparece no terminal. Ou defina a variável <code>ADMIN_PASSWORD</code> ao iniciar: <code>ADMIN_PASSWORD=minhasenha node server.js</code>.</div></details>
-<details class="faq"><summary>Posso acessar de outro computador ou celular?</summary><div class="a">O servidor responde na rede local pelo IP da máquina (ex.: <code>http://192.168.0.10:3000</code>), mas a geração de vídeo exige Chrome/Edge de computador. Se expor na rede, troque a senha do Admin.</div></details>
+<details class="faq"><summary>"A criação com IA não está configurada"</summary><div class="a">O site precisa de uma chave da Groq no servidor. Quem administra o site deve configurá-la. Enquanto isso, você pode colar um JSON seu.</div></details>
+<details class="faq"><summary>"Limite de gerações por hora atingido"</summary><div class="a">Existe um limite por pessoa para proteger a cota. Aguarde um pouco e tente de novo.</div></details>
+<details class="faq"><summary>A IA demorou ou deu erro</summary><div class="a">Pode ser instabilidade ou limite da Groq. Tente novamente; ideias muito longas ou vagas também atrapalham. Se persistir, simplifique a ideia.</div></details>
+<details class="faq"><summary>Minha biblioteca sumiu</summary><div class="a">Ela fica no navegador. Foi limpa se você apagou dados do site, usou outro navegador ou janela anônima. Importe seu backup em "Minha biblioteca".</div></details>
 </section>
 
 <section class="doc" id="req" data-g="Ajuda"><h2>Requisitos e privacidade</h2>
 <ul>
-<li>Node.js recente (qualquer versão atual) e Chrome ou Edge no computador.</li>
-<li>Nada é enviado para a internet: voz, história e vídeo ficam na sua máquina. O servidor só guarda, em <code>dados.json</code>, as configurações, a biblioteca e o histórico (nome, duração e estilo dos vídeos, nunca o arquivo).</li>
+<li>Node.js 18 ou mais novo e Chrome ou Edge no computador.</li>
+<li>Voz, história e vídeo ficam na sua máquina. Ao usar <b>Criar com IA</b>, apenas o texto da sua ideia é enviado (via servidor) à Groq. A biblioteca fica só no seu navegador. O servidor registra somente estatísticas dos vídeos (título, duração e estilo), nunca o arquivo.</li>
 <li>Sem dependências: não há <code>npm install</code>.</li>
 </ul>
 </section>
 </main></div>
 
-<footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Shorts Animados · build 7 · <a href="/">voltar ao gerador</a></footer>
+<footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Shorts Animados · build 8 · <a href="/">voltar ao gerador</a></footer>
 </div>
 <script src="schema.js"></script>
 <script>

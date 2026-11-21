@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin · Shorts Animados</title>
+<title>Painel · Shorts Animados</title>
+<meta name="robots" content="noindex,nofollow">
 <link rel="stylesheet" href="ui.css">
 <style>
 .login{max-width:380px;margin:8vh auto 0}
@@ -33,7 +34,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 .ok-dot{background:var(--ok)}.bad-dot{background:var(--bad)}
 </style></head>
 <body class="page"><div class="shell">
-<nav class="topnav"><a class="brand" href="/"><i></i>Shorts Animados</a><a class="nl" href="/">Gerador</a><a class="nl" href="/ajuda">Ajuda</a><a class="nl" href="/admin" aria-current="page">Admin</a></nav>
+<nav class="topnav"><a class="brand" href="/"><i></i>Shorts Animados</a><a class="nl" href="/">Gerador</a><a class="nl" href="/ajuda">Ajuda</a></nav>
 
 <!-- LOGIN -->
 <div id="login" class="login hidden">
@@ -50,10 +51,10 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 
 <!-- APP -->
 <div id="app" class="hidden">
-  <div class="row sb" style="margin-bottom:14px"><div><h1>Admin</h1><div class="muted">Configurações, biblioteca de histórias e histórico de vídeos.</div></div><button class="sec" id="logout">Sair</button></div>
+  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IA (Groq), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" data-t="painel" aria-selected="true">Painel</button>
-    <button role="tab" data-t="biblioteca" aria-selected="false">Biblioteca</button>
+    <button role="tab" data-t="ia" aria-selected="false">IA (Groq)</button>
     <button role="tab" data-t="padroes" aria-selected="false">Padrões</button>
     <button role="tab" data-t="historico" aria-selected="false">Histórico</button>
     <button role="tab" data-t="seguranca" aria-selected="false">Segurança</button>
@@ -70,19 +71,35 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
     <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Últimos vídeos</h3><div class="tbl-wrap" id="recent"></div></div>
   </section>
 
-  <!-- BIBLIOTECA -->
-  <section id="t-biblioteca" class="hidden">
-    <div class="card" style="margin-bottom:14px">
-      <h3 style="margin-top:0">Adicionar história</h3>
-      <div class="row" style="margin-bottom:10px">
-        <input id="sname" placeholder="Nome (ex.: A árvore no meio da estrada)" style="flex:1;min-width:220px" aria-label="Nome da história">
-        <label class="btn sec" style="margin:0">Escolher .json<input id="sfile" type="file" accept=".json,application/json" class="hidden"></label>
+  <!-- IA -->
+  <section id="t-ia" class="hidden">
+    <div class="grid g2">
+      <div class="card">
+        <h3 style="margin-top:0">Integração com a Groq</h3>
+        <p class="muted">Os visitantes descrevem uma ideia no gerador e a Groq escreve o roteiro e o JSON. A chave fica só neste servidor, nunca vai para o navegador.</p>
+        <div id="ainote" class="notice hidden"></div>
+        <form id="aif">
+          <label class="f" style="display:flex;gap:8px;align-items:center"><input id="ai-on" type="checkbox"> Criação com IA ativada</label>
+          <label class="f">Chave da API da Groq<input id="ai-key" type="password" autocomplete="off" placeholder="gsk_… (deixe vazio para manter a atual)"></label>
+          <div id="ai-hint" class="muted" style="margin:-6px 0 12px"></div>
+          <div class="grid g2">
+            <label class="f">Modelo<input id="ai-model" list="ai-models" autocomplete="off"><datalist id="ai-models"><option value="llama-3.3-70b-versatile"><option value="openai/gpt-oss-120b"><option value="openai/gpt-oss-20b"><option value="llama-3.1-8b-instant"></datalist></label>
+            <label class="f">Limite por IP / hora<input id="ai-ph" type="number" min="1" max="1000"></label>
+          </div>
+          <div class="row"><button type="submit">Salvar</button><button type="button" class="danger" id="ai-clear">Remover chave</button></div>
+        </form>
       </div>
-      <textarea id="sjson" class="json" spellcheck="false" placeholder='Cole o JSON da história aqui…' aria-label="JSON da história"></textarea>
-      <div class="row" style="margin-top:10px"><button class="sec" id="svalidate">Validar</button><button id="ssave">Salvar na biblioteca</button></div>
-      <div id="sres" class="hidden" style="margin-top:12px"></div>
+      <div class="card">
+        <h3 style="margin-top:0">Como funciona</h3>
+        <ul style="padding-left:18px;margin:0">
+          <li>Crie a chave em <code>console.groq.com</code> (API Keys).</li>
+          <li>Alternativa: defina a variável <code>GROQ_API_KEY</code> ao iniciar o servidor; ela tem prioridade.</li>
+          <li>O limite por hora protege sua cota gratuita contra abuso.</li>
+          <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
+          <li>Modelo recomendado: <code>llama-3.3-70b-versatile</code>.</li>
+        </ul>
+      </div>
     </div>
-    <div class="card"><div class="tbl-wrap" id="stories"></div></div>
   </section>
 
   <!-- PADRÕES -->
@@ -139,6 +156,13 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
         </form>
       </div>
       <div class="card">
+        <h3 style="margin-top:0">Endereço secreto deste painel</h3>
+        <p class="muted">Não há link para este painel no site. Só quem souber o endereço chega até a tela de login.</p>
+        <p>Atual: <code id="curpath"></code></p>
+        <div id="pathenv" class="notice warn hidden">O endereço vem de <code>ADMIN_PATH</code>. Altere-o no ambiente.</div>
+        <form id="pathf"><label class="f">Novo caminho (4–40 letras, números, - ou _)<input id="newpath" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{3,39}" required></label><button type="submit">Trocar endereço</button></form>
+      </div>
+      <div class="card">
         <h3 style="margin-top:0">Boas práticas</h3>
         <ul style="padding-left:18px;margin:0">
           <li>A sessão expira em 8 horas e é cancelada ao sair.</li>
@@ -179,7 +203,7 @@ $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST',headers:{
 (async()=>{try{const s=await api('/api/session');s.admin?showApp():showLogin()}catch{showLogin()}})();
 
 /* ---- abas ---- */
-const TABS=['painel','biblioteca','padroes','historico','seguranca'];
+const TABS=['painel','ia','padroes','historico','seguranca'];
 function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{location.hash=n}catch{}}
 $('tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.t)};
 $('tabs').onkeydown=e=>{const bs=[...document.querySelectorAll('#tabs button')],i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true');
@@ -187,17 +211,18 @@ $('tabs').onkeydown=e=>{const bs=[...document.querySelectorAll('#tabs button')],
 if(TABS.includes(location.hash.slice(1)))tab(location.hash.slice(1));
 
 let HIST=[];
-async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadStories(),loadSettings()])})}
+async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadSettings(),loadAi()])})}
 
 /* ---- painel ---- */
 async function loadStatus(){const s=await api('/api/admin/status');
-  const k=[[s.counts.videos,'Vídeos gerados'],[fmtDur(s.counts.seconds),'Tempo total de vídeo'],[s.counts.stories,'Histórias na biblioteca'],[fmtDur(s.uptime),'Servidor ligado há']];
+  const k=[[s.counts.videos,'Vídeos gerados'],[fmtDur(s.counts.seconds),'Tempo total de vídeo'],[s.counts.ideas,'Ideias geradas por IA'],[fmtDur(s.uptime),'Servidor ligado há']];
   $('kpis').innerHTML=k.map(([n,l])=>`<div class="card kpi"><div class="n">${esc(n)}</div><div class="l">${l}</div></div>`).join('');
   const mx=Math.max(1,...Object.values(s.byLook)),ent=Object.entries(s.byLook).sort((a,b)=>b[1]-a[1]);
   $('bars').innerHTML=ent.length?ent.map(([k,v])=>`<div class="bar"><span>${esc(LOOKN[k]||k)}</span><div class="tr"><i style="width:${v/mx*100}%"></i></div><b>${v}</b></div>`).join(''):'<p class="muted">Ainda não há vídeos. Eles aparecem aqui assim que você gerar o primeiro.</p>';
   $('sys').innerHTML=`<table class="tbl"><tbody><tr><td class="muted">Build</td><td>${s.build}</td></tr><tr><td class="muted">Node.js</td><td>${esc(s.node)} (${esc(s.platform)})</td></tr><tr><td class="muted">Porta</td><td>${s.port}</td></tr><tr><td class="muted">dados.json</td><td>${fmtBytes(s.dataBytes)}</td></tr><tr><td class="muted">Senha</td><td>${s.passwordFromEnv?'<span class="badge info">variável de ambiente</span>':'<span class="badge ok">armazenada com hash</span>'}</td></tr></tbody></table>`;
   $('files').innerHTML=s.files.map(f=>`<div><span class="${f.ok?'ok-dot':'bad-dot'}"></span>${esc(f.name)} <span class="muted">${f.ok?fmtBytes(f.bytes):'ausente'}</span></div>`).join('');
-  $('envnote').classList.toggle('hidden',!s.passwordFromEnv);$('pwf').classList.toggle('hidden',s.passwordFromEnv)}
+  $('envnote').classList.toggle('hidden',!s.passwordFromEnv);$('pwf').classList.toggle('hidden',s.passwordFromEnv);
+  $('curpath').textContent='/'+s.adminPath;$('pathenv').classList.toggle('hidden',!s.adminPathFromEnv);$('pathf').classList.toggle('hidden',s.adminPathFromEnv)}
 function histTable(rows,del){return rows.length?`<table class="tbl"><thead><tr><th>Data</th><th>Título</th><th>Duração</th><th>Estilo</th><th>Qualidade</th><th>Arquivo</th>${del?'<th></th>':''}</tr></thead><tbody>${rows.map(h=>`<tr><td>${fmtDate(h.at)}</td><td>${esc(h.name)}</td><td>${fmtDur(h.duration)}</td><td>${esc(LOOKN[h.look]||h.look)}</td><td>${h.res}p · ${h.fps} fps</td><td>${h.format.toUpperCase()} · ${fmtBytes(h.bytes)}</td>${del?`<td><button class="danger sm" data-del="${esc(h.id)}" aria-label="Remover do histórico">Remover</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<p class="muted">Nenhum vídeo registrado ainda.</p>'}
 
 /* ---- histórico ---- */
@@ -213,24 +238,16 @@ $('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['da
   const csv=[head.join(','),...HIST.map(h=>[h.at,h.name,h.duration,h.look,h.res,h.fps,h.format,h.bytes,h.scenes].map(q).join(','))].join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));a.download='historico-shorts.csv';a.click()};
 
-/* ---- biblioteca ---- */
-async function loadStories(){const ss=await api('/api/admin/stories');
-  $('stories').innerHTML=ss.length?`<table class="tbl"><thead><tr><th>Nome</th><th>Resumo</th><th>Estilo</th><th>Validação</th><th>Atualizada</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td class="muted">${fmtDur(s.summary.total)} · ${s.summary.scenes} cenas · ${s.summary.actors} personagens</td><td>${esc(LOOKN[s.summary.look]||s.summary.look)}</td><td>${s.issues?`<span class="badge warn">${s.issues} aviso(s)</span>`:'<span class="badge ok">ok</span>'}</td><td>${fmtDate(s.updatedAt)}</td><td><div class="acts"><button class="sm" data-open="${s.id}">Abrir no gerador</button><button class="sec sm" data-dl="${s.id}">Baixar</button><button class="sec sm" data-ren="${s.id}" data-name="${esc(s.name)}">Renomear</button><button class="danger sm" data-rm="${s.id}">Excluir</button></div></td></tr>`).join('')}</tbody></table>`:'<p class="muted">Biblioteca vazia. Adicione uma história acima ou use "Salvar na biblioteca" no gerador.</p>'}
-$('stories').onclick=e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.open)run(async()=>{const s=await api('/api/admin/stories/'+b.dataset.open);try{localStorage.setItem('shorts.pendingStory',JSON.stringify({name:s.name,story:s.story}))}catch{toast('Não foi possível passar a história ao gerador.',true);return}location.href='/'});
-  if(b.dataset.dl)run(async()=>{const s=await api('/api/admin/stories/'+b.dataset.dl),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(s.story,null,1)],{type:'application/json'}));a.download=(s.name.replace(/[^\w\-]+/g,'_')||'historia')+'.json';a.click()});
-  if(b.dataset.ren){const n=prompt('Novo nome:',b.dataset.name);if(n&&n.trim())run(async()=>{await api('/api/admin/stories/'+b.dataset.ren,'PUT',{name:n});toast('Renomeada.');loadStories()})}
-  if(b.dataset.rm&&confirm('Excluir esta história da biblioteca?'))run(async()=>{await api('/api/admin/stories/'+b.dataset.rm,'DELETE');toast('Excluída.');await Promise.all([loadStories(),loadStatus()])})};
-$('sfile').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('sjson').value=await f.text();if(!$('sname').value)$('sname').value=f.name.replace(/\.json$/i,'');e.target.value=''};
-function parseStory(){try{return JSON.parse($('sjson').value)}catch(e){showRes(null,'JSON inválido: '+e.message);return null}}
-function showRes(issues,err){const el=$('sres');el.classList.remove('hidden');
-  if(err){el.innerHTML=`<div class="notice bad">${esc(err)}</div>`;return}
-  const er=issues.filter(i=>i.level==='erro').length,aw=issues.length-er;
-  el.innerHTML=(!issues.length?'<div class="notice ok">Tudo certo: nenhum problema encontrado.</div>':`<div class="notice ${er?'bad':'warn'}">${er} erro(s) e ${aw} aviso(s).${er?' Corrija os erros para salvar.':''}</div><ul class="issues">${issues.map(i=>`<li><span class="badge ${i.level==='erro'?'bad':'warn'}">${i.level}</span><code>${esc(i.path||'raiz')}</code><span>${esc(i.msg)}</span></li>`).join('')}</ul>`)}
-$('svalidate').onclick=()=>{const st=parseStory();if(st)showRes(S.validateStory(st))};
-$('ssave').onclick=()=>{const st=parseStory();if(!st)return;run(async()=>{
-  try{const r=await api('/api/admin/stories','POST',{name:$('sname').value,story:st});toast('História salva.');showRes(r.issues);$('sjson').value='';$('sname').value='';await Promise.all([loadStories(),loadStatus()])}
-  catch(e){if(e.data&&e.data.issues)showRes(e.data.issues);else throw e}})};
+/* ---- IA ---- */
+async function loadAi(){const a=await api('/api/admin/ai');
+  $('ai-on').checked=a.enabled;$('ai-model').value=a.model;$('ai-ph').value=a.perHour;$('ai-key').value='';
+  $('ai-hint').textContent=a.hasKey?`Chave configurada (${a.keyHint})${a.keyFromEnv?' via GROQ_API_KEY':''}.`:'Nenhuma chave configurada.';
+  const n=$('ainote');n.classList.remove('hidden','ok','warn','bad');n.classList.add(a.enabled&&a.hasKey?'ok':'warn');
+  n.textContent=a.enabled&&a.hasKey?'A criação com IA está ativa para os visitantes.':(a.hasKey?'A criação com IA está desativada.':'Falta a chave da Groq: a criação com IA fica indisponível.');
+  $('ai-clear').classList.toggle('hidden',!a.hasKey||a.keyFromEnv)}
+$('aif').onsubmit=e=>{e.preventDefault();run(async()=>{const d={enabled:$('ai-on').checked,model:$('ai-model').value,perHour:+$('ai-ph').value};if($('ai-key').value.trim())d.key=$('ai-key').value;
+  await api('/api/admin/ai','PUT',d);toast('IA atualizada.');await Promise.all([loadAi(),loadStatus()])})};
+$('ai-clear').onclick=()=>{if(confirm('Remover a chave da Groq deste servidor?'))run(async()=>{await api('/api/admin/ai','PUT',{clearKey:true});toast('Chave removida.');await loadAi()})};
 
 /* ---- padrões ---- */
 function fillLooks(){$('s-look').innerHTML=S.LOOKS.map(l=>`<option value="${l.id}">${esc(l.label)}</option>`).join('')}fillLooks();
@@ -247,6 +264,7 @@ $('setf').onsubmit=e=>{e.preventDefault();run(async()=>{
   toast('Padrões salvos.');await loadSettings()})};
 
 /* ---- segurança ---- */
+$('pathf').onsubmit=e=>{e.preventDefault();run(async()=>{const r=await api('/api/admin/adminpath','POST',{path:$('newpath').value});toast('Endereço alterado. Abrindo o novo…');setTimeout(()=>{location.href='/'+r.path+'#seguranca'},900)})};
 $('pwf').onsubmit=e=>{e.preventDefault();
   if($('p-new').value!==$('p-new2').value)return toast('As senhas novas não conferem.',true);
   run(async()=>{await api('/api/admin/password','POST',{current:$('p-cur').value,next:$('p-new').value});$('pwf').reset();toast('Senha alterada.')})};

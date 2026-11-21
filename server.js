@@ -2,16 +2,17 @@
 // Serve os arquivos estáticos e uma pequena API para o painel Admin (dados em dados.json).
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const SCHEMA = require('./schema.js');
+const AI = require('./ai.js');
 
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
 const DATA_FILE = path.join(dir, 'dados.json');
-const BUILD = 7;
+const BUILD = 8;
 const STARTED = Date.now();
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
 // Arquivos que nunca são servidos pela web.
-const PRIVATE = new Set(['dados.json', 'dados.json.tmp', 'server.js']);
+const PRIVATE = new Set(['dados.json', 'dados.json.tmp', 'server.js', 'ai.js', 'admin.html']);
 
 /* ---------- dados ---------- */
 const DEFAULTS = () => ({
@@ -21,14 +22,16 @@ const DEFAULTS = () => ({
     caption: { size: 110, color: '#ffffff', alt: '#ffd93b', y: 0.69, stroke: '#000000', upper: false },
   },
   auth: null,
-  stories: [],
+  adminPath: null,
+  ai: { enabled: true, model: 'llama-3.3-70b-versatile', key: '', perHour: 8, maxTokens: 8000 },
   history: [],
 });
 let db = DEFAULTS();
 function load() {
   try {
     const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')), base = DEFAULTS();
-    db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } } };
+    db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } }, ai: { ...base.ai, ...(d.ai || {}) } };
+    delete db.stories; // a biblioteca agora fica no navegador de cada usuário
   } catch (e) { if (e.code !== 'ENOENT') console.warn('Aviso: dados.json ilegível, começando vazio (' + e.message + ')'); }
 }
 function save() {
@@ -51,6 +54,10 @@ if (!process.env.ADMIN_PASSWORD && !db.auth) {
   firstRunPassword = crypto.randomBytes(6).toString('base64url');
   setPassword(firstRunPassword);
 }
+const validPath = v => /^[a-z0-9][a-z0-9_-]{3,39}$/i.test(v) && !['api', 'ajuda', 'index', 'admin'].includes(v.toLowerCase());
+if (!db.adminPath) { db.adminPath = 'painel-' + crypto.randomBytes(5).toString('hex'); save(); }
+const adminPath = () => (process.env.ADMIN_PATH && validPath(process.env.ADMIN_PATH) ? process.env.ADMIN_PATH : db.adminPath);
+const groqKey = () => process.env.GROQ_API_KEY || db.ai.key || '';
 const sessions = new Map(); // token -> expira
 const SESSION_MS = 8 * 3600e3;
 const newSession = () => { const t = crypto.randomBytes(24).toString('hex'); sessions.set(t, Date.now() + SESSION_MS); return t; };
@@ -94,8 +101,11 @@ function cleanSettings(s, cur) {
 }
 const publicSettings = () => db.settings;
 
+const aiInfo = () => { const k = groqKey(); return { enabled: !!db.ai.enabled, model: db.ai.model, perHour: db.ai.perHour, hasKey: !!k, keyHint: k ? '…' + k.slice(-4) : '', keyFromEnv: !!process.env.GROQ_API_KEY }; };
+const aiHits = new Map(); // ip -> [timestamps]
+
 function status() {
-  const expected = ['index.html', 'ajuda.html', 'admin.html', 'audio.js', 'schema.js', 'ui.css', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json'];
+  const expected = ['index.html', 'ajuda.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'ui.css', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
@@ -103,7 +113,8 @@ function status() {
   return {
     build: BUILD, node: process.version, platform: process.platform, port: PORT, uptime: Math.round((Date.now() - STARTED) / 1000),
     passwordFromEnv: !!process.env.ADMIN_PASSWORD, dataBytes, files,
-    counts: { stories: db.stories.length, videos: db.history.length, seconds: Math.round(secs) }, byLook,
+    counts: { videos: db.history.length, seconds: Math.round(secs), ideas: db.aiCount || 0 }, byLook,
+    ai: aiInfo(), adminPath: adminPath(), adminPathFromEnv: !!process.env.ADMIN_PATH,
   };
 }
 
@@ -140,6 +151,24 @@ async function api(req, res, p) {
       return send(res, 201, { ok: true, id: h.id });
     }
 
+    // IA: a chave da Groq fica só no servidor. Limite por IP para ninguém gastar a cota.
+    if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.enabled && i.hasKey, perHour: i.perHour }); }
+    if (p === '/api/ai/generate' && m === 'POST') {
+      const i = aiInfo();
+      if (!i.enabled || !i.hasKey) return send(res, 503, { error: 'A criação com IA não está configurada neste site.' });
+      const ip = ipOf(req), now = Date.now(), hits = (aiHits.get(ip) || []).filter(t => now - t < 3600e3);
+      if (hits.length >= db.ai.perHour) return send(res, 429, { error: `Limite de ${db.ai.perHour} gerações por hora atingido. Tente mais tarde.` });
+      const b = await body(req, 1e4), idea = str(b.idea, 1500);
+      if (idea.length < 8) return send(res, 400, { error: 'Descreva melhor a ideia do vídeo (pelo menos uma frase).' });
+      const seconds = [20, 30, 45, 60].includes(+b.seconds) ? +b.seconds : 30, look = SCHEMA.SET.look.has(b.look) ? b.look : '';
+      hits.push(now); aiHits.set(ip, hits);
+      try {
+        const out = await AI.generate({ key: groqKey(), model: db.ai.model, maxTokens: db.ai.maxTokens, idea, seconds, look });
+        db.aiCount = (db.aiCount || 0) + 1; save();
+        return send(res, 200, out);
+      } catch (e) { hits.pop(); throw e; }
+    }
+
     // ---- daqui para baixo exige login ----
     if (!p.startsWith('/api/admin/')) return send(res, 404, { error: 'Rota não encontrada.' });
     if (!isAdmin(req)) return send(res, 401, { error: 'Faça login.' });
@@ -155,35 +184,22 @@ async function api(req, res, p) {
       save(); return send(res, 200, { ok: true });
     }
 
-    if (r[0] === 'stories') {
-      if (m === 'GET' && !id) return send(res, 200, db.stories.map(s => ({ id: s.id, name: s.name, createdAt: s.createdAt, updatedAt: s.updatedAt, summary: s.summary, issues: s.issues })));
-      if (m === 'GET' && id) { const s = db.stories.find(x => x.id === id); return s ? send(res, 200, s) : send(res, 404, { error: 'História não encontrada.' }); }
-      if (m === 'POST' && !id) {
-        const b = await body(req, 3e6), st = b.story;
-        if (!st || typeof st !== 'object') return send(res, 400, { error: 'Envie { name, story }.' });
-        const issues = SCHEMA.validateStory(st), errs = issues.filter(i => i.level === 'erro');
-        if (errs.length) return send(res, 422, { error: 'História com erros estruturais.', issues });
-        if (db.stories.length >= 500) return send(res, 409, { error: 'Biblioteca cheia (500 histórias).' });
-        const now = new Date().toISOString();
-        const s = { id: crypto.randomBytes(6).toString('hex'), name: str(b.name, 80) || 'História sem nome', createdAt: now, updatedAt: now, summary: SCHEMA.summarize(st), issues: issues.length, story: st };
-        db.stories.unshift(s); save();
-        return send(res, 201, { id: s.id, issues });
-      }
-      if (m === 'PUT' && id) {
-        const s = db.stories.find(x => x.id === id); if (!s) return send(res, 404, { error: 'História não encontrada.' });
-        const b = await body(req, 3e6);
-        if (b.name !== undefined) s.name = str(b.name, 80) || s.name;
-        if (b.story) {
-          const issues = SCHEMA.validateStory(b.story);
-          if (issues.some(i => i.level === 'erro')) return send(res, 422, { error: 'História com erros estruturais.', issues });
-          s.story = b.story; s.summary = SCHEMA.summarize(b.story); s.issues = issues.length;
-        }
-        s.updatedAt = new Date().toISOString(); save(); return send(res, 200, { ok: true });
-      }
-      if (m === 'DELETE' && id) { db.stories = db.stories.filter(x => x.id !== id); save(); return send(res, 200, { ok: true }); }
+    if (r[0] === 'ai' && m === 'GET') return send(res, 200, aiInfo());
+    if (r[0] === 'ai' && m === 'PUT') {
+      const b = await body(req, 1e4), a = db.ai;
+      if (b.enabled !== undefined) a.enabled = !!b.enabled;
+      if (typeof b.model === 'string' && /^[\w.\/:-]{2,80}$/.test(b.model.trim())) a.model = b.model.trim();
+      if (b.perHour !== undefined) a.perHour = Math.round(clampN(+b.perHour, 1, 1000, a.perHour));
+      if (typeof b.key === 'string' && b.key.trim()) a.key = b.key.trim().slice(0, 200);
+      if (b.clearKey) a.key = '';
+      save(); return send(res, 200, aiInfo());
     }
-
-    if (r[0] === 'validate' && m === 'POST') { const b = await body(req, 3e6); return send(res, 200, { issues: SCHEMA.validateStory(b.story) }); }
+    if (r[0] === 'adminpath' && m === 'POST') {
+      if (process.env.ADMIN_PATH) return send(res, 409, { error: 'O caminho vem da variável ADMIN_PATH. Altere-a no ambiente.' });
+      const b = await body(req, 1e4), v = String(b.path || '').replace(/^\/+/, '');
+      if (!validPath(v)) return send(res, 400, { error: 'Use 4 a 40 caracteres (letras, números, - ou _), sem usar "admin", "api", "ajuda" ou "index".' });
+      db.adminPath = v; save(); return send(res, 200, { path: v });
+    }
 
     if (r[0] === 'password' && m === 'POST') {
       if (process.env.ADMIN_PASSWORD) return send(res, 409, { error: 'A senha vem da variável ADMIN_PASSWORD. Altere-a no ambiente.' });
@@ -208,7 +224,7 @@ http.createServer((req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   if (p === '/') p = '/index.html';
   if (p === '/ajuda') p = '/ajuda.html';
-  if (p === '/admin') p = '/admin.html';
+  if (p === '/' + adminPath()) { res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' }); return res.end(fs.readFileSync(path.join(dir, 'admin.html'))); }
   const f = path.normalize(path.join(dir, p)), rel = path.relative(dir, f);
   if (rel.startsWith('..') || path.isAbsolute(rel) || rel.split(path.sep).some(s => s.startsWith('.')) || PRIVATE.has(rel)) { res.writeHead(403); return res.end('acesso negado'); }
   fs.readFile(f, (e, d) => {
@@ -220,7 +236,8 @@ http.createServer((req, res) => {
   console.log('Gerador de Shorts Animados · build ' + BUILD);
   console.log('  Gerador: http://localhost:' + PORT);
   console.log('  Ajuda:   http://localhost:' + PORT + '/ajuda');
-  console.log('  Admin:   http://localhost:' + PORT + '/admin');
+  console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
+  console.log('  IA Groq: ' + (groqKey() ? 'chave configurada' : 'sem chave (configure GROQ_API_KEY ou no Admin > IA)'));
   if (firstRunPassword) console.log('\n  >>> Senha inicial do admin: ' + firstRunPassword + '\n  >>> (aparece só desta vez; troque em Admin > Segurança)\n');
   else if (process.env.ADMIN_PASSWORD) console.log('  Senha do admin vem de ADMIN_PASSWORD.');
 });

@@ -1,0 +1,495 @@
+{
+ "total": 30.8,
+ "style": {
+  "caption": {
+   "size": 110,
+   "color": "#ffffff",
+   "alt": "#ffd93b",
+   "y": 0.8,
+   "stroke": "#000000"
+  }
+ },
+ "scenes": [
+  {
+   "t0": 0,
+   "t1": 4.6,
+   "bg": [
+    "#7ec8ff",
+    "#eaf7ff"
+   ],
+   "scenery": "hills",
+   "ground": "#4a4a55",
+   "tr": "fade",
+   "caption": "A estrada estava vazia, só uma árvore no meio do nada.",
+   "cam": {
+    "z0": 1,
+    "z1": 1.15,
+    "x0": 540,
+    "x1": 600,
+    "y0": 960,
+    "y1": 1050
+   },
+   "props": [
+    {
+     "type": "tree",
+     "x": 840,
+     "y": 1250,
+     "s": 520,
+     "anim": "none"
+    },
+    {
+     "type": "car",
+     "x": -350,
+     "y": 1390,
+     "s": 300,
+     "color": "#e23b3b",
+     "anim": "none",
+     "to": {
+      "x": 380
+     },
+     "dur": 3.2,
+     "move": 0.4
+    }
+   ],
+   "actors": [
+    {
+     "x": -390,
+     "y": 1350,
+     "h": 420,
+     "outfit": "hoodie",
+     "hair": "short",
+     "glasses": true,
+     "still": true,
+     "anim": "idle",
+     "to": {
+      "x": 340
+     },
+     "dur": 3.2,
+     "move": 0.4,
+     "mood": "smile"
+    }
+   ]
+  },
+  {
+   "t0": 4.6,
+   "t1": 9.2,
+   "bg": [
+    "#7ec8ff",
+    "#eaf7ff"
+   ],
+   "scenery": "hills",
+   "ground": "#4a4a55",
+   "tr": "fade",
+   "caption": "O motorista viu a árvore e pensou: não olha pra ela.",
+   "cam": {
+    "z0": 1,
+    "z1": 1.5,
+    "x0": 540,
+    "x1": 430,
+    "y0": 960,
+    "y1": 1220
+   },
+   "props": [
+    {
+     "type": "tree",
+     "x": 840,
+     "y": 1250,
+     "s": 520,
+     "anim": "none"
+    },
+    {
+     "type": "car",
+     "x": 380,
+     "y": 1390,
+     "s": 300,
+     "color": "#e23b3b",
+     "anim": "none"
+    }
+   ],
+   "actors": [
+    {
+     "x": 340,
+     "y": 1350,
+     "h": 420,
+     "outfit": "hoodie",
+     "hair": "short",
+     "glasses": true,
+     "still": true,
+     "anim": "think",
+     "look": 1,
+     "mood": "deadpan",
+     "seq": [
+      {
+       "t": 2.8,
+       "anim": "nervous",
+       "mood": "worry"
+      }
+     ],
+     "bubbles": [
+      {
+       "t": 0.8,
+       "end": 3,
+       "say": "Não olha..."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "t0": 9.2,
+   "t1": 14.5,
+   "bg": [
+    "#7ec8ff",
+    "#eaf7ff"
+   ],
+   "scenery": "hills",
+   "ground": "#4a4a55",
+   "tr": "flash",
+   "tint": "#ff000022",
+   "fx": [
+    "lines"
+   ],
+   "caption": "Mas quanto mais ele tentava desviar o olhar, mais ela crescia no para-brisa.",
+   "cam": {
+    "z0": 1.1,
+    "z1": 1.9,
+    "x0": 540,
+    "x1": 820,
+    "y0": 1100,
+    "y1": 1000
+   },
+   "props": [
+    {
+     "type": "tree",
+     "x": 840,
+     "y": 1250,
+     "s": 520,
+     "anim": "none"
+    },
+    {
+     "type": "ring",
+     "x": 840,
+     "y": 1000,
+     "s": 560,
+     "color": "#ff3b3b",
+     "anim": "pulse",
+     "at": 0.5
+    },
+    {
+     "type": "car",
+     "x": 380,
+     "y": 1390,
+     "s": 300,
+     "color": "#e23b3b",
+     "anim": "none"
+    }
+   ],
+   "actors": [
+    {
+     "x": 340,
+     "y": 1350,
+     "h": 420,
+     "outfit": "hoodie",
+     "hair": "short",
+     "glasses": true,
+     "still": true,
+     "anim": "nervous",
+     "nerv": true,
+     "look": 1,
+     "mood": "worry",
+     "bubbles": [
+      {
+       "t": 2.5,
+       "end": 5.2,
+       "mark": "!"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "t0": 14.5,
+   "t1": 21.3,
+   "bg": [
+    "#0d1230",
+    "#2b2f6b"
+   ],
+   "scenery": "night",
+   "ground": "#1c1f3d",
+   "tr": "iris",
+   "caption": "Isso tem nome: fixação de alvo. O cérebro segue o olhar, e as mãos seguem o cérebro.",
+   "cam": {
+    "z0": 1,
+    "z1": 1.12,
+    "x0": 540,
+    "x1": 540,
+    "y0": 960,
+    "y1": 1000
+   },
+   "props": [
+    {
+     "type": "text",
+     "t": "FIXAÇÃO",
+     "x": 540,
+     "y": 400,
+     "s": 300,
+     "color": "#ffd93b",
+     "at": 0.3
+    },
+    {
+     "type": "text",
+     "t": "DE ALVO",
+     "x": 540,
+     "y": 540,
+     "s": 300,
+     "color": "#ffd93b",
+     "at": 0.6
+    },
+    {
+     "type": "sign",
+     "t": "OLHAR",
+     "x": 190,
+     "y": 820,
+     "s": 240,
+     "color": "#fff",
+     "at": 2.4
+    },
+    {
+     "type": "arrow",
+     "x": 365,
+     "y": 820,
+     "s": 110,
+     "color": "#ffd93b",
+     "anim": "pulse",
+     "at": 3.1
+    },
+    {
+     "type": "sign",
+     "t": "CÉREBRO",
+     "x": 540,
+     "y": 820,
+     "s": 240,
+     "color": "#fff",
+     "at": 3.5
+    },
+    {
+     "type": "arrow",
+     "x": 715,
+     "y": 820,
+     "s": 110,
+     "color": "#ffd93b",
+     "anim": "pulse",
+     "at": 4.3
+    },
+    {
+     "type": "sign",
+     "t": "MÃOS",
+     "x": 890,
+     "y": 820,
+     "s": 240,
+     "color": "#fff",
+     "at": 4.7
+    }
+   ],
+   "actors": [
+    {
+     "x": 540,
+     "y": 1450,
+     "h": 440,
+     "outfit": "blazer",
+     "hair": "grey",
+     "glasses": true,
+     "anim": "point",
+     "mood": "grin",
+     "talk": [
+      0.2,
+      2.2
+     ]
+    }
+   ]
+  },
+  {
+   "t0": 21.3,
+   "t1": 26.2,
+   "bg": [
+    "#7ec8ff",
+    "#eaf7ff"
+   ],
+   "scenery": "hills",
+   "ground": "#4a4a55",
+   "tr": "flash",
+   "shake": 0.5,
+   "fx": [
+    "sparks"
+   ],
+   "caption": "Resultado: a única árvore da estrada foi exatamente a que ele acertou.",
+   "cam": {
+    "z0": 1.4,
+    "z1": 1.1,
+    "x0": 700,
+    "x1": 600,
+    "y0": 1200,
+    "y1": 1100
+   },
+   "props": [
+    {
+     "type": "tree",
+     "x": 790,
+     "y": 1250,
+     "s": 520,
+     "anim": "none"
+    },
+    {
+     "type": "car",
+     "x": 500,
+     "y": 1390,
+     "s": 300,
+     "color": "#e23b3b",
+     "anim": "none"
+    },
+    {
+     "type": "star",
+     "x": 740,
+     "y": 1290,
+     "s": 220,
+     "color": "#ffd23b",
+     "anim": "pulse"
+    },
+    {
+     "type": "sign",
+     "t": "BUM!",
+     "x": 420,
+     "y": 760,
+     "s": 300,
+     "color": "#ffe9e9",
+     "anim": "fall",
+     "at": 0.3
+    }
+   ],
+   "actors": [
+    {
+     "x": 460,
+     "y": 1350,
+     "h": 420,
+     "outfit": "hoodie",
+     "hair": "short",
+     "glasses": true,
+     "still": true,
+     "anim": "shock",
+     "mood": "shock"
+    }
+   ]
+  },
+  {
+   "t0": 26.2,
+   "t1": 30.8,
+   "bg": [
+    "#9be0ff",
+    "#fff7d6"
+   ],
+   "scenery": "hills",
+   "ground": "#4a4a55",
+   "tr": "wipe",
+   "fx": [
+    "confetti"
+   ],
+   "caption": "A solução? Olhe para onde quer ir, nunca para o perigo.",
+   "cam": {
+    "z0": 1.3,
+    "z1": 1,
+    "x0": 540,
+    "x1": 540,
+    "y0": 1100,
+    "y1": 960
+   },
+   "props": [
+    {
+     "type": "car",
+     "x": 380,
+     "y": 1390,
+     "s": 300,
+     "color": "#e23b3b",
+     "anim": "none",
+     "to": {
+      "x": 1500
+     },
+     "dur": 4,
+     "move": 0.8
+    },
+    {
+     "type": "text",
+     "t": "OLHE O CAMINHO",
+     "x": 540,
+     "y": 700,
+     "s": 200,
+     "color": "#ffffff",
+     "at": 0.6
+    },
+    {
+     "type": "arrow",
+     "x": 760,
+     "y": 1000,
+     "s": 260,
+     "color": "#3fa34d",
+     "anim": "pulse",
+     "at": 1
+    }
+   ],
+   "actors": [
+    {
+     "x": 340,
+     "y": 1350,
+     "h": 420,
+     "outfit": "hoodie",
+     "hair": "short",
+     "glasses": true,
+     "still": true,
+     "anim": "idle",
+     "to": {
+      "x": 1460
+     },
+     "dur": 4,
+     "move": 0.8,
+     "mood": "laugh"
+    }
+   ]
+  }
+ ],
+ "sfx": [
+  {
+   "t": 0.1,
+   "type": "whoosh"
+  },
+  {
+   "t": 4.699999999999999,
+   "type": "whoosh",
+   "len": 0.4
+  },
+  {
+   "t": 9.299999999999999,
+   "type": "rumble",
+   "len": 2.5,
+   "amp": 0.5
+  },
+  {
+   "t": 14.6,
+   "type": "ping",
+   "f": 1568
+  },
+  {
+   "t": 16.9,
+   "type": "ping",
+   "f": 2093
+  },
+  {
+   "t": 21.35,
+   "type": "thud",
+   "f": 60,
+   "len": 0.9
+  },
+  {
+   "t": 26.3,
+   "type": "slide"
+  }
+ ]
+}
