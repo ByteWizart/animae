@@ -1,4 +1,4 @@
-// Catálogo do formato de história + validador. Usado pela página de ajuda, pelo admin e pelo servidor.
+// Catálogo do formato de história + validador. Usado pela página de docs, pelo admin e pelo servidor.
 // Funciona no navegador (window.SCHEMA) e no Node (require('./schema.js')).
 (function (root) {
   const L = (id, label, desc, extra) => Object.assign({ id, label, desc }, extra || {});

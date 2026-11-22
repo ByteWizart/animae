@@ -70,7 +70,7 @@ if (!process.env.ADMIN_PASSWORD && !db.auth) {
   firstRunPassword = crypto.randomBytes(6).toString('base64url');
   setPassword(firstRunPassword);
 }
-const validPath = v => /^[a-z0-9][a-z0-9_-]{3,39}$/i.test(v) && !['api', 'ajuda', 'index', 'admin'].includes(v.toLowerCase());
+const validPath = v => /^[a-z0-9][a-z0-9_-]{3,39}$/i.test(v) && !['api', 'ajuda', 'docs', 'index', 'admin'].includes(v.toLowerCase());
 if (!db.adminPath) { db.adminPath = 'painel-' + crypto.randomBytes(5).toString('hex'); save(); }
 const adminPath = () => (process.env.ADMIN_PATH && validPath(process.env.ADMIN_PATH) ? process.env.ADMIN_PATH : db.adminPath);
 const sessions = new Map(); // token -> expira
@@ -149,7 +149,7 @@ let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
 const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
 
 function status() {
-  const expected = ['index.html', 'ajuda.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
+  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
@@ -375,7 +375,7 @@ async function api(req, res, p) {
     if (r[0] === 'adminpath' && m === 'POST') {
       if (process.env.ADMIN_PATH) return send(res, 409, { error: 'O caminho vem da variável ADMIN_PATH. Altere-a no ambiente.' });
       const b = await body(req, 1e4), v = String(b.path || '').replace(/^\/+/, '');
-      if (!validPath(v)) return send(res, 400, { error: 'Use 4 a 40 caracteres (letras, números, - ou _), sem usar "admin", "api", "ajuda" ou "index".' });
+      if (!validPath(v)) return send(res, 400, { error: 'Use 4 a 40 caracteres (letras, números, - ou _), sem usar "admin", "api", "docs" ou "index".' });
       db.adminPath = v; save(); return send(res, 200, { path: v });
     }
 
@@ -401,7 +401,8 @@ http.createServer((req, res) => {
   if (p.startsWith('/api/')) return api(req, res, p);
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   if (p === '/') p = '/index.html';
-  if (p === '/ajuda') p = '/ajuda.html';
+  if (p === '/ajuda' || p === '/ajuda.html') { res.writeHead(301, { Location: '/docs' }); return res.end(); } // endereço antigo
+  if (p === '/docs') p = '/docs.html';
   if (p === '/' + adminPath()) { res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' }); return res.end(fs.readFileSync(path.join(dir, 'admin.html'))); }
   const f = path.normalize(path.join(dir, p)), rel = path.relative(dir, f);
   if (rel.startsWith('..') || path.isAbsolute(rel) || rel.split(path.sep).some(s => s.startsWith('.')) || PRIVATE.has(rel)) { res.writeHead(403); return res.end('acesso negado'); }
@@ -413,7 +414,7 @@ http.createServer((req, res) => {
 }).listen(PORT, () => {
   console.log('Gerador de Shorts Animados · build ' + BUILD);
   console.log('  Gerador: http://localhost:' + PORT);
-  console.log('  Ajuda:   http://localhost:' + PORT + '/ajuda');
+  console.log('  Docs:    http://localhost:' + PORT + '/docs');
   console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
   { const c = aiChain(); console.log('  IA: ' + (c.length ? c.map(p => p.label + ' (' + p.model + ')').join(' → ') : 'nenhum provedor configurado (use uma variável como GROQ_API_KEY / ZAI_API_KEY ou o Admin > IA)')); }
   if (firstRunPassword) console.log('\n  >>> Senha inicial do admin: ' + firstRunPassword + '\n  >>> (aparece só desta vez; troque em Admin > Segurança)\n');

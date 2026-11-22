@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Docs · Shorts Animados</title>
+<link rel="stylesheet" href="ui.css">
+<style>
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:28px;align-items:start}
+.side{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto;padding-right:6px}
+.side input{margin-bottom:10px}
+.side a{display:block;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:7px;font-size:14px;border-left:2px solid transparent}
+.side a:hover{background:var(--panel2);color:var(--text)}
+.side a.on{color:var(--text);font-weight:600;border-left-color:var(--text);background:var(--panel2)}
+.side .grp{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:16px 10px 4px}
+section.doc{padding:6px 0 26px;border-bottom:1px solid var(--line);margin-bottom:26px;scroll-margin-top:16px}
+section.doc:last-of-type{border-bottom:0}
+.hero{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:32px;margin-bottom:28px}
+.hero p{color:var(--muted);max-width:60ch;margin-bottom:16px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:12px}
+.steps li{counter-increment:s;display:grid;grid-template-columns:30px 1fr;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.steps li::before{content:counter(s);width:30px;height:30px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--text);font-weight:600;font-size:13px;display:grid;place-items:center}
+.steps li>div>b:first-child{display:block;margin-bottom:2px}
+.looks{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.look{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.look .sw{height:54px}
+.look div.t{padding:10px 12px}
+.look b{display:block}.look span{font-size:13px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.chips code{cursor:default}
+details.faq{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px}
+details.faq summary{cursor:pointer;padding:12px 14px;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:10px}
+details.faq summary::after{content:"+";color:var(--muted);font-weight:600}
+details.faq[open] summary::after{content:"–"}
+details.faq .a{padding:0 14px 12px;color:var(--muted)}
+.hide{display:none!important}
+.empty{display:none;text-align:center;padding:40px 10px}
+@media(max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}.side{position:static;max-height:none}.side .links{display:flex;flex-wrap:wrap;gap:4px}.side .grp{display:none}}
+</style></head>
+<body class="page"><div class="shell">
+<nav class="topnav"><a class="brand" href="/"><i></i>Shorts Animados</a><a class="nl" href="/">Gerador</a><a class="nl" href="/docs" aria-current="page">Docs</a></nav>
+
+<div class="hero">
+  <h1>Documentação</h1>
+  <p>Tudo para transformar uma narração e uma história em JSON num short vertical animado (1080×1920), gerado direto no navegador, sem API paga.</p>
+  <a class="btn" href="#inicio">Começar em 4 passos</a> <a class="btn sec" href="#json">Referência do JSON</a>
+</div>
+
+<div class="layout">
+<aside class="side" aria-label="Sumário">
+  <input id="q" type="search" placeholder="Buscar nos docs…" aria-label="Buscar nos docs">
+  <div class="links" id="toc"></div>
+</aside>
+
+<main id="main">
+<p class="empty" id="empty">Nada encontrado para essa busca.</p>
+
+<section class="doc" id="inicio" data-g="Começar"><h2>Início rápido</h2>
+<ol class="steps">
+  <li><div><b>Abra o gerador</b>Rode <code>node server.js</code> nesta pasta e acesse <code>http://localhost:3000</code> no <b>Chrome ou Edge</b> (PC). Aperte <span class="kbd code">Ctrl+F5</span>; o rodapé deve mostrar <code>build 9</code>.</div></li>
+  <li><div><b>Grave e carregue a voz</b>Leia o roteiro e carregue o áudio (mp3, wav ou m4a). Ele define a duração do vídeo.</div></li>
+  <li><div><b>Crie ou carregue a história</b>Descreva a ideia em <b>Criar com IA</b> (a IA escreve o roteiro e o JSON), ou envie/cole um <code>.json</code> seu. Depois de gravar a voz, use <b>Ajustar ao áudio</b> para encaixar as cenas na duração dela.</div></li>
+  <li><div><b>Escolha estilo, resolução e gere</b>Clique em <b>Prévia</b> para ver com som, depois em <b>Gerar vídeo</b>. Deixe a aba aberta e visível: a gravação acontece em tempo real. O arquivo <code>short.mp4</code> (ou <code>.webm</code>) baixa sozinho.</div></li>
+</ol>
+<div class="notice warn" style="margin-top:14px"><b>Importante:</b> se você minimizar a aba ou trocar de janela durante a gravação, o navegador reduz a velocidade e o vídeo sai com falhas. Espere terminar.</div>
+</section>
+
+<section class="doc" id="fluxo" data-g="Começar"><h2>Fluxo de trabalho recomendado</h2>
+<div class="grid g4">
+  <div class="card"><b>1. Ideia</b><p class="muted" style="margin:6px 0 0">Conte o tema; a IA escreve o roteiro (30–60 s rende bem em short).</p></div>
+  <div class="card"><b>2. Voz</b><p class="muted" style="margin:6px 0 0">Grave ou gere o áudio. Ele é a "régua" de tempo.</p></div>
+  <div class="card"><b>3. História</b><p class="muted" style="margin:6px 0 0">O JSON já vem pronto da IA. Você pode editar na caixa de texto.</p></div>
+  <div class="card"><b>4. Ajuste e gere</b><p class="muted" style="margin:6px 0 0">Ajustar ao áudio, prévia, corrigir, gerar.</p></div>
+</div>
+<p style="margin-top:14px">Dica: guarde o que gostou em <b>Minha biblioteca</b> (botão "Salvar na biblioteca"). Ela fica no seu navegador e guarda a história e o roteiro.</p>
+</section>
+
+<section class="doc" id="ia" data-g="Usar o gerador"><h2>Criar com IA</h2>
+<p>No topo do gerador, o painel <b>Criar com IA</b> transforma sua ideia em um roteiro falado e em uma história animada completa (cenas, personagens, objetos, câmera, legendas e sons).</p>
+<ol>
+<li>Escreva a ideia com tema, tom e público (ex.: <i>"curiosidade sobre por que esquecemos o que íamos fazer ao passar por uma porta, tom bem-humorado"</i>).</li>
+<li>Escolha a duração aproximada e, se quiser, um estilo visual. Deixe em "a IA escolhe" para ela decidir pelo tema.</li>
+<li>Clique em <b>Gerar roteiro e JSON</b>. O roteiro aparece na caixa de roteiro e o JSON na caixa de história.</li>
+<li>Grave a narração, carregue o áudio e use <b>Ajustar ao áudio</b> e <b>Prévia</b>.</li>
+</ol>
+<h3>Opções da IA</h3>
+<ul>
+<li><b>Formato</b>: curiosidade, história, tutorial, notícia, lista, mito ou verdade, quiz, humor, motivacional, terror, como funciona, diálogo e comparação. Cada um usa uma estrutura de roteiro e recursos visuais próprios.</li>
+<li><b>Tom, idioma, trilha e número de personagens</b>: ficam em <i>Opções da IA</i>. A trilha escolhida vale para o vídeo inteiro.</li>
+<li><b>Sugerir ideias</b>: a IA propõe 6 ideias prontas para o seu assunto; clique em <i>Usar</i> para preenchê-las.</li>
+<li><b>Texto longo</b>: cole uma notícia ou artigo no campo da ideia e a IA resume em um short.</li>
+<li><b>Copiar prompt para outra IA</b>: copia as mesmas regras e o catálogo completo para você usar no ChatGPT, Claude etc. Cole o JSON da resposta em <i>Avançado</i>.</li>
+</ul>
+<h3>Depois de gerar</h3>
+<ul>
+<li><b>Pacote de publicação</b>: 3 títulos, descrição, hashtags, direção de voz (como narrar), texto de miniatura e uma lista de fatos para conferir antes de postar.</li>
+<li><b>Melhorar com a IA</b>: escolha um atalho (mais dinâmico, mais engraçado, mais dramático, melhorar o gancho...) ou escreva o que quer mudar. A IA edita a história atual.</li>
+<li><b>Avaliar a direção</b>: dá uma nota de 0 a 10, aponta problemas por cena e oferece <i>Aplicar as melhorias</i> com um clique.</li>
+<li><b>Traduzir</b>: traduz o roteiro e todos os textos da tela para outro idioma mantendo os tempos.</li>
+<li><b>Ajuste automático</b>: o site corrige sozinho coordenadas, textos longos na faixa da legenda, câmera ausente, transições repetidas e falta de sons nas trocas de cena.</li>
+</ul>
+<div class="notice"><b>Se algo não ficou bom:</b> edite o roteiro ou o JSON à mão, ou gere de novo com uma ideia mais específica. Quanto mais detalhe você der (personagens, cenário, humor), melhor o resultado.</div>
+<p class="muted">A geração leva de 10 a 40 segundos. Há um limite de gerações por hora por pessoa. Sua ideia é enviada ao provedor de IA do site (Groq, Z.ai, Gemini etc.) para gerar o texto; o áudio e o vídeo nunca saem do seu computador.</p>
+</section>
+
+<section class="doc" id="biblioteca" data-g="Usar o gerador"><h2>Minha biblioteca</h2>
+<p>É a sua coleção pessoal de histórias, guardada <b>apenas neste navegador</b> (localStorage). Ninguém mais vê, e o servidor não guarda nada dela.</p>
+<ul>
+<li><b>Salvar na biblioteca</b> guarda a história atual e o roteiro. Usar o mesmo nome atualiza o item.</li>
+<li>Em cada item: <b>Abrir</b>, <b>Baixar JSON</b>, <b>Renomear</b> e <b>Excluir</b>.</li>
+<li><b>Exportar backup</b> gera um arquivo com tudo; <b>Importar backup</b> traz de volta ou leva para outro computador.</li>
+</ul>
+<div class="notice warn">Limpar os dados do navegador, usar janela anônima ou trocar de navegador apaga/esconde a biblioteca. Exporte um backup de vez em quando.</div>
+</section>
+
+<section class="doc" id="botoes" data-g="Usar o gerador"><h2>O que cada controle faz</h2>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Controle</th><th>Função</th></tr></thead><tbody>
+<tr><td><b>Voz</b></td><td>Áudio da narração. Entra no vídeo junto com a trilha e os efeitos sonoros gerados por código.</td></tr>
+<tr><td><b>História (.json)</b></td><td>Arquivo ou texto com cenas, personagens e objetos. Erros de sintaxe aparecem no quadro de log.</td></tr>
+<tr><td><b>Estilo</b></td><td>Aparência de todo o vídeo. Grava <code>style.look</code> no JSON. Para uma cena só, use <code>"look"</code> dentro dela.</td></tr>
+<tr><td><b>720p / 1080p</b></td><td>720p gera mais rápido; 1080p fica mais nítido e o arquivo é maior.</td></tr>
+<tr><td><b>30 / 60 fps</b></td><td>60 fps deixa o movimento mais fluido, mas exige mais do computador.</td></tr>
+<tr><td><b>Ajustar ao áudio</b></td><td>Reescala <code>t0</code>, <code>t1</code> e os <code>sfx</code> para a duração real da voz. Marque falas (<code>talk</code>) à mão se precisar.</td></tr>
+<tr><td><b>Detectar pausas</b></td><td>Lista os silêncios da voz (em segundos) para você alinhar a troca de cenas.</td></tr>
+<tr><td><b>Prévia</b></td><td>Toca no navegador com áudio, sem gravar.</td></tr>
+<tr><td><b>Gerar vídeo</b></td><td>Grava em tempo real e baixa o arquivo. O vídeo dura no máximo a voz + 0,5 s.</td></tr>
+<tr><td><b>Salvar na biblioteca</b></td><td>Guarda a história e o roteiro na sua biblioteca, neste navegador.</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="doc" id="json" data-g="Referência do JSON"><h2>Estrutura da história</h2>
+<p>O arquivo é um objeto com a duração total, um estilo opcional e a lista de cenas. Tempos são sempre em <b>segundos</b>; posições, em pixels de uma tela de <b>1080×1920</b> (os pés do personagem ficam em <code>y</code>).</p>
+<pre><code>{
+  "total": 12,
+  "style": { "look": "sketch", "caption": { "size": 110, "color": "#fff", "alt": "#ffd93b", "y": 0.69 } },
+  "scenes": [
+    {
+      "t0": 0, "t1": 6,
+      "bg": ["#7ec8ff", "#eaf7ff"], "scenery": "hills", "ground": "#4a4a55",
+      "tr": "fade",
+      "caption": "A estrada estava vazia.",
+      "cam": { "z0": 1, "z1": 1.15, "x0": 540, "x1": 600, "y0": 960, "y1": 1050 },
+      "props":  [ { "type": "tree", "x": 840, "y": 1250, "s": 520 } ],
+      "actors": [ { "x": 340, "y": 1350, "h": 420, "outfit": "hoodie", "hair": "short",
+                    "anim": "idle", "mood": "smile", "talk": [0.3, 5.5],
+                    "seq": [ { "t": 3, "anim": "think", "mood": "worry" } ],
+                    "bubbles": [ { "t": 1, "end": 3, "say": "Calma..." } ] } ]
+    }
+  ],
+  "sfx": [ { "t": 0.1, "type": "whoosh" } ]
+}</code></pre>
+<h3>Campos da cena</h3>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody>
+<tr><td><code>t0</code>, <code>t1</code></td><td>Início e fim da cena. Uma cena deve começar onde a anterior termina.</td></tr>
+<tr><td><code>bg</code></td><td>Cores do degradê de fundo <code>[topo, base]</code>.</td></tr>
+<tr><td><code>scenery</code></td><td>Cenário (tabela abaixo). <code>ground</code> pinta o chão; <code>gy</code> muda a altura dele.</td></tr>
+<tr><td><code>caption</code></td><td>Fala da cena: aparece 1–2 palavras por vez, sincronizada ao tempo da cena.</td></tr>
+<tr><td><code>cs</code></td><td>Estilo de legenda só nesta cena: <code>{size, y, color, alt, stroke, upper}</code>.</td></tr>
+<tr><td><code>text</code></td><td>Título fixo: <code>{t, at, y, size, color}</code>.</td></tr>
+<tr><td><code>tr</code></td><td>Transição de entrada.</td></tr>
+<tr><td><code>fx</code></td><td>Efeitos de atmosfera (lista).</td></tr>
+<tr><td><code>tint</code></td><td>Cor com transparência sobre a cena, ex. <code>"#3040ff22"</code> (azul = noite, vermelho = perigo).</td></tr>
+<tr><td><code>shake</code></td><td>Segundos de tremor de câmera no início (impacto).</td></tr>
+<tr><td><code>look</code></td><td>Estilo visual só desta cena (flashback, sonho).</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="doc" id="cenarios" data-g="Referência do JSON"><h2>Cenários, transições e efeitos</h2>
+<h3>Cenários (<code>scenery</code>)</h3><div id="t-scenery"></div>
+<h3>Transições (<code>tr</code>)</h3><div id="t-tr"></div>
+<h3>Efeitos (<code>fx</code>)</h3><div id="t-fx"></div>
+</section>
+
+<section class="doc" id="personagens" data-g="Referência do JSON"><h2>Personagens (<code>actors</code>)</h2>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody>
+<tr><td><code>x</code>, <code>y</code>, <code>h</code></td><td>Posição dos pés e altura. Em cenas <code>room</code>, <code>y</code> menor = mais longe e menor.</td></tr>
+<tr><td><code>outfit</code>, <code>hair</code>, <code>hat</code></td><td>Aparência (opções abaixo). Também: <code>glasses</code>, <code>skin</code>, <code>hairc</code>, <code>color</code>.</td></tr>
+<tr><td><code>anim</code>, <code>mood</code></td><td>Animação e humor iniciais.</td></tr>
+<tr><td><code>seq</code></td><td>Mudanças ao longo da cena: <code>[{t, anim, mood, look}]</code>. A troca leva 0,3 s. <code>look</code> vai de −1 (esquerda) a 1 (direita).</td></tr>
+<tr><td><code>to</code>, <code>dur</code>, <code>move</code></td><td>Deslocamento: ele anda sozinho. <code>to</code> aceita lista de trechos <code>[{x,y,dur,move}]</code>. Use <code>still:true</code> para não mexer as pernas (dentro de carro).</td></tr>
+<tr><td><code>talk</code></td><td><code>[início, fim]</code> em que a boca se mexe e os braços gesticulam.</td></tr>
+<tr><td><code>bubbles</code></td><td><code>[{t, end, say}]</code> balão de fala (até 4 palavras) ou <code>{t, end, mark}</code> marca sobre a cabeça.</td></tr>
+<tr><td><code>hold</code></td><td>Item na mão. Para <code>sign</code>, use <code>holdT</code> com o texto.</td></tr>
+<tr><td><code>at</code>, <code>end</code>, <code>flip</code></td><td>Quando aparece, quando some e se vira para o outro lado.</td></tr>
+</tbody></table></div>
+<h3>Animações (<code>anim</code>)</h3><div id="t-anim"></div>
+<h3>Humores (<code>mood</code>)</h3><div id="t-mood"></div>
+<h3>Opções de aparência</h3><div id="c-look-opts"></div>
+<div class="notice"><b>Dica de direção:</b> a cada 2–3 segundos, mude algo (animação, humor, olhar, ponto de câmera ou um objeto entrando). Dúvida = <code>think</code>, erro = <code>facepalm</code>, descoberta = <code>jump</code>/<code>cheer</code>, medo = <code>nervous</code>, susto = <code>shock</code>.</div>
+</section>
+
+<section class="doc" id="objetos" data-g="Referência do JSON"><h2>Objetos (<code>props</code>)</h2>
+<p>Campos comuns: <code>type</code>, <code>x</code>, <code>y</code>, <code>s</code> (tamanho), <code>color</code>, <code>t</code> (texto), <code>at</code> (quando entra), <code>end</code> (quando some), <code>alpha</code>, <code>front</code> (desenha na frente), <code>rot</code>, <code>to</code>/<code>dur</code>/<code>move</code> (movimento).</p>
+<div id="t-prop"></div>
+<h3>Animações de objeto (<code>anim</code>)</h3><div id="c-propanim"></div>
+</section>
+
+<section class="doc" id="camera" data-g="Referência do JSON"><h2>Câmera</h2>
+<p>Duas formas. A simples vai de um ponto a outro durante a cena:</p>
+<pre><code>"cam": { "z0": 1, "z1": 1.4, "x0": 540, "x1": 430, "y0": 960, "y1": 1220, "r0": 0, "r1": -1.5 }</code></pre>
+<p>Com vários pontos (preencha <code>z</code>, <code>x</code>, <code>y</code> e <code>r</code> em todos):</p>
+<pre><code>"cam": { "keys": [ { "t": 0, "z": 1, "x": 540, "y": 960, "r": 0 }, { "t": 2, "z": 1.3, "x": 420, "y": 1050, "r": -1.5 } ] }</code></pre>
+<p>Para seguir um personagem: <code>"cam": { "follow": 0, "z0": 1.2, "z1": 1.4, "fy": 380 }</code> (<code>0</code> = primeiro personagem). <code>z</code> é zoom, <code>r</code> é inclinação em graus. Aproxime nos momentos de tensão e afaste no final.</p>
+</section>
+
+<section class="doc" id="legendas" data-g="Referência do JSON"><h2>Legendas</h2>
+<p>O padrão de todo o vídeo fica em <code>style.caption</code>: <code>size</code>, <code>color</code>, <code>alt</code> (cor alternada a cada palavra), <code>stroke</code> (contorno), <code>y</code> (altura, 0 a 1) e <code>upper</code> (maiúsculas). Quem administra o site pode definir valores iniciais, que valem quando a história não traz <code>style.caption</code>.</p>
+<p class="muted">Evite colocar a legenda onde cobre o rosto: <code>y</code> perto de 0.69 costuma ser seguro em telas verticais de celular.</p>
+</section>
+
+<section class="doc" id="estilos" data-g="Referência do JSON"><h2>Estilos visuais</h2>
+<p>Escolha <b>um</b> por vídeo, de acordo com o tema, em <code>style.look</code>.</p>
+<div class="looks" id="looks"></div>
+<p class="muted" style="margin-top:12px">Nos estilos escuros, use <code>tint</code> e <code>fx</code> com moderação para não escurecer demais.</p>
+</section>
+
+<section class="doc" id="recursos" data-g="Referência do JSON"><h2>Recursos de cena e de personagem</h2>
+<p>Campos extras que dão acabamento profissional: títulos animados, terceiro inferior, holofote, zoom de impacto, clarões, tremores, fundo em movimento e mais.</p>
+<div id="t-feat"></div>
+</section>
+
+<section class="doc" id="sons" data-g="Referência do JSON"><h2>Sons (<code>sfx</code>)</h2>
+<p>Lista no topo do JSON: <code>{ "t": 6.5, "type": "thud", "f": 60, "len": 0.8, "amp": 1 }</code>. Os efeitos são gerados por código (sem arquivos). Parâmetros opcionais: <code>f</code> (frequência), <code>len</code> (duração) e <code>amp</code> (volume).</p>
+<div id="t-sfx"></div>
+<h3>Trilha musical (<code>style.music</code>)</h3>
+<p>Gerada por código e ajustada para ficar abaixo da voz. Use <code>"style":{"music":"happy"}</code> ou <code>{"type":"tense","vol":0.8,"bpm":100}</code>. Também dá para trocar no gerador, no seletor <i>Trilha</i>.</p>
+<div id="t-music"></div>
+</section>
+
+<section class="doc" id="faq" data-g="Suporte"><h2>Solução de problemas</h2>
+<details class="faq"><summary>"JSON inválido" ao carregar a história</summary><div class="a">Há um erro de sintaxe (vírgula sobrando, aspas faltando). A mensagem indica a posição. Se o JSON veio da IA e deu erro depois de editar, gere de novo ou volte à versão salva na biblioteca.</div></details>
+<details class="faq"><summary>Um objeto não aparece</summary><div class="a">O tipo pode estar escrito errado ou o <code>index.html</code> estar desatualizado. O gerador mostra um aviso com os tipos desconhecidos. Aperte Ctrl+F5 e confira se o rodapé diz <code>build 9</code>.</div></details>
+<details class="faq"><summary>O vídeo sai travando ou pulando</summary><div class="a">Mantenha a aba visível durante a gravação, feche abas pesadas e use 720p/30 fps. Em computadores fracos, evite 1080p/60.</div></details>
+<details class="faq"><summary>O arquivo baixa como .webm em vez de .mp4</summary><div class="a">Depende do navegador. Chrome e Edge recentes gravam MP4; versões antigas caem para WebM, que a maioria das redes aceita, ou converta com qualquer conversor.</div></details>
+<details class="faq"><summary>"Navegador sem gravação"</summary><div class="a">Use Chrome ou Edge no computador. Celulares e alguns navegadores não oferecem a gravação necessária.</div></details>
+<details class="faq"><summary>A fala não bate com a boca/legenda</summary><div class="a">Use <b>Ajustar ao áudio</b>, depois <b>Detectar pausas</b> e acerte <code>t0</code>/<code>t1</code> das cenas e o <code>talk</code> dos personagens com esses tempos.</div></details>
+<details class="faq"><summary>"A criação com IA não está configurada"</summary><div class="a">O site precisa de uma chave de algum provedor de IA (Groq, Z.ai, Gemini...) no servidor. Quem administra o site deve configurá-la. Enquanto isso, você pode colar um JSON seu.</div></details>
+<details class="faq"><summary>"Limite de gerações por hora atingido"</summary><div class="a">Existe um limite por pessoa para proteger a cota. Aguarde um pouco e tente de novo.</div></details>
+<details class="faq"><summary>A IA demorou ou deu erro</summary><div class="a">Pode ser instabilidade ou limite do provedor de IA (se o administrador configurou uma reserva, o site troca sozinho). Tente novamente; ideias muito longas ou vagas também atrapalham. Se persistir, simplifique a ideia.</div></details>
+<details class="faq"><summary>Minha biblioteca sumiu</summary><div class="a">Ela fica no navegador. Foi limpa se você apagou dados do site, usou outro navegador ou janela anônima. Importe seu backup em "Minha biblioteca".</div></details>
+</section>
+
+<section class="doc" id="req" data-g="Suporte"><h2>Requisitos e privacidade</h2>
+<ul>
+<li>Node.js 18 ou mais novo e Chrome ou Edge no computador.</li>
+<li>Voz, história e vídeo ficam na sua máquina. Ao usar <b>Criar com IA</b>, apenas o texto da sua ideia é enviado (via servidor) ao provedor de IA. A biblioteca fica só no seu navegador. O servidor registra somente estatísticas dos vídeos (título, duração e estilo), nunca o arquivo.</li>
+<li>Sem dependências: não há <code>npm install</code>.</li>
+</ul>
+</section>
+</main></div>
+
+<footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Shorts Animados · build 9 · <a href="/">voltar ao gerador</a></footer>
+</div>
+<script src="schema.js"></script>
+<script>
+const $=i=>document.getElementById(i),S=SCHEMA;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const table=(rows,head=['Valor','Nome','Quando usar'])=>`<div class="tbl-wrap"><table class="tbl"><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td><code>${esc(r.id)}</code></td><td>${esc(r.label)}</td><td class="muted">${esc(r.desc)}</td></tr>`).join('')}</tbody></table></div>`;
+const chips=a=>`<div class="chips">${a.map(x=>`<code>${esc(x)}</code>`).join('')}</div>`;
+$('t-scenery').innerHTML=table(S.SCENERY);
+$('t-tr').innerHTML=table(S.TRANSITIONS);
+$('t-fx').innerHTML=table(S.FX);
+$('t-anim').innerHTML=table(S.ANIMS);
+$('t-mood').innerHTML=table(S.MOODS);
+$('t-prop').innerHTML=table(S.PROPS);
+$('t-sfx').innerHTML=table(S.SFX);
+$('t-music').innerHTML=table(S.MUSIC);
+$('t-feat').innerHTML=table(S.SCENE_FEATURES,['Recurso','Nome','Como usar']);
+$('c-propanim').innerHTML=chips(S.PROP_ANIMS);
+$('c-look-opts').innerHTML=`<div class="grid g2"><div><b>outfit</b>${chips(S.OUTFITS)}<b>hair</b>${chips(S.HAIRS)}<b>hat</b>${chips(S.HATS)}</div><div><b>hold</b>${chips(S.HOLDS)}<b>marcas (bubbles.mark)</b>${chips(S.MARKS)}</div></div>`;
+$('looks').innerHTML=S.LOOKS.map(l=>`<div class="look"><div class="sw" style="background:linear-gradient(120deg,${l.sw[0]} 55%,${l.sw[1]} 55%)"></div><div class="t"><b>${esc(l.label)}</b><code>${l.id}</code><br><span>${esc(l.desc)}</span></div></div>`).join('');
+
+// Sumário gerado a partir das seções
+const secs=[...document.querySelectorAll('section.doc')];let lastG='',toc='';
+secs.forEach(s=>{const g=s.dataset.g;if(g!==lastG){toc+=`<div class="grp">${esc(g)}</div>`;lastG=g}toc+=`<a href="#${s.id}" data-id="${s.id}">${esc(s.querySelector('h2').textContent)}</a>`});
+$('toc').innerHTML=toc;
+const links=[...document.querySelectorAll('#toc a')];
+const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(a=>a.classList.toggle('on',a.dataset.id===e.target.id))}})},{rootMargin:'-10% 0px -75% 0px'});
+secs.forEach(s=>io.observe(s));
+
+// Busca
+$('q').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();let n=0;
+  secs.forEach(s=>{const hit=!q||s.textContent.toLowerCase().includes(q);s.classList.toggle('hide',!hit);if(hit)n++;
+    const a=links.find(x=>x.dataset.id===s.id);a.classList.toggle('hide',!hit);
+    if(q&&hit)s.querySelectorAll('details.faq').forEach(d=>d.open=d.textContent.toLowerCase().includes(q))});
+  $('empty').style.display=n?'none':'block'});
+</script>
+</body></html>

@@ -5,12 +5,12 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | Arquivo | Para que serve |
 |---|---|
 | index.html | O gerador de vídeo |
-| ajuda.html | Central de ajuda (guia, referência do JSON, solução de problemas) |
+| docs.html | Documentação (guia, referência do JSON, solução de problemas), em `/docs` |
 | admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
 | ai.js | Integração com a IA (roteiro + JSON a partir da ideia do usuário), com troca automática de provedor |
 | providers.js | Catálogo dos provedores de IA grátis (Groq, Z.ai, Gemini, Cerebras, OpenRouter...) |
 | server.js | Servidor local + API do Admin |
-| schema.js | Catálogo do formato de história e validador (usado por Ajuda, Admin e servidor) |
+| schema.js | Catálogo do formato de história e validador (usado por Docs, Admin e servidor) |
 | tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
 | audio.js | Trilha e efeitos sonoros gerados por código |
 | ui.css | Estilos compartilhados |
@@ -59,7 +59,7 @@ O site fala com qualquer provedor que aceite o formato de chat da OpenAI. Já v�
 ## Páginas
 
 - **/** Gerador, com "Criar com IA" e "Minha biblioteca".
-- **/ajuda** Central de ajuda (referência gerada do `schema.js`).
+- **/docs** Documentação (referência gerada do `schema.js`). O endereço antigo `/ajuda` redireciona para ela.
 - **Painel administrativo**: **não tem link em nenhuma página** e `/admin` não existe. O endereço aleatório (ex.: `/painel-1a2b3c4d5e`) aparece no terminal a cada início. Troque em Segurança ou defina `ADMIN_PATH=meu-caminho`. Abas: Painel, IA, Padrões, Histórico, Segurança.
 
 ## Biblioteca do usuário
