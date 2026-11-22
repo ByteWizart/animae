@@ -6,8 +6,8 @@ Pasta única, sem subpastas e sem dependências (não precisa de npm install).
 |---|---|
 | index.html | O gerador de vídeo |
 | ajuda.html | Central de ajuda (guia, referência do JSON, solução de problemas) |
-| admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
-| ai.js | Integração com a Groq (roteiro + JSON a partir da ideia do usuário) |
+| admin.html | Painel administrativo, em endereço secreto (IA: ligar/desligar provedores e trocar o modelo; padrões, histórico, segurança) |
+| ai.js | Integração com a IA: Groq e FreeLLM API (roteiro + JSON a partir da ideia do usuário) |
 | server.js | Servidor local + API do Admin |
 | schema.js | Catálogo do formato de história e validador (usado por Ajuda, Admin e servidor) |
 | audio.js | Trilha e efeitos sonoros gerados por código |
@@ -15,7 +15,7 @@ Pasta única, sem subpastas e sem dependências (não precisa de npm install).
 | PROMPT-MOVIMENTOS.md | Bloco para colar no seu prompt de IA |
 | historia-teste.json | História de exemplo simples |
 | historia-demo-v9.json | História de 30 s que mostra os recursos novos (rua em movimento, gráfico, chat, glitch, holofote, palco...). Carregue em Avançado > Carregar história |
-| dados.json | Criado automaticamente: configurações, chave da Groq, histórico, senha (com hash) e endereço do painel. Não compartilhe |
+| dados.json | Criado automaticamente: configurações, chaves das IAs, histórico, senha (com hash) e endereço do painel. Não compartilhe |
 
 ## Como usar
 
@@ -80,3 +80,18 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 **Limite de tokens por minuto (Groq)**
 - O plano gratuito do `openai/gpt-oss-120b` aceita ~8.000 tokens por minuto (pedido + resposta). O site calcula o tamanho do prompt, compacta o catálogo quando preciso, ajusta o teto de resposta e, se necessário, reduz a duração (avisando na tela). Se a Groq ainda recusar, o servidor reduz a resposta e repete, ou espera o tempo indicado.
 - Com um plano com mais cota, ajuste **Tokens por minuto (TPM)** no painel (aba IA): o prompt completo, com exemplos, e vídeos de 45 a 60 s passam a ser usados.
+
+## Provedores de IA (Admin > IA)
+
+O painel permite **ligar/desligar cada IA** e **trocar o modelo** de cada uma, sem reiniciar o servidor.
+
+| Provedor | Endereço padrão | Chave | Modelo padrão |
+|---|---|---|---|
+| Groq | `https://api.groq.com/openai/v1` | `gsk_…` (console.groq.com) | `openai/gpt-oss-120b` |
+| FreeLLM API ([tashfeenahmed/freellmapi](https://github.com/tashfeenahmed/freellmapi)) | `http://localhost:3001/v1` | `freellmapi-…` (página Keys do painel dele) | `auto` (também `auto:fast`, `auto:smart` ou um modelo específico) |
+
+- **Provedor principal + fallback**: a requisição vai ao principal; se ele falhar (limite, fora do ar), o outro assume automaticamente (desligável).
+- **Buscar modelos** lista o que o provedor oferece (`GET /models`); **Testar conexão** valida chave, endereço e modelo antes de salvar.
+- **TPM** é o limite de tokens por minuto usado para dimensionar o prompt (Groq grátis ≈ 8000; FreeLLM padrão 32000).
+- Variáveis de ambiente (têm prioridade sobre o painel): `GROQ_API_KEY`, `GROQ_URL`, `FREELLM_API_KEY`, `FREELLM_URL`.
+- Instalações antigas são migradas sozinhas: a chave/modelo da Groq do `dados.json` continuam valendo.
