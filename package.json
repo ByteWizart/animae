@@ -1,5 +1,5 @@
 {
-  "name": "shorts-animados",
+  "name": "animae",
   "version": "0.4.0",
   "description": "Gera shorts animados verticais no navegador. Voz com IA opcional (msedge-tts).",
   "scripts": { "start": "node server.js" },

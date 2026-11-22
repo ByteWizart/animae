@@ -33,7 +33,7 @@ const PROVIDERS = {
     url: 'https://openrouter.ai/api/v1/chat/completions', onlyFree: true,
     model: 'openrouter/free', models: ['openrouter/free'],
     tpm: 30000, free: 'Sem cartão. Dezenas de modelos com sufixo :free, de várias empresas (cerca de 20 pedidos por minuto e 50 por dia). O modelo "openrouter/free" escolhe sozinho um modelo grátis disponível.',
-    headers: { 'X-Title': 'Shorts Animados' },
+    headers: { 'X-Title': 'Animaê' },
   },
   cloudflare: {
     label: 'Cloudflare Workers AI', families: ['Llama', 'GPT-OSS', 'Qwen', 'Gemma'], env: ['CLOUDFLARE_API_TOKEN', 'CF_API_TOKEN'], signup: 'https://dash.cloudflare.com/profile/api-tokens',

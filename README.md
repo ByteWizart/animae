@@ -1,4 +1,4 @@
-# Gerador de Shorts Animados (no navegador, sem API paga)
+# Animaê: gerador de shorts animados (no navegador, sem API paga)
 
 Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (voz com IA): rode `npm install` uma vez. Sem ela, tudo funciona, menos a voz com IA.
 

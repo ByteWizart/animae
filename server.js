@@ -230,7 +230,7 @@ let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
 const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
 
 function status() {
-  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'theme.js', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
+  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'theme.js', 'favicon.svg', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
@@ -255,7 +255,7 @@ const ICON_API = 'https://api.iconify.design';
 const ICON_SETS = ['noto', 'fluent-emoji-flat', 'twemoji', 'openmoji', 'flat-color-icons']; // 1º conjunto = estilo principal
 const iconMiss = new Map(); // chave -> expira (cache negativo curto)
 const iconHits = new Map(); // ip -> [timestamps] (só pedidos que vão à internet)
-const iconFetch = async u => { const r = await fetch(u, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'shorts-animados' } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r; };
+const iconFetch = async u => { const r = await fetch(u, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'animae' } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r; };
 async function iconResolve(q) {
   for (const prefixes of [ICON_SETS[0], ICON_SETS.slice(1).join(',')]) {
     const j = await (await iconFetch(`${ICON_API}/search?query=${encodeURIComponent(q)}&prefixes=${prefixes}&limit=12`)).json();
@@ -496,7 +496,7 @@ http.createServer((req, res) => {
     res.end(req.method === 'HEAD' ? undefined : d);
   });
 }).listen(PORT, () => {
-  console.log('Gerador de Shorts Animados · build ' + BUILD);
+  console.log('Animaê · build ' + BUILD);
   console.log('  Gerador: http://localhost:' + PORT);
   console.log('  Docs:    http://localhost:' + PORT + '/docs');
   console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
