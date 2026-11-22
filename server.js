@@ -126,6 +126,46 @@ function status() {
   };
 }
 
+
+/* ---------- ícones online (Iconify, API pública, sem chave) ---------- */
+// Um proxy com cache em disco: o navegador pede /api/icon?q=rocket (ou ?id=noto:rocket) no mesmo endereço do site,
+// então o desenho no canvas não "contamina" a gravação do vídeo, e cada ícone só é baixado uma vez.
+const ICON_DIR = path.join(dir, '.cache-icones');
+const ICON_API = 'https://api.iconify.design';
+const ICON_SETS = ['noto', 'fluent-emoji-flat', 'twemoji', 'openmoji', 'flat-color-icons']; // 1º conjunto = estilo principal
+const iconMiss = new Map(); // chave -> expira (cache negativo curto)
+const iconHits = new Map(); // ip -> [timestamps] (só pedidos que vão à internet)
+const iconFetch = async u => { const r = await fetch(u, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'shorts-animados' } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r; };
+async function iconResolve(q) {
+  for (const prefixes of [ICON_SETS[0], ICON_SETS.slice(1).join(',')]) {
+    const j = await (await iconFetch(`${ICON_API}/search?query=${encodeURIComponent(q)}&prefixes=${prefixes}&limit=12`)).json();
+    const ids = (j.icons || []).filter(i => /^[a-z0-9-]+:[a-z0-9-]+$/.test(i));
+    if (ids.length) { // respeita a ordem de preferência dos conjuntos
+      ids.sort((a, b) => ICON_SETS.indexOf(a.split(':')[0]) - ICON_SETS.indexOf(b.split(':')[0]));
+      return ids[0];
+    }
+  }
+  return null;
+}
+async function iconGet(q, id) {
+  const key = id || 'q:' + q, file = path.join(ICON_DIR, crypto.createHash('sha1').update(key).digest('hex') + '.svg');
+  try { return fs.readFileSync(file); } catch {}
+  if ((iconMiss.get(key) || 0) > Date.now()) throw { code: 404, msg: 'Ícone não encontrado.' };
+  try {
+    const rid = id || await iconResolve(q);
+    if (!rid) throw { code: 404, msg: 'Ícone não encontrado.' };
+    const [pre, name] = rid.split(':');
+    const svg = Buffer.from(await (await iconFetch(`${ICON_API}/${pre}/${name}.svg?height=256`)).arrayBuffer());
+    if (!/<svg/i.test(svg.slice(0, 400).toString()) || svg.length > 300e3) throw new Error('SVG inválido');
+    fs.mkdirSync(ICON_DIR, { recursive: true }); fs.writeFileSync(file, svg);
+    return svg;
+  } catch (e) {
+    if (e && e.code) { iconMiss.set(key, Date.now() + 600e3); throw e; }
+    console.warn('Ícone falhou:', key, e.message);
+    throw { code: 502, msg: 'Não consegui buscar o ícone (sem internet ou serviço fora do ar).' };
+  }
+}
+
 /* ---------- rotas da API ---------- */
 async function api(req, res, p) {
   const m = req.method;
@@ -165,6 +205,24 @@ async function api(req, res, p) {
     if (p === '/api/ai/prompt' && m === 'GET') {
       const q = new URL(req.url, 'http://x').searchParams, seconds = [20, 30, 45, 60].includes(+q.get('seconds')) ? +q.get('seconds') : 30;
       return send(res, 200, { prompt: AI.systemPrompt({ seconds, look: SCHEMA.SET.look.has(q.get('look')) ? q.get('look') : '', format: q.get('format') || 'auto', tone: q.get('tone') || 'auto', lang: q.get('lang') || '', music: q.get('music') || '', cast: +q.get('cast') || 0, extra: db.ai.extra || '' }) });
+    }
+
+
+    // Ícone da biblioteca online (SVG). Só pedidos que vão à internet contam no limite por IP.
+    if (p === '/api/icon' && m === 'GET') {
+      const qs = new URL(req.url, 'http://x').searchParams;
+      const id = /^[a-z0-9-]{2,40}:[a-z0-9-]{1,80}$/.test(qs.get('id') || '') ? qs.get('id') : '';
+      const q = str(qs.get('q'), 40).toLowerCase().replace(/[^a-z0-9 -]/g, '').trim();
+      if (!id && q.length < 2) return send(res, 400, { error: 'Informe q (palavra em inglês) ou id (ex.: noto:rocket).' });
+      const key = id || 'q:' + q, cached = fs.existsSync(path.join(ICON_DIR, crypto.createHash('sha1').update(key).digest('hex') + '.svg'));
+      if (!cached) {
+        const ip = ipOf(req), now = Date.now(), h = (iconHits.get(ip) || []).filter(x => now - x < 3600e3);
+        if (h.length >= 400) return send(res, 429, { error: 'Muitos ícones novos por hora. Tente mais tarde.' });
+        h.push(now); iconHits.set(ip, h);
+      }
+      const svg = await iconGet(q, id);
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'" });
+      return res.end(svg);
     }
 
     // Voz com IA (TTS): texto -> MP3. Sem chave de API; limite por IP e poucas gerações ao mesmo tempo.

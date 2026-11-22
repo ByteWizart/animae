@@ -58,8 +58,8 @@ const FULL_DATA = `Móveis e prédios usam y = chão. Objetos pequenos têm x,y 
   checklist {"items":["a","b",{"t":"c","ok":false}],"gap":0.7,"s":600}   chat {"msgs":[{"w":0,"t":"oi"},{"w":1,"t":"olá"}],"gap":1,"name":"Mãe","s":560}
   callout {"t":"até 8 palavras","tx":x_alvo,"ty":y_alvo,"s":260}   stamp {"t":"FALSO","color":"#e23b3b","s":360}   headline {"tag":"URGENTE","t":"manchete curta","s":500}
   gauge/thermo/donut/battery {"v":0 a 1}   clock {"h","m"} ou {"spin":true}   calendar {"t":"21","m":"NOV"}   burst/versus {"t":"POW!"}   notification {"t","b","icon"}   lock {"open":true}
-  "sign" e "text": no máximo 2 palavras curtas (sign s≥300; text s≤300). NUNCA use "emoji".`;
-const SHORT_DATA = `Móveis e prédios: y = chão. Dados: chart{kind:bar|line|pie|donut,data:[n],labels:[],t,vals} counter{from,to,pre,suf} checklist{items:[]} chat{msgs:[{w:0|1,t}]} callout{t,tx,ty} stamp{t} headline{tag,t} gauge/thermo/donut{v 0-1} clock calendar burst{t}. sign/text: até 2 palavras. Nunca "emoji".`;
+  "sign" e "text": no máximo 2 palavras curtas (sign s≥300; text s≤300). NUNCA use "emoji". icon {"q":"locomotive"} (biblioteca online de milhares de objetos coloridos: q = 1–2 palavras em INGLÊS; use só quando nenhum objeto do catálogo servir; no máximo 3 por cena; s 220–320).`;
+const SHORT_DATA = `Móveis e prédios: y = chão. Dados: chart{kind:bar|line|pie|donut,data:[n],labels:[],t,vals} counter{from,to,pre,suf} checklist{items:[]} chat{msgs:[{w:0|1,t}]} callout{t,tx,ty} stamp{t} headline{tag,t} gauge/thermo/donut{v 0-1} clock calendar burst{t}. sign/text: até 2 palavras. Nunca "emoji". icon{q:"palavra em inglês"} só se o catálogo não tiver o objeto.`;
 function catalogText(level) {
   const S = SCHEMA;
   const nonEmoji = S.PROPS.filter(p => p.id !== 'emoji');

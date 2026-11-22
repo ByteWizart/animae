@@ -154,6 +154,7 @@
     L('ring', 'Círculo de destaque', 'Contorno para chamar atenção.'),
     L('text', 'Rótulo', '"t" com 1–2 palavras.'),
     L('bar', 'Barra de progresso', '"v" de 0 a 1 e "dur".'),
+    L('icon', 'Ícone da biblioteca online', '"q":"rocket" (1–2 palavras em inglês) ou "id":"noto:rocket". Milhares de objetos coloridos; use quando nenhum objeto do catálogo servir. s≈260. Precisa do servidor com internet.'),
     L('emoji', 'Emoji', '"t":"😀".'),
     L('circle', 'Círculo', 'Forma simples.'),
     L('rect', 'Retângulo', 'Forma simples.'),
@@ -362,6 +363,7 @@
         if (!pr.type) E(q, 'Objeto sem "type".'); else oneOf(`${q}.type`, pr.type, SET.prop, 'Objeto');
         if (!num(pr.x) || !num(pr.y)) E(q, '"x" e "y" devem ser números.');
         else if ((pr.type === 'sign' || pr.type === 'text') && pr.y > 1250 && pr.y < 1450) W(q, 'Placa/rótulo na faixa y 1250–1450, onde fica a legenda do vídeo.');
+        if (pr.type === 'icon' && !String(pr.q || pr.id || '').trim()) E(q, 'O objeto "icon" precisa de "q" (palavra em inglês) ou "id".');
         if (pr.type === 'emoji') W(q, 'Evite o objeto "emoji": use os objetos desenhados do catálogo.');
         oneOf(`${q}.anim`, pr.anim, SET.propAnim, 'Animação de objeto');
       });
