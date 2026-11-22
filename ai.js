@@ -36,9 +36,31 @@ const LANGS = { 'pt-BR': 'português do Brasil', en: 'inglês', es: 'espanhol', 
 const LOOK_MUSIC = { noir: 'mystery', neon: 'retro', retro: 'retro', pixel: 'retro', blueprint: 'chill', pastel: 'calm', vintage: 'sad', comic: 'happy', sketch: 'calm', cartoon: 'calm' };
 
 /* ------------------------------------------------------------------ prompt ------------------------------------------------------------------ */
+// Estimativa grosseira de tokens (português + JSON ~ 3 caracteres por token).
+const estTok = t => Math.ceil(String(t).length / 3);
+const msgTok = m => m.reduce((n, x) => n + estTok(x.content) + 8, 0);
+// Escolhe o nível de compactação do prompt e o teto de saída para caber no limite de tokens por minuto (TPM) da Groq.
+function budget({ build, user, maxTokens, tpm, minOut }) {
+  tpm = tpm || 8000; minOut = minOut || 3800;
+  let res = null;
+  for (let level = 0; level <= 2; level++) {
+    const sys = build(level), inTok = estTok(sys) + estTok(user) + 40, out = Math.min(maxTokens || 12000, tpm - inTok - 250);
+    res = { sys, level, inTok, out };
+    if (out >= minOut) break;
+  }
+  return res;
+}
 const idsOf = a => a.map(x => (typeof x === 'string' ? x : x.id)).join(' | ');
 
-function catalogText() {
+const FULL_DATA = `Móveis e prédios usam y = chão. Objetos pequenos têm x,y no centro. Props com dados:
+  chart {"kind":"bar|line|pie|donut","data":[30,55,40],"labels":["A","B","C"],"t":"título","vals":true,"s":600}
+  counter {"from":0,"to":1250000,"pre":"R$ ","suf":"","dec":0,"dur":1.6,"s":150}
+  checklist {"items":["a","b",{"t":"c","ok":false}],"gap":0.7,"s":600}   chat {"msgs":[{"w":0,"t":"oi"},{"w":1,"t":"olá"}],"gap":1,"name":"Mãe","s":560}
+  callout {"t":"até 8 palavras","tx":x_alvo,"ty":y_alvo,"s":260}   stamp {"t":"FALSO","color":"#e23b3b","s":360}   headline {"tag":"URGENTE","t":"manchete curta","s":500}
+  gauge/thermo/donut/battery {"v":0 a 1}   clock {"h","m"} ou {"spin":true}   calendar {"t":"21","m":"NOV"}   burst/versus {"t":"POW!"}   notification {"t","b","icon"}   lock {"open":true}
+  "sign" e "text": no máximo 2 palavras curtas (sign s≥300; text s≤300). NUNCA use "emoji".`;
+const SHORT_DATA = `Móveis e prédios: y = chão. Dados: chart{kind:bar|line|pie|donut,data:[n],labels:[],t,vals} counter{from,to,pre,suf} checklist{items:[]} chat{msgs:[{w:0|1,t}]} callout{t,tx,ty} stamp{t} headline{tag,t} gauge/thermo/donut{v 0-1} clock calendar burst{t}. sign/text: até 2 palavras. Nunca "emoji".`;
+function catalogText(level) {
   const S = SCHEMA;
   const nonEmoji = S.PROPS.filter(p => p.id !== 'emoji');
   return `CATÁLOGO (use SOMENTE estes valores; qualquer outro é ignorado)
@@ -49,13 +71,7 @@ function catalogText() {
 - actors[]: {"x","y"(pés),"h"(altura),"outfit":${idsOf(S.OUTFITS)},"hair":${idsOf(S.HAIRS)},"hat":${idsOf(S.HATS)},"glasses":true,"skin":"#hex","hairc":"#hex","hatc":"#hex","color":"#hex"(roupa),"cape":true,"tag":"nome","anim":${idsOf(S.ANIMS)},"mood":${idsOf(S.MOODS)},"talk":[ini,fim],"seq":[{"t","anim","mood","look"(-1 a 1)}],"to":{"x","y","dur","move"} ou lista,"bubbles":[{"t","end","say":"até 4 palavras"} ou {"t","end","mark":${S.MARKS.join('|')}}],"hold":${idsOf(S.HOLDS)},"holdL":(mesmos itens),"holdT":"texto da placa","flip":true,"at","end","still":true}
   Valores típicos: y 1350–1560, h 420–560, x 150–930. Quem tem "to" anda sozinho (não use walk). Para sentar: anim sit com o mesmo y de chair/sofa/bed. skin sugeridos: #f7e2d0 #e8c39e #c68b59 #8d5524 #5c3a21.
 - props[]: {"type":${idsOf(nonEmoji)},"x","y","s"(tamanho),"color","t","at","anim":${S.PROP_ANIMS.join('|')},"alpha","front","rot","flip","to"}.
-  Móveis e prédios usam y = chão. Objetos pequenos têm x,y no centro. Props com dados:
-  chart {"kind":"bar|line|pie|donut","data":[30,55,40],"labels":["A","B","C"],"t":"título","vals":true,"s":600}
-  counter {"from":0,"to":1250000,"pre":"R$ ","suf":"","dec":0,"dur":1.6,"s":150}
-  checklist {"items":["a","b",{"t":"c","ok":false}],"gap":0.7,"s":600}   chat {"msgs":[{"w":0,"t":"oi"},{"w":1,"t":"olá"}],"gap":1,"name":"Mãe","s":560}
-  callout {"t":"até 8 palavras","tx":x_alvo,"ty":y_alvo,"s":260}   stamp {"t":"FALSO","color":"#e23b3b","s":360}   headline {"tag":"URGENTE","t":"manchete curta","s":500}
-  gauge/thermo/donut/battery {"v":0 a 1}   clock {"h","m"} ou {"spin":true}   calendar {"t":"21","m":"NOV"}   burst/versus {"t":"POW!"}   notification {"t","b","icon"}   lock {"open":true}
-  "sign" e "text": no máximo 2 palavras curtas (sign s≥300; text s≤300). NUNCA use "emoji".
+  ${level >= 2 ? SHORT_DATA : FULL_DATA}
 - cena: "title":{"t","anim":slam|rise|type|pulse,"at","y":0.25,"size":150,"color","end"} | "lower":{"t","sub","at","end"} | "spot":{"x","y","r","a","follow":índice} | "bars":0.08 | "punch":[{"t","z":0.12}] | "flashes":[{"t","dur","color"}] | "shakes":[{"t","dur","amp"}] | "scroll":px/s (fundo andando, para viagem/corrida) | cam.hand:1 (câmera na mão).
 - cam: {"z0":1,"z1":1.2,"x0":540,"x1":600,"y0":960,"y1":1050,"r0":0,"r1":0} (zoom 1–1.6, x 400–680, y 900–1150) ou {"keys":[{"t","z","x","y","r"},...]} (preencha os 4 campos em cada ponto) ou {"follow":índice_do_ator,"z0","z1","fy":380}.
 - sfx (lista no topo): [{"t","type":${idsOf(S.SFX)},"f"(Hz p/ thud/ping/bell),"len","amp"}]
@@ -67,7 +83,7 @@ function systemPrompt(opts) {
   const S = SCHEMA, target = opts.seconds || 30, nScenes = Math.max(4, Math.round(target / 5.5));
   const fmt = FORMATS[opts.format] || FORMATS.auto, tone = TONES[opts.tone] || TONES.auto;
   const lang = LANGS[opts.lang] || LANGS['pt-BR'];
-  const edit = opts.mode === 'edit';
+  const edit = opts.mode === 'edit', level = opts.level || 0;
   const lookRule = opts.look ? `ESTILO: use obrigatoriamente "style":{"look":"${opts.look}"}.` : `ESTILO: escolha UM em "style":{"look":...} conforme o tema: ${S.LOOKS.map(l => l.id + ' (' + l.desc.split('.')[0] + ')').join('; ')}.`;
   const musicRule = opts.music && S.SET.music.has(opts.music) ? `Trilha: use obrigatoriamente "music":"${opts.music}" em style.` : `Trilha: escolha em style.music conforme o clima${tone.music ? ' (sugestão: ' + tone.music + ')' : ''}: calm, happy, tense, epic, mystery, sad, chill, retro, none.`;
   const cast = opts.cast ? `Elenco: use exatamente ${opts.cast} personagem(ns) recorrente(s)${opts.cast > 1 ? ', cada um com tag (nome) e visual bem diferente' : ''}.` : 'Elenco: 1 a 3 personagens recorrentes; com 2 ou mais, use tag (nome) em cada um.';
@@ -97,6 +113,7 @@ SAÍDA: exatamente estas chaves, NESTA ORDEM (primeiro planeje, depois escreva):
 - ${cast} Mantenha o MESMO visual de cada personagem em todas as cenas (outfit, hair, hat, skin, color). Continuidade: se ele sai andando da direita, entra na cena seguinte pela esquerda ou no mesmo ponto.
 - ${lookRule} Não inclua "style.caption" (o site já aplica o padrão). ${musicRule}`;
 
+  const DIR_MIN = `DIREÇÃO\n- Algo muda a cada 2–3 s (seq, câmera, objeto entrando com "at", punch). Toda cena tem cam (alterne z 1.0/1.15/1.3). A cena 1 prende em 1 s (title slam, objeto grande ou ação forte).\n- Números → chart ou counter; pessoa/lugar → lower; lista → checklist; comparação → versus. Emoção → anim/mood/fx/sfx coerentes (medo: cower+scared+fog+heartbeat; alegria: cheer+confetti+success).\n- sfx em trocas de cena e impactos; música coerente.\nCHECAGEM: captions somam o roteiro; só valores do catálogo; sem "emoji"; sign/text até 2 palavras; legenda livre em y 1250–1450; tempos dentro da cena; JSON válido.`;
   const direcao = `DIREÇÃO (o que separa um short bom de um fraco)
 - Ritmo: a cada 2–3 s algo muda (animação via seq, humor, olhar, ponto de câmera, objeto entrando com "at", punch de zoom). Cada ideia nova da narração ganha um elemento visual novo; nunca deixe uma cena parada.
 - Câmera: toda cena tem cam. Alterne abertura (z 1.0), plano médio (1.15) e close (1.3–1.5). Aproxime em tensão, afaste no final, use punch nas viradas e hand:1 em suspense.
@@ -119,7 +136,7 @@ CHECAGEM FINAL (mentalmente, antes de responder): captions somam o roteiro; nenh
 
   const tarefa = edit ? '' : '\nTAREFA: crie o short para a ideia abaixo.';
   const extra = opts.extra ? `\n\nINSTRUÇÕES DA CASA (têm prioridade sobre o estilo padrão acima):\n${String(opts.extra).slice(0, 2000)}` : '';
-  return [head, roteiro, story, catalogText(), direcao, rec.join('\n\n')].join('\n\n') + tarefa + extra;
+  return [head, roteiro, story, catalogText(level), level >= 2 ? DIR_MIN : direcao].concat(level >= 1 ? [] : [rec.join('\n\n')]).join('\n\n') + tarefa + extra;
 }
 
 /* ------------------------------------------------------------------ limpeza e direção automática ------------------------------------------------------------------ */
@@ -231,7 +248,7 @@ async function callGroq({ key, model, messages, maxTokens, temperature, json }) 
   if (json !== false) body.response_format = { type: 'json_object' };
   // Modelos de raciocínio (gpt-oss) gastam tokens pensando: pedimos pouco raciocínio e escondemos o texto dele.
   if (/gpt-oss/i.test(model)) { body.reasoning_effort = 'low'; body.include_reasoning = false; }
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 120e3);
     let r, j = {};
     try {
@@ -246,7 +263,17 @@ async function callGroq({ key, model, messages, maxTokens, temperature, json }) 
     if (r.status === 400 && /reasoning|include_reasoning/i.test(msg) && body.reasoning_effort) { delete body.reasoning_effort; delete body.include_reasoning; continue; }
     if (r.status === 401) throw httpErr(502, 'A chave da Groq foi recusada. Peça ao administrador para conferir a chave.');
     if (r.status === 404 || (r.status === 400 && /model/i.test(msg))) throw httpErr(502, 'Modelo da Groq indisponível: ' + msg);
-    if (r.status === 413 || (r.status === 429 && /tokens/i.test(msg) && /request/i.test(msg))) throw httpErr(502, 'O pedido ficou grande demais para a cota da Groq. Reduza a duração ou o tamanho da ideia. ' + msg.slice(0, 160));
+    const lim = /Limit (\d+)/i.exec(msg), req = /Requested (\d+)/i.exec(msg), wait = /try again in ([\d.]+)\s*(ms|s|m)/i.exec(msg);
+    if ((r.status === 429 || r.status === 413) && /tokens/i.test(msg) && lim && req) {
+      const L = +lim[1], R = +req[1];
+      if (R > L) { // este pedido sozinho passa do limite por minuto: reduz a saída e tenta de novo
+        const nm = body.max_tokens - (R - L) - 150;
+        if (nm >= 2500) { body.max_tokens = nm; continue; }
+        throw httpErr(502, `O pedido é grande demais para o limite do seu plano da Groq (${L} tokens por minuto). Reduza a duração ou o tamanho da ideia, ou use um modelo/plano com limite maior.`);
+      }
+      if (wait && attempt < 4) { const ms = Math.min(45000, Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400); await new Promise(res => setTimeout(res, ms)); continue; } // limite do minuto: espera e repete
+    }
+    if (r.status === 413) throw httpErr(502, 'O pedido ficou grande demais para a Groq. Reduza a duração ou o tamanho da ideia.');
     if (r.status === 429) throw httpErr(429, 'A Groq atingiu o limite de uso. Tente novamente em instantes.');
     throw httpErr(502, 'Erro da Groq (' + r.status + '): ' + (msg || 'sem detalhes'));
   }
@@ -286,9 +313,10 @@ function checkResult(obj, look, ctx) {
   return { issues, errs: issues.filter(i => i.level === 'erro') };
 }
 
-async function runStory({ key, model, maxTokens, messages, look, ctx }) {
+async function runStory({ key, model, maxTokens, messages, look, ctx, tpm }) {
   let out = null, issues = [], raw = '';
   for (let round = 0; round < 2; round++) {
+    if (round > 0 && msgTok(messages) + maxTokens > (tpm || 8000)) break; // a conversa de correção não cabe na cota por minuto
     raw = await callGroq({ key, model, messages, maxTokens });
     const obj = parseModelJson(raw);
     if (!obj || !obj.story) {
@@ -316,21 +344,32 @@ const optClean = o => ({
 });
 
 /* ------------------------------------------------------------------ operações ------------------------------------------------------------------ */
-async function generate({ key, model, maxTokens, idea, extra, ...raw }) {
-  const o = optClean({ ...raw, extra });
-  const messages = [{ role: 'system', content: systemPrompt(o) }, { role: 'user', content: 'Ideia do vídeo:\n' + idea }];
+async function generate({ key, model, maxTokens, tpm, idea, extra, ...raw }) {
+  tpm = tpm || 8000;
+  const o = optClean({ ...raw, extra }), maxIdea = tpm <= 10000 ? 2800 : 6000;
+  const user = 'Ideia do vídeo:\n' + String(idea).slice(0, maxIdea), need = sec => 1500 + sec * 100;
+  let b = budget({ build: l => systemPrompt({ ...o, level: l }), user, maxTokens, tpm, minOut: need(o.seconds) }), notice = '';
+  if (b.out < need(o.seconds)) { // reduz a duração até caber na cota de tokens por minuto
+    const orig = o.seconds;
+    for (const sec of [45, 30, 20]) if (sec < orig) { o.seconds = sec; b = budget({ build: l => systemPrompt({ ...o, level: l }), user, maxTokens, tpm, minOut: need(sec) }); if (b.out >= need(sec)) break; }
+    if (o.seconds !== orig) notice = `Duração ajustada de ${orig} s para ${o.seconds} s: o limite de ${tpm} tokens por minuto do seu plano da Groq não comporta vídeos maiores de uma vez.`;
+  }
+  if (b.out < 2800) throw httpErr(413, 'A ideia é longa demais para o limite de tokens por minuto da Groq. Resuma a ideia.');
+  const messages = [{ role: 'system', content: b.sys }, { role: 'user', content: user }];
   const ctx = { music: o.music, toneMusic: (TONES[o.tone] || {}).music || '' };
-  const { out, issues, script } = await runStory({ key, model, maxTokens, messages, look: o.look, ctx });
-  return { title: cleanStr(out.titulo || 'Sem título', 80), script, story: out.story, issues, plan: cleanPlan(out.plano), publish: cleanPublish(out.publicacao) };
+  const { out, issues, script } = await runStory({ key, model, maxTokens: b.out, messages, look: o.look, ctx, tpm });
+  return { title: cleanStr(out.titulo || 'Sem título', 80), script, story: out.story, issues, plan: cleanPlan(out.plano), publish: cleanPublish(out.publicacao), notice };
 }
 
 // Edita uma história existente seguindo uma instrução ("deixe mais dinâmico", "troque para noite"...).
-async function refine({ key, model, maxTokens, story, script, instruction, extra, ...raw }) {
-  const o = optClean({ ...raw, extra });
-  const sj = JSON.stringify(story);
-  if (sj.length > 60000) throw httpErr(413, 'A história é grande demais para editar com a IA (limite ~60 mil caracteres).');
-  const messages = [{ role: 'system', content: systemPrompt({ ...o, mode: 'edit' }) }, { role: 'user', content: `INSTRUÇÃO DE EDIÇÃO:\n${instruction}\n\nROTEIRO ATUAL:\n${script || '(use as captions das cenas)'}\n\nSTORY ATUAL (JSON):\n${sj}` }];
-  const { out, issues, script: sc } = await runStory({ key, model, maxTokens, messages, look: o.look || '', ctx: { music: '', toneMusic: '' } });
+async function refine({ key, model, maxTokens, tpm, story, script, instruction, extra, ...raw }) {
+  tpm = tpm || 8000;
+  const o = optClean({ ...raw, extra }), sj = JSON.stringify(story);
+  const user = `INSTRUÇÃO DE EDIÇÃO:\n${instruction}\n\nROTEIRO ATUAL:\n${script || '(use as captions das cenas)'}\n\nSTORY ATUAL (JSON):\n${sj}`;
+  const b = budget({ build: l => systemPrompt({ ...o, mode: 'edit', level: Math.max(1, l) }), user, maxTokens, tpm, minOut: Math.min(5200, Math.ceil(estTok(sj) * 1.15) + 500) });
+  if (b.out < Math.ceil(estTok(sj) * 1.05) + 300) throw httpErr(413, `A história é grande demais para a IA editar dentro do limite de ${tpm} tokens por minuto da Groq. Edite pelo JSON ou use um plano/modelo com limite maior.`);
+  const messages = [{ role: 'system', content: b.sys }, { role: 'user', content: user }];
+  const { out, issues, script: sc } = await runStory({ key, model, maxTokens: b.out, messages, look: o.look || '', ctx: { music: '', toneMusic: '' }, tpm });
   return { title: cleanStr(out.titulo || '', 80), script: sc, story: out.story, issues, summary: cleanStr(out.resumo_mudancas, 400) };
 }
 
@@ -355,13 +394,13 @@ function outline(st) {
     return `${i + 1}) ${s.t0}-${s.t1}s [${s.scenery || '?'}${s.tr ? ' tr=' + s.tr : ''}] cam=${s.cam ? (s.cam.keys ? 'keys' : `${s.cam.z0 || 1}->${s.cam.z1 || 1}`) : 'nenhuma'} fx=${asArr(s.fx).join(',') || '-'} props=${asArr(s.props).map(p => p.type).join(',') || '-'} atores=${acts.join(' | ') || '-'} extras=${['title', 'lower', 'spot', 'punch', 'flashes', 'shakes', 'scroll'].filter(k => s[k]).join(',') || '-'}\n   fala: ${s.caption || ''}`;
   }).join('\n');
 }
-async function review({ key, model, story, script }) {
+async function review({ key, model, story, script, tpm }) {
   const sys = `Você é um diretor de shorts animados exigente e construtivo. Avalie o roteiro e a direção (resumo por cena) quanto a: gancho nos 3 primeiros segundos, ritmo (algo muda a cada 2–3 s), clareza, variedade de câmera/cenário/transição, uso de som e de recursos visuais (gráficos, títulos, efeitos), continuidade de elenco e fecho. Seja específico (cite o número da cena).
 Os recursos existentes são: cenários ${idsOf(SCHEMA.SCENERY)}; fx ${idsOf(SCHEMA.FX)}; transições ${idsOf(SCHEMA.TRANSITIONS)}; trilhas ${idsOf(SCHEMA.MUSIC)}; e os recursos de cena title, lower, spot, bars, punch, flashes, shakes, scroll, cam.hand, além de objetos de dados (chart, counter, checklist, chat, callout, stamp, headline...).
 Responda SOMENTE JSON: {"nota":0 a 10,"resumo":"2 frases","pontos_fortes":["..."],"problemas":[{"cena":número ou 0 para geral,"problema":"...","correcao":"o que fazer, usando recursos existentes"}],"instrucao_refino":"UMA instrução objetiva (até 700 caracteres) que aplique as correções mais importantes quando enviada a um editor automático"}`;
   const stl = (story && story.style) || {};
   const user = `ROTEIRO:\n${script || ''}\n\nDIREÇÃO POR CENA (total ${story && story.total}s, estilo ${stl.look || 'cartoon'}, trilha ${(isObj(stl.music) ? stl.music.type : stl.music) || 'nenhuma'}, sfx ${asArr(story && story.sfx).length}):\n${outline(story)}`;
-  const raw = await callGroq({ key, model, maxTokens: 3000, temperature: 0.4, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] });
+  const raw = await callGroq({ key, model, maxTokens: Math.max(1500, Math.min(3000, (tpm || 8000) - estTok(sys + user) - 400)), temperature: 0.4, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] });
   const o = parseModelJson(raw);
   if (!o) throw httpErr(502, 'A IA não devolveu uma avaliação utilizável. Tente de novo.');
   return { score: Math.max(0, Math.min(10, +o.nota || 0)), summary: cleanStr(o.resumo, 500), strengths: asArr(o.pontos_fortes).map(x => cleanStr(x, 200)).slice(0, 6),
@@ -385,14 +424,15 @@ function collectTexts(st) {
   }
   return refs;
 }
-async function translate({ key, model, maxTokens, story, script, lang }) {
+async function translate({ key, model, maxTokens, tpm, story, script, lang }) {
+  tpm = tpm || 8000;
   if (!LANGS[lang]) throw httpErr(400, 'Idioma não suportado.');
   const st = JSON.parse(JSON.stringify(story)), refs = collectTexts(st);
   const items = [String(script || ''), ...refs.map(r => String(r.o[r.k]))];
   const total = items.reduce((n, t) => n + t.length, 0);
-  if (total > 30000) throw httpErr(413, 'Texto grande demais para traduzir.');
+  if (estTok(JSON.stringify(items)) * 2 + 500 > tpm) throw httpErr(413, 'Há texto demais para traduzir de uma vez dentro do limite de tokens por minuto da Groq.');
   const sys = `Você é tradutor de legendas e roteiros de vídeos curtos. Traduza cada item da lista para ${LANGS[lang]}, mantendo tom, sentido e brevidade (os textos precisam caber na tela e na fala no mesmo tempo; textos de 1 a 3 palavras continuam curtos). Preserve números, símbolos de moeda, hashtags e nomes próprios. O item 0 é o roteiro completo; os demais são textos da tela, na mesma ordem. Responda SOMENTE JSON: {"itens":["...","..."]} com exatamente ${items.length} itens, na mesma ordem.`;
-  const raw = await callGroq({ key, model, maxTokens: Math.min(maxTokens || 8000, 8000), temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify({ itens: items }) }] });
+  const raw = await callGroq({ key, model, maxTokens: Math.max(1500, Math.min(maxTokens || 8000, tpm - estTok(JSON.stringify(items)) - 700)), temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify({ itens: items }) }] });
   const o = parseModelJson(raw);
   if (!o || !Array.isArray(o.itens) || o.itens.length !== items.length) throw httpErr(502, 'A tradução voltou incompleta. Tente de novo.');
   refs.forEach((r, i) => { const v = cleanStr(o.itens[i + 1], 400); if (v) r.o[r.k] = v; });

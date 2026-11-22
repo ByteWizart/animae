@@ -23,7 +23,7 @@ const DEFAULTS = () => ({
   },
   auth: null,
   adminPath: null,
-  ai: { enabled: true, model: 'openai/gpt-oss-120b', key: '', perHour: 20, maxTokens: 12000, extra: '' },
+  ai: { enabled: true, model: 'openai/gpt-oss-120b', key: '', perHour: 20, maxTokens: 12000, extra: '', tpm: 8000 },
   history: [],
 });
 let db = DEFAULTS();
@@ -104,7 +104,7 @@ function cleanSettings(s, cur) {
 }
 const publicSettings = () => db.settings;
 
-const aiInfo = () => { const k = groqKey(); return { enabled: !!db.ai.enabled, model: db.ai.model, perHour: db.ai.perHour, hasKey: !!k, keyHint: k ? '…' + k.slice(-4) : '', keyFromEnv: !!process.env.GROQ_API_KEY, extra: db.ai.extra || '' }; };
+const aiInfo = () => { const k = groqKey(); return { enabled: !!db.ai.enabled, model: db.ai.model, perHour: db.ai.perHour, hasKey: !!k, keyHint: k ? '…' + k.slice(-4) : '', keyFromEnv: !!process.env.GROQ_API_KEY, extra: db.ai.extra || '', tpm: db.ai.tpm || 8000 }; };
 const aiHits = new Map(); // ip -> [timestamps]
 
 function status() {
@@ -168,7 +168,7 @@ async function api(req, res, p) {
       const ip = ipOf(req), now = Date.now(), hits = (aiHits.get(ip) || []).filter(t => now - t < 3600e3);
       if (hits.length >= db.ai.perHour) return send(res, 429, { error: `Limite de ${db.ai.perHour} usos da IA por hora atingido. Tente mais tarde.` });
       const b = await body(req, aiOp === 'generate' || aiOp === 'ideas' ? 2e4 : 5e5);
-      const common = { key: groqKey(), model: db.ai.model, maxTokens: db.ai.maxTokens, extra: db.ai.extra || '' };
+      const common = { key: groqKey(), model: db.ai.model, maxTokens: db.ai.maxTokens, extra: db.ai.extra || '', tpm: db.ai.tpm || 8000 };
       const opt = { seconds: +b.seconds, look: SCHEMA.SET.look.has(b.look) ? b.look : '', format: str(b.format, 20), tone: str(b.tone, 20), lang: str(b.lang, 8), music: str(b.music, 20), cast: +b.cast };
       const storyOk = v => v && typeof v === 'object' && Array.isArray(v.scenes) && v.scenes.length > 0 && v.scenes.length <= 40;
       let job;
@@ -185,7 +185,7 @@ async function api(req, res, p) {
           const instruction = str(b.instruction, 1200);
           if (instruction.length < 5) return send(res, 400, { error: 'Diga o que você quer mudar.' });
           job = () => AI.refine({ ...common, ...opt, story: b.story, script, instruction });
-        } else if (aiOp === 'review') job = () => AI.review({ key: common.key, model: common.model, story: b.story, script });
+        } else if (aiOp === 'review') job = () => AI.review({ key: common.key, model: common.model, story: b.story, script, tpm: common.tpm });
         else job = () => AI.translate({ ...common, story: b.story, script, lang: str(b.lang, 8) });
       }
       hits.push(now); aiHits.set(ip, hits);
@@ -216,6 +216,7 @@ async function api(req, res, p) {
       const b = await body(req, 1e4), a = db.ai;
       if (b.enabled !== undefined) a.enabled = !!b.enabled;
       if (typeof b.model === 'string' && /^[\w.\/:-]{2,80}$/.test(b.model.trim())) a.model = b.model.trim();
+      if (b.tpm !== undefined) a.tpm = Math.round(clampN(+b.tpm, 3000, 200000, a.tpm || 8000));
       if (typeof b.extra === 'string') a.extra = str(b.extra, 2000);
       if (b.perHour !== undefined) a.perHour = Math.round(clampN(+b.perHour, 1, 1000, a.perHour));
       if (typeof b.key === 'string' && b.key.trim()) a.key = b.key.trim().slice(0, 200);
