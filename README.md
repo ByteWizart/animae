@@ -91,8 +91,8 @@ O painel permite **ligar/desligar cada IA** e **trocar o modelo** de cada uma, s
 | IteraCompute (`api.iteracompute.com`) | chave da plataforma | `Auto` (saída máx. 8192 tokens) | `ITERACOMPUTE_API_KEY`, `ITERACOMPUTE_URL` |
 
 - **Principal + fallback**: a requisição vai ao principal; se falhar (limite, fora do ar), tenta o outro, se ativo.
-- **Buscar modelos** lista os modelos da Groq; **Testar conexão** valida chave e modelo antes de salvar.
+- **Buscar modelos** lista os modelos do provedor (`GET /models`); **Testar conexão** valida chave e modelo antes de salvar.
 - **TPM** (tokens por minuto) dimensiona o prompt (Groq grátis ≈ 8000).
 - Variáveis de ambiente têm prioridade sobre o painel. Instalações antigas migram sozinhas (a chave da Groq continua valendo).
 
-**Tempo limite:** se um provedor ficar 50 s sem responder, a chamada falha e o fallback tenta o próximo (ajustável com a variável `LLM_TIMEOUT_MS`, em milissegundos).
+**Tempo limite:** a resposta chega em streaming; se o provedor ficar 50 s sem enviar nenhum texto, a chamada falha e o fallback tenta o próximo (`LLM_TIMEOUT_MS`). Respostas longas, mas chegando, podem durar até 240 s no total (`LLM_TOTAL_MS`).

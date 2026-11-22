@@ -257,7 +257,7 @@ $('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['da
 /* ---- IA ---- */
 const PV={
   groq:{models:['openai/gpt-oss-120b','openai/gpt-oss-20b','llama-3.3-70b-versatile','llama-3.1-8b-instant'],keyPh:'gsk_…',desc:'Nuvem, cota gratuita com limite de tokens por minuto.'},
-  iteracompute:{models:['Auto'],keyPh:'Chave da IteraCompute',desc:'Plano gratuito: modelo Auto (o provedor escolhe), 30M de tokens por mês, 1 requisição por vez.',nolist:1}
+  iteracompute:{models:['Auto'],keyPh:'Chave da IteraCompute',desc:'Plano gratuito: modelo Auto (o provedor escolhe), 30M de tokens por mês, 1 requisição por vez.'}
 };
 let AI={};
 const pid=()=>Object.keys(PV);

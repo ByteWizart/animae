@@ -242,31 +242,64 @@ function autoDirect(st) {
 
 /* ------------------------------------------------------------------ chamadas à Groq ------------------------------------------------------------------ */
 const httpErr = (code, msg) => ({ code, msg });
-const LLM_TIMEOUT = +process.env.LLM_TIMEOUT_MS || 50e3; // sem resposta em 50 s = erro (e o fallback passa para o próximo provedor)
+const LLM_TIMEOUT = +process.env.LLM_TIMEOUT_MS || 50e3;   // sem receber NENHUM texto por 50 s = erro (e o fallback tenta o próximo provedor)
+const LLM_TOTAL = +process.env.LLM_TOTAL_MS || 240e3;      // teto para a resposta inteira, mesmo chegando aos poucos
 const chatUrl = base => String(base || '').replace(/\/+$/, '') + '/chat/completions';
+const secs = ms => Math.round(ms / 1000);
+// Lê a resposta em streaming (SSE). O relógio de 50 s zera a cada pedaço de texto recebido.
+async function readStream(r, bump, left) {
+  const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', out = '';
+  for (;;) {
+    const { done, value } = await rd.read(); if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i; while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+      if (!line.startsWith('data:')) continue;
+      const d = line.slice(5).trim(); if (!d || d === '[DONE]') continue;
+      let j; try { j = JSON.parse(d); } catch { continue; }
+      if (j.error) throw httpErr(502, 'Erro do provedor: ' + (j.error.message || JSON.stringify(j.error)).slice(0, 200));
+      const dl = j.choices && j.choices[0] && j.choices[0].delta;
+      if (dl && (dl.content || dl.reasoning_content || dl.reasoning)) bump();
+      if (dl && dl.content) out += dl.content;
+    }
+  }
+  return out;
+}
 async function callLLM({ key, model, baseUrl, label, kind, messages, maxTokens, temperature, json }) {
   label = label || 'a IA';
-  const body = { model, messages, temperature: temperature == null ? 0.7 : temperature, max_tokens: maxTokens };
+  const body = { model, messages, temperature: temperature == null ? 0.7 : temperature, max_tokens: maxTokens, stream: true };
   if (json !== false) body.response_format = { type: 'json_object' };
   // Modelos de raciocínio da Groq (gpt-oss) gastam tokens pensando: pedimos pouco raciocínio e escondemos o texto dele.
   if (kind === 'groq' && /gpt-oss/i.test(model)) { body.reasoning_effort = 'low'; body.include_reasoning = false; }
+  if (kind === 'iteracompute') body.reasoning = false; // como no exemplo oficial: sem raciocínio, senão a resposta pode vir vazia
   const headers = { 'Content-Type': 'application/json' };
   if (key) headers.Authorization = 'Bearer ' + key;
-  const t0 = Date.now(), left = () => LLM_TIMEOUT - (Date.now() - t0);
+  const t0 = Date.now(), left = () => LLM_TOTAL - (Date.now() - t0);
+  const idleMsg = `${label} ficou mais de ${secs(LLM_TIMEOUT)} s sem responder.`;
   for (let attempt = 0; attempt < 5; attempt++) {
-    if (left() < 1500) throw httpErr(504, `${label} demorou mais de ${Math.round(LLM_TIMEOUT / 1000)} s sem responder.`);
-    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), left());
+    if (left() < 1500) throw httpErr(504, `${label} demorou demais (mais de ${secs(LLM_TOTAL)} s no total).`);
+    const ctl = new AbortController(); let timer, why = '';
+    const bump = () => { clearTimeout(timer); timer = setTimeout(() => { why = 'idle'; ctl.abort(); }, Math.min(LLM_TIMEOUT, left())); };
+    bump();
     let r, j = {};
     try {
       r = await fetch(chatUrl(baseUrl), { method: 'POST', headers, body: JSON.stringify(body), signal: ctl.signal });
+      if (r.ok && /text\/event-stream/i.test(r.headers.get('content-type') || '')) {
+        const txt = await readStream(r, bump, left);
+        clearTimeout(timer);
+        if (!txt.trim()) throw httpErr(502, `${label} respondeu vazio. Tente de novo ou troque o modelo.`);
+        return txt;
+      }
       try { j = await r.json(); } catch {}
     } catch (e) {
-      throw httpErr(504, e.name === 'AbortError' ? `${label} demorou mais de ${Math.round(LLM_TIMEOUT / 1000)} s sem responder.` : `Não consegui falar com ${label} (sem internet?).`);
+      if (e && e.msg) throw e; // erro nosso (httpErr); o AbortError do fetch também tem .code, por isso testo .msg
+      throw httpErr(504, e.name === 'AbortError' || ctl.signal.aborted ? idleMsg : `Não consegui falar com ${label} (sem internet?).`);
     } finally { clearTimeout(timer); }
-    if (r.ok) return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+    if (r.ok) { const t = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ''; if (!String(t).trim()) throw httpErr(502, `${label} respondeu vazio. Tente de novo ou troque o modelo.`); return t; }
     const msg = (j.error && (j.error.message || (typeof j.error === 'string' ? j.error : ''))) || j.message || '';
     if (r.status === 400 && /response_format|json/i.test(msg) && body.response_format) { delete body.response_format; continue; } // modelo sem modo JSON
-    if (r.status === 400 && /reasoning|include_reasoning/i.test(msg) && body.reasoning_effort) { delete body.reasoning_effort; delete body.include_reasoning; continue; }
+    if (r.status === 400 && /reasoning|include_reasoning/i.test(msg) && (body.reasoning_effort || body.reasoning !== undefined)) { delete body.reasoning_effort; delete body.include_reasoning; delete body.reasoning; continue; }
+    if (r.status === 400 && /stream/i.test(msg) && body.stream) { delete body.stream; continue; } // provedor sem streaming
     if (r.status === 401 || r.status === 403) throw httpErr(502, `A chave de ${label} foi recusada. Peça ao administrador para conferir a chave.`);
     if (r.status === 404 || (r.status === 400 && /model/i.test(msg))) throw httpErr(502, `Modelo indisponível em ${label}: ${msg || model}`);
     const lim = /Limit (\d+)/i.exec(msg), req = /Requested (\d+)/i.exec(msg), wait = /try again in ([\d.]+)\s*(ms|s|m)/i.exec(msg);
@@ -277,10 +310,11 @@ async function callLLM({ key, model, baseUrl, label, kind, messages, maxTokens, 
         if (nm >= 2500) { body.max_tokens = nm; continue; }
         throw httpErr(502, `O pedido é grande demais para o limite do seu plano em ${label} (${L} tokens por minuto). Reduza a duração ou o tamanho da ideia, ou use um modelo/plano com limite maior.`);
       }
-      if (wait && attempt < 4 && Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400 < left() - 1500) { const ms = Math.min(45000, Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400); await new Promise(res => setTimeout(res, ms)); continue; } // limite do minuto: espera e repete
+      const ms = wait ? Math.min(45000, Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400) : 0;
+      if (wait && attempt < 4 && ms < left() - 1500) { await new Promise(res => setTimeout(res, ms)); continue; } // limite do minuto: espera e repete
     }
     if (r.status === 413) throw httpErr(502, `O pedido ficou grande demais para ${label}. Reduza a duração ou o tamanho da ideia.`);
-    if (r.status === 429) throw httpErr(429, `${label} atingiu o limite de uso. Tente novamente em instantes.`);
+    if (r.status === 429) throw httpErr(429, `${label} atingiu o limite de uso (ou já há uma requisição em andamento). Tente novamente em instantes.`);
     throw httpErr(502, `Erro de ${label} (${r.status}): ${msg || 'sem detalhes'}`);
   }
   throw httpErr(502, `${label} não respondeu corretamente.`);
@@ -298,7 +332,7 @@ async function listModels({ key, baseUrl, label, kind }) {
     if (kind === 'groq') ids = ids.filter(id => !/whisper|tts|guard|playai|orpheus|embed/i.test(id));
     return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
   } catch (e) {
-    if (e && e.code) throw e;
+    if (e && e.msg) throw e;
     throw httpErr(504, e && e.name === 'AbortError' ? `${label} demorou demais para listar os modelos.` : `Não consegui falar com ${label} em ${baseUrl}.`);
   } finally { clearTimeout(timer); }
 }
