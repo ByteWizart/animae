@@ -1,26 +1,27 @@
 # Gerador de Shorts Animados (no navegador, sem API paga)
 
-Pasta única, sem subpastas e sem dependências (não precisa de npm install).
+Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (voz com IA): rode `npm install` uma vez. Sem ela, tudo funciona, menos a voz com IA.
 
 | Arquivo | Para que serve |
 |---|---|
 | index.html | O gerador de vídeo |
 | ajuda.html | Central de ajuda (guia, referência do JSON, solução de problemas) |
-| admin.html | Painel administrativo, em endereço secreto (IA: ligar/desligar provedores e trocar o modelo; padrões, histórico, segurança) |
-| ai.js | Integração com a IA: Groq e IteraCompute (roteiro + JSON a partir da ideia do usuário) |
+| admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
+| ai.js | Integração com a Groq (roteiro + JSON a partir da ideia do usuário) |
 | server.js | Servidor local + API do Admin |
 | schema.js | Catálogo do formato de história e validador (usado por Ajuda, Admin e servidor) |
+| tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
 | audio.js | Trilha e efeitos sonoros gerados por código |
 | ui.css | Estilos compartilhados |
 | PROMPT-MOVIMENTOS.md | Bloco para colar no seu prompt de IA |
 | historia-teste.json | História de exemplo simples |
 | historia-demo-v9.json | História de 30 s que mostra os recursos novos (rua em movimento, gráfico, chat, glitch, holofote, palco...). Carregue em Avançado > Carregar história |
-| dados.json | Criado automaticamente: configurações, chaves das IAs, histórico, senha (com hash) e endereço do painel. Não compartilhe |
+| dados.json | Criado automaticamente: configurações, chave da Groq, histórico, senha (com hash) e endereço do painel. Não compartilhe |
 
 ## Como usar
 
 1. Instale o Node.js **18 ou mais novo**.
-2. Na pasta, rode: `node server.js` (o terminal mostra os endereços, a senha inicial do painel e o endereço secreto).
+2. Na pasta, rode `npm install` (só na primeira vez) e depois `node server.js` (o terminal mostra os endereços, a senha inicial do painel e o endereço secreto).
 3. Abra http://localhost:3000 no Chrome ou Edge (PC) e aperte Ctrl+F5. O rodapé deve mostrar "build 9".
 4. **Criar com IA**: descreva a ideia; a Groq escreve o roteiro e o JSON. Grave a voz, carregue o áudio, "Ajustar ao áudio", "Prévia" e "Gerar vídeo" (aba aberta e visível: a gravação é em tempo real).
 5. O arquivo é baixado sozinho (short.mp4 ou short.webm).
@@ -81,18 +82,11 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 - O plano gratuito do `openai/gpt-oss-120b` aceita ~8.000 tokens por minuto (pedido + resposta). O site calcula o tamanho do prompt, compacta o catálogo quando preciso, ajusta o teto de resposta e, se necessário, reduz a duração (avisando na tela). Se a Groq ainda recusar, o servidor reduz a resposta e repete, ou espera o tempo indicado.
 - Com um plano com mais cota, ajuste **Tokens por minuto (TPM)** no painel (aba IA): o prompt completo, com exemplos, e vídeos de 45 a 60 s passam a ser usados.
 
-## Provedores de IA (Admin > IA)
 
-O painel permite **ligar/desligar cada IA** e **trocar o modelo** de cada uma, sem reiniciar o servidor.
+## Novidades do build 10: voz com IA
 
-| Provedor | Chave | Modelo padrão | Variáveis de ambiente |
-|---|---|---|---|
-| Groq (`api.groq.com`) | `gsk_…` | `openai/gpt-oss-120b` | `GROQ_API_KEY`, `GROQ_URL` |
-| IteraCompute (`api.iteracompute.com`) | chave da plataforma | `Auto` (saída máx. 8192 tokens) | `ITERACOMPUTE_API_KEY`, `ITERACOMPUTE_URL` |
-
-- **Principal + fallback**: a requisição vai ao principal; se falhar (limite, fora do ar), tenta o outro, se ativo.
-- **Buscar modelos** lista os modelos do provedor (`GET /models`); **Testar conexão** valida chave e modelo antes de salvar.
-- **TPM** (tokens por minuto) dimensiona o prompt (Groq grátis ≈ 8000).
-- Variáveis de ambiente têm prioridade sobre o painel. Instalações antigas migram sozinhas (a chave da Groq continua valendo).
-
-**Tempo limite:** a resposta chega em streaming; se o provedor ficar 50 s sem enviar nenhum texto, a chamada falha e o fallback tenta o próximo (`LLM_TIMEOUT_MS`). Respostas longas, mas chegando, podem durar até 240 s no total (`LLM_TOTAL_MS`).
+- Em **Roteiro e voz** há o bloco **Voz com IA**: escolha a voz, a velocidade e o tom e clique em **Gerar voz com IA**. O texto do roteiro vira um MP3 que já fica carregado como narração (depois: Ajustar ao áudio, Prévia, Gerar vídeo). Dá para ouvir e baixar o MP3. Enviar a própria gravação continua funcionando.
+- Usa as vozes neurais do serviço "Read Aloud" do Microsoft Edge via `msedge-tts`: não precisa de chave de API e não conta tokens. Textos longos são divididos em trechos e juntados.
+- Limites de proteção do seu servidor (ajustáveis em `dados.json` ou por `PUT /api/admin/tts`): 60 vozes por hora por IP, 3 gerações ao mesmo tempo, 6000 caracteres por pedido.
+- Rotas: `GET /api/tts/status`, `GET /api/tts/voices`, `POST /api/tts` (`{text, voice, rate, pitch}` devolve `audio/mpeg`).
+- Aviso: é um serviço **não oficial**. Pode mudar ou bloquear sem aviso e os termos da Microsoft não preveem esse uso de forma explícita. Para uso comercial ou para algo que nunca pode falhar, troque por Azure Speech ou Google Cloud TTS (têm cota grátis mensal, mas com chave e limite).

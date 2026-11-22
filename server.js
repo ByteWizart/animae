@@ -3,16 +3,17 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const SCHEMA = require('./schema.js');
 const AI = require('./ai.js');
+const TTS = require('./tts.js');
 
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
 const DATA_FILE = path.join(dir, 'dados.json');
-const BUILD = 9;
+const BUILD = 10;
 const STARTED = Date.now();
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
 // Arquivos que nunca são servidos pela web.
-const PRIVATE = new Set(['dados.json', 'dados.json.tmp', 'server.js', 'ai.js', 'admin.html']);
+const PRIVATE = new Set(['dados.json', 'dados.json.tmp', 'server.js', 'ai.js', 'tts.js', 'admin.html']);
 
 /* ---------- dados ---------- */
 const DEFAULTS = () => ({
@@ -23,40 +24,18 @@ const DEFAULTS = () => ({
   },
   auth: null,
   adminPath: null,
-  ai: {
-    enabled: true, perHour: 20, maxTokens: 12000, extra: '',
-    primary: 'groq', fallback: true, // provedor principal; se falhar, tenta o outro (quando ativo)
-    providers: {
-      groq: { enabled: true, model: 'openai/gpt-oss-120b', key: '', baseUrl: '', tpm: 8000 },
-      iteracompute: { enabled: false, model: 'Auto', key: '', baseUrl: '', tpm: 60000 },
-    },
-  },
+  ai: { enabled: true, model: 'openai/gpt-oss-120b', key: '', perHour: 20, maxTokens: 12000, extra: '', tpm: 8000 },
+  tts: { enabled: true, perHour: 60, voice: 'pt-BR-FranciscaNeural' },
   history: [],
 });
-
-// Provedores de IA compatíveis com OpenAI. A chave e o endereço podem vir do ambiente (têm prioridade sobre o dados.json).
-const PROVIDERS = {
-  groq: { label: 'Groq', keyEnv: 'GROQ_API_KEY', urlEnv: 'GROQ_URL', defaultUrl: 'https://api.groq.com/openai/v1' },
-  iteracompute: { label: 'IteraCompute', keyEnv: 'ITERACOMPUTE_API_KEY', urlEnv: 'ITERACOMPUTE_URL', defaultUrl: 'https://api.iteracompute.com/v1', maxOut: 8192 }, // saída máx. 8192 tokens
-};
-const PIDS = Object.keys(PROVIDERS);
 let db = DEFAULTS();
-// Mescla a config de IA com os padrões e migra o formato antigo (model/key/tpm soltos = Groq).
-function mergeAi(base, cur) {
-  const a = { ...base, ...cur, providers: {} };
-  for (const id of PIDS) a.providers[id] = { ...base.providers[id], ...((cur.providers || {})[id] || {}) };
-  if (!cur.providers) for (const k of ['model', 'key', 'tpm']) if (cur[k] !== undefined) a.providers.groq[k] = cur[k];
-  for (const k of ['model', 'key', 'tpm']) delete a[k];
-  if (!PROVIDERS[a.primary]) a.primary = base.primary;
-  return a;
-}
 function load() {
   try {
     const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')), base = DEFAULTS();
-    db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } }, ai: mergeAi(base.ai, d.ai || {}) };
+    db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } }, ai: { ...base.ai, ...(d.ai || {}) }, tts: { ...base.tts, ...(d.tts || {}) } };
     delete db.stories; // a biblioteca agora fica no navegador de cada usuário
     // migração: o antigo padrão (llama) passa para o novo padrão
-    if (db.ai.providers.groq.model === 'llama-3.3-70b-versatile') db.ai.providers.groq.model = base.ai.providers.groq.model;
+    if (db.ai.model === 'llama-3.3-70b-versatile') db.ai.model = base.ai.model;
     if (db.ai.maxTokens < 12000) db.ai.maxTokens = 12000;
   } catch (e) { if (e.code !== 'ENOENT') console.warn('Aviso: dados.json ilegível, começando vazio (' + e.message + ')'); }
 }
@@ -83,19 +62,7 @@ if (!process.env.ADMIN_PASSWORD && !db.auth) {
 const validPath = v => /^[a-z0-9][a-z0-9_-]{3,39}$/i.test(v) && !['api', 'ajuda', 'index', 'admin'].includes(v.toLowerCase());
 if (!db.adminPath) { db.adminPath = 'painel-' + crypto.randomBytes(5).toString('hex'); save(); }
 const adminPath = () => (process.env.ADMIN_PATH && validPath(process.env.ADMIN_PATH) ? process.env.ADMIN_PATH : db.adminPath);
-const provKey = id => process.env[PROVIDERS[id].keyEnv] || db.ai.providers[id].key || '';
-const provAccount = () => '';
-const provUrl = id => {
-  let u = process.env[PROVIDERS[id].urlEnv] || db.ai.providers[id].baseUrl || PROVIDERS[id].defaultUrl;
-  return u.replace(/\/chat\/completions\/?$/, '').replace(/\/+$/, '');
-};
-const provReady = id => !!provKey(id) && !!provUrl(id);
-// Provedores que serão usados, na ordem: principal primeiro; o outro só entra se o fallback estiver ligado.
-function activeProviders() {
-  const order = [db.ai.primary, ...PIDS.filter(i => i !== db.ai.primary)].filter(i => db.ai.providers[i].enabled && provReady(i));
-  return (db.ai.fallback ? order : order.slice(0, 1)).map(llmOf); // sem fallback: só o primeiro da fila
-}
-const llmOf = id => ({ id, kind: id, label: PROVIDERS[id].label, key: provKey(id), baseUrl: provUrl(id), model: db.ai.providers[id].model, tpm: db.ai.providers[id].tpm });
+const groqKey = () => process.env.GROQ_API_KEY || db.ai.key || '';
 const sessions = new Map(); // token -> expira
 const SESSION_MS = 8 * 3600e3;
 const newSession = () => { const t = crypto.randomBytes(24).toString('hex'); sessions.set(t, Date.now() + SESSION_MS); return t; };
@@ -138,25 +105,15 @@ function cleanSettings(s, cur) {
   };
 }
 const publicSettings = () => db.settings;
-// Endereço-base de provedor: aceita só http/https; vazio = usar o padrão. Devolve null se inválido.
-function cleanUrl(v) {
-  v = String(v || '').trim().replace(/\/chat\/completions\/?$/, '').replace(/\/+$/, '');
-  if (!v) return '';
-  try { const u = new URL(v); return /^https?:$/.test(u.protocol) ? u.toString().replace(/\/+$/, '') : null; } catch { return null; }
-}
 
-const aiInfo = () => {
-  const providers = {};
-  for (const id of PIDS) {
-    const c = db.ai.providers[id], k = provKey(id);
-    providers[id] = { label: PROVIDERS[id].label, enabled: !!c.enabled, model: c.model, tpm: c.tpm, baseUrl: provUrl(id), defaultUrl: PROVIDERS[id].defaultUrl, accountId: provAccount(id), accountFromEnv: !!(PROVIDERS[id].accountEnv && process.env[PROVIDERS[id].accountEnv]), hasAccount: !PROVIDERS[id].accountEnv || !!provAccount(id), hasKey: !!k, keyHint: k ? '…' + k.slice(-4) : '', keyFromEnv: !!process.env[PROVIDERS[id].keyEnv], urlFromEnv: !!process.env[PROVIDERS[id].urlEnv], keyEnv: PROVIDERS[id].keyEnv, ready: !!c.enabled && provReady(id), uses: (db.aiByProv || {})[id] || 0 };
-  }
-  return { enabled: !!db.ai.enabled, perHour: db.ai.perHour, extra: db.ai.extra || '', primary: db.ai.primary, fallback: !!db.ai.fallback, providers, available: !!db.ai.enabled && activeProviders().length > 0 };
-};
+const aiInfo = () => { const k = groqKey(); return { enabled: !!db.ai.enabled, model: db.ai.model, perHour: db.ai.perHour, hasKey: !!k, keyHint: k ? '…' + k.slice(-4) : '', keyFromEnv: !!process.env.GROQ_API_KEY, extra: db.ai.extra || '', tpm: db.ai.tpm || 8000 }; };
 const aiHits = new Map(); // ip -> [timestamps]
+const ttsHits = new Map(); // ip -> [timestamps]
+let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
+const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
 
 function status() {
-  const expected = ['index.html', 'ajuda.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'ui.css', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
+  const expected = ['index.html', 'ajuda.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'tts.js', 'ui.css', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
@@ -164,7 +121,7 @@ function status() {
   return {
     build: BUILD, node: process.version, platform: process.platform, port: PORT, uptime: Math.round((Date.now() - STARTED) / 1000),
     passwordFromEnv: !!process.env.ADMIN_PASSWORD, dataBytes, files,
-    counts: { videos: db.history.length, seconds: Math.round(secs), ideas: db.aiCount || 0 }, byLook,
+    tts: ttsInfo(), counts: { videos: db.history.length, seconds: Math.round(secs), ideas: db.aiCount || 0 }, byLook,
     ai: aiInfo(), adminPath: adminPath(), adminPathFromEnv: !!process.env.ADMIN_PATH,
   };
 }
@@ -202,57 +159,65 @@ async function api(req, res, p) {
       return send(res, 201, { ok: true, id: h.id });
     }
 
-    // IA: as chaves ficam só no servidor. Limite por IP para ninguém gastar a cota.
-    if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.available, perHour: i.perHour }); }
+    // IA: a chave da Groq fica só no servidor. Limite por IP para ninguém gastar a cota.
+    if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.enabled && i.hasKey, perHour: i.perHour }); }
     // Prompt pronto para copiar e usar em outra IA (ChatGPT, Claude...): as mesmas regras que o site usa.
     if (p === '/api/ai/prompt' && m === 'GET') {
       const q = new URL(req.url, 'http://x').searchParams, seconds = [20, 30, 45, 60].includes(+q.get('seconds')) ? +q.get('seconds') : 30;
       return send(res, 200, { prompt: AI.systemPrompt({ seconds, look: SCHEMA.SET.look.has(q.get('look')) ? q.get('look') : '', format: q.get('format') || 'auto', tone: q.get('tone') || 'auto', lang: q.get('lang') || '', music: q.get('music') || '', cast: +q.get('cast') || 0, extra: db.ai.extra || '' }) });
     }
+
+    // Voz com IA (TTS): texto -> MP3. Sem chave de API; limite por IP e poucas gerações ao mesmo tempo.
+    if (p === '/api/tts/status' && m === 'GET') { const t = ttsInfo(); return send(res, 200, { available: t.installed && t.enabled, installed: t.installed, maxChars: t.maxChars, voice: t.voice, perHour: t.perHour }); }
+    if (p === '/api/tts/voices' && m === 'GET') return send(res, 200, { voices: await TTS.voices(), default: db.tts.voice });
+    if (p === '/api/tts' && m === 'POST') {
+      const t = ttsInfo();
+      if (!t.enabled) return send(res, 503, { error: 'A voz com IA está desativada neste site.' });
+      if (!t.installed) return send(res, 503, { error: 'A voz com IA não está instalada no servidor (rode "npm install" e reinicie).' });
+      const ip = ipOf(req), now = Date.now(), hits = (ttsHits.get(ip) || []).filter(x => now - x < 3600e3);
+      if (hits.length >= db.tts.perHour) return send(res, 429, { error: `Limite de ${db.tts.perHour} vozes por hora atingido. Tente mais tarde.` });
+      if (ttsBusy >= TTS_MAX_PARALLEL) return send(res, 429, { error: 'O servidor de voz está ocupado. Tente de novo em alguns segundos.' });
+      const b = await body(req, 3e4);
+      hits.push(now); ttsHits.set(ip, hits); ttsBusy++;
+      try {
+        const mp3 = await TTS.synth({ text: b.text, voice: str(b.voice, 60) || db.tts.voice, rate: +b.rate, pitch: +b.pitch });
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': mp3.length, 'Cache-Control': 'no-store' });
+        return res.end(mp3);
+      } catch (e) { hits.pop(); throw e; } finally { ttsBusy--; }
+    }
     const aiOp = p.startsWith('/api/ai/') ? p.slice(8) : '';
     if (m === 'POST' && { generate: 1, refine: 1, ideas: 1, review: 1, translate: 1 }[aiOp]) {
-      const provs = db.ai.enabled ? activeProviders() : [];
-      if (!provs.length) return send(res, 503, { error: 'A criação com IA não está configurada neste site.' });
+      const i = aiInfo();
+      if (!i.enabled || !i.hasKey) return send(res, 503, { error: 'A criação com IA não está configurada neste site.' });
       const ip = ipOf(req), now = Date.now(), hits = (aiHits.get(ip) || []).filter(t => now - t < 3600e3);
       if (hits.length >= db.ai.perHour) return send(res, 429, { error: `Limite de ${db.ai.perHour} usos da IA por hora atingido. Tente mais tarde.` });
       const b = await body(req, aiOp === 'generate' || aiOp === 'ideas' ? 2e4 : 5e5);
+      const common = { key: groqKey(), model: db.ai.model, maxTokens: db.ai.maxTokens, extra: db.ai.extra || '', tpm: db.ai.tpm || 8000 };
       const opt = { seconds: +b.seconds, look: SCHEMA.SET.look.has(b.look) ? b.look : '', format: str(b.format, 20), tone: str(b.tone, 20), lang: str(b.lang, 8), music: str(b.music, 20), cast: +b.cast };
       const storyOk = v => v && typeof v === 'object' && Array.isArray(v.scenes) && v.scenes.length > 0 && v.scenes.length <= 40;
-      const common = (llm) => ({ llm, maxTokens: Math.min(db.ai.maxTokens, PROVIDERS[llm.id].maxOut || 1e9), extra: db.ai.extra || '', tpm: llm.tpm || 8000 });
-      let job; // job(llm): recebe o provedor da vez (principal primeiro, depois o fallback)
+      let job;
       if (aiOp === 'generate') {
         const idea = str(b.idea, 6000);
         if (idea.length < 8) return send(res, 400, { error: 'Descreva melhor a ideia do vídeo (pelo menos uma frase).' });
-        job = llm => AI.generate({ ...common(llm), ...opt, idea });
+        job = () => AI.generate({ ...common, ...opt, idea });
       } else if (aiOp === 'ideas') {
-        job = llm => AI.ideas({ llm, topic: str(b.topic, 300), count: +b.count, format: opt.format, tone: opt.tone, seconds: opt.seconds });
+        job = () => AI.ideas({ key: common.key, model: common.model, topic: str(b.topic, 300), count: +b.count, format: opt.format, tone: opt.tone, seconds: opt.seconds });
       } else {
         if (!storyOk(b.story)) return send(res, 400, { error: 'Não há uma história válida para enviar à IA.' });
         const script = str(b.script, 6000);
         if (aiOp === 'refine') {
           const instruction = str(b.instruction, 1200);
           if (instruction.length < 5) return send(res, 400, { error: 'Diga o que você quer mudar.' });
-          job = llm => AI.refine({ ...common(llm), ...opt, story: b.story, script, instruction });
-        } else if (aiOp === 'review') job = llm => AI.review({ llm, story: b.story, script, tpm: llm.tpm || 8000 });
-        else job = llm => AI.translate({ ...common(llm), story: b.story, script, lang: str(b.lang, 8) });
+          job = () => AI.refine({ ...common, ...opt, story: b.story, script, instruction });
+        } else if (aiOp === 'review') job = () => AI.review({ key: common.key, model: common.model, story: b.story, script, tpm: common.tpm });
+        else job = () => AI.translate({ ...common, story: b.story, script, lang: str(b.lang, 8) });
       }
       hits.push(now); aiHits.set(ip, hits);
-      // Tenta cada provedor ativo; erros de provedor (limite, fora do ar, modelo ruim) passam para o próximo.
-      let lastErr = null;
-      for (const llm of provs) {
-        try {
-          const out = await job(llm);
-          db.aiCount = (db.aiCount || 0) + 1; (db.aiByProv = db.aiByProv || {})[llm.id] = ((db.aiByProv || {})[llm.id] || 0) + 1; save();
-          if (provs.length > 1 && llm.id !== provs[0].id) console.warn(`IA: ${provs[0].label} falhou (${lastErr && lastErr.msg}); atendido por ${llm.label}.`);
-          if (out && typeof out === 'object') out.via = { provider: llm.label, model: llm.model };
-          return send(res, 200, out);
-        } catch (e) {
-          lastErr = e;
-          if (!(e && [413, 429, 502, 504].includes(e.code))) { hits.pop(); throw e; }
-          console.warn(`IA: ${llm.label} falhou: ${e.msg}`);
-        }
-      }
-      hits.pop(); throw lastErr;
+      try {
+        const out = await job();
+        db.aiCount = (db.aiCount || 0) + 1; save();
+        return send(res, 200, out);
+      } catch (e) { hits.pop(); throw e; }
     }
 
     // ---- daqui para baixo exige login ----
@@ -270,39 +235,26 @@ async function api(req, res, p) {
       save(); return send(res, 200, { ok: true });
     }
 
-    if (r[0] === 'ai' && !id && m === 'GET') return send(res, 200, aiInfo());
-    if (r[0] === 'ai' && !id && m === 'PUT') {
-      const b = await body(req, 2e4), a = db.ai;
+    if (r[0] === 'ai' && m === 'GET') return send(res, 200, aiInfo());
+    if (r[0] === 'ai' && m === 'PUT') {
+      const b = await body(req, 1e4), a = db.ai;
       if (b.enabled !== undefined) a.enabled = !!b.enabled;
-      if (b.fallback !== undefined) a.fallback = !!b.fallback;
-      if (PROVIDERS[b.primary]) a.primary = b.primary;
+      if (typeof b.model === 'string' && /^[\w.\/:-]{2,80}$/.test(b.model.trim())) a.model = b.model.trim();
+      if (b.tpm !== undefined) a.tpm = Math.round(clampN(+b.tpm, 3000, 200000, a.tpm || 8000));
       if (typeof b.extra === 'string') a.extra = str(b.extra, 2000);
       if (b.perHour !== undefined) a.perHour = Math.round(clampN(+b.perHour, 1, 1000, a.perHour));
-      for (const pid of PIDS) {
-        const pb = (b.providers || {})[pid]; if (!pb || typeof pb !== 'object') continue;
-        const c = a.providers[pid];
-        if (pb.enabled !== undefined) c.enabled = !!pb.enabled;
-        if (typeof pb.model === 'string' && /^[\w.\/:@+-]{1,100}$/.test(pb.model.trim())) c.model = pb.model.trim();
-        if (pb.tpm !== undefined) c.tpm = Math.round(clampN(+pb.tpm, 3000, 2000000, c.tpm || 8000));
-        if (typeof pb.baseUrl === 'string') { const u = cleanUrl(pb.baseUrl); if (u === null) return send(res, 400, { error: `Endereço inválido para ${PROVIDERS[pid].label}. Use http:// ou https://.` }); c.baseUrl = u; }
-        if (typeof pb.key === 'string' && pb.key.trim()) c.key = pb.key.trim().slice(0, 300);
-        if (pb.clearKey) c.key = '';
-      }
+      if (typeof b.key === 'string' && b.key.trim()) a.key = b.key.trim().slice(0, 200);
+      if (b.clearKey) a.key = '';
       save(); return send(res, 200, aiInfo());
     }
-    // Testar conexão / listar modelos de um provedor, com os valores do formulário (ainda não salvos) por cima dos salvos.
-    if (r[0] === 'ai' && (id === 'test' || id === 'models') && m === 'POST') {
-      const b = await body(req, 1e4), pid = PROVIDERS[b.provider] ? b.provider : null;
-      if (!pid) return send(res, 400, { error: 'Provedor desconhecido.' });
-      const llm = llmOf(pid);
-      if (typeof b.baseUrl === 'string' && b.baseUrl.trim() && !process.env[PROVIDERS[pid].urlEnv]) { const u = cleanUrl(b.baseUrl); if (!u) return send(res, 400, { error: 'Endereço inválido. Use http:// ou https://.' }); llm.baseUrl = u; }
-      if (typeof b.key === 'string' && b.key.trim() && !process.env[PROVIDERS[pid].keyEnv]) llm.key = b.key.trim();
-      if (!llm.baseUrl) return send(res, 400, { error: `Informe o ID da conta de ${llm.label}.` });
-      if (typeof b.model === 'string' && /^[\w.\/:@+-]{1,100}$/.test(b.model.trim())) llm.model = b.model.trim();
-      if (!llm.key) return send(res, 400, { error: `Informe a chave de ${llm.label} primeiro.` });
-      if (id === 'models') return send(res, 200, { models: await AI.listModels(llm) });
-      try { return send(res, 200, { ok: true, model: llm.model, ...(await AI.ping(llm)) }); }
-      catch (e) { if (e && e.code) return send(res, 200, { ok: false, error: e.msg }); throw e; }
+
+    if (r[0] === 'tts' && m === 'GET') return send(res, 200, ttsInfo());
+    if (r[0] === 'tts' && m === 'PUT') {
+      const b = await body(req, 1e4), a = db.tts;
+      if (b.enabled !== undefined) a.enabled = !!b.enabled;
+      if (b.perHour !== undefined) a.perHour = Math.round(clampN(+b.perHour, 1, 5000, a.perHour));
+      if (typeof b.voice === 'string' && /^[a-z]{2,3}-[A-Z]{2}-[A-Za-z]{2,40}Neural$/.test(b.voice)) a.voice = b.voice;
+      save(); return send(res, 200, ttsInfo());
     }
     if (r[0] === 'adminpath' && m === 'POST') {
       if (process.env.ADMIN_PATH) return send(res, 409, { error: 'O caminho vem da variável ADMIN_PATH. Altere-a no ambiente.' });
@@ -347,8 +299,7 @@ http.createServer((req, res) => {
   console.log('  Gerador: http://localhost:' + PORT);
   console.log('  Ajuda:   http://localhost:' + PORT + '/ajuda');
   console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
-  const ap = activeProviders();
-  console.log('  IA: ' + (db.ai.enabled && ap.length ? ap.map(l => `${l.label} (${l.model})`).join(' → ') : 'desativada ou sem chave (configure no Admin > IA ou GROQ_API_KEY / ITERACOMPUTE_API_KEY)'));
+  console.log('  IA Groq: ' + (groqKey() ? 'chave configurada' : 'sem chave (configure GROQ_API_KEY ou no Admin > IA)'));
   if (firstRunPassword) console.log('\n  >>> Senha inicial do admin: ' + firstRunPassword + '\n  >>> (aparece só desta vez; troque em Admin > Segurança)\n');
   else if (process.env.ADMIN_PASSWORD) console.log('  Senha do admin vem de ADMIN_PASSWORD.');
 });

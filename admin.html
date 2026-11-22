@@ -28,18 +28,6 @@
 .issues li{padding:5px 0;border-bottom:1px solid #2a2840;display:flex;gap:8px;align-items:baseline}
 .issues code{white-space:nowrap}
 .hidden{display:none!important}
-.sw{display:flex;gap:10px;align-items:center;font-weight:700;cursor:pointer;white-space:nowrap}
-.sw input{appearance:none;-webkit-appearance:none;width:42px!important;height:24px;border-radius:99px;background:#3a3852;border:1px solid var(--line);position:relative;cursor:pointer;padding:0;transition:background .15s;flex:none}
-.sw input::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#cfcde0;transition:transform .15s}
-.sw input:checked{background:var(--ok);border-color:var(--ok)}
-.sw input:checked::after{transform:translateX(18px);background:#fff}
-.pcard.off{opacity:.78}
-.pcard .res{font-size:13px;margin-top:10px}
-.pcard .res.ok{color:var(--ok)}.pcard .res.bad{color:var(--bad)}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px;max-height:150px;overflow:auto}
-.chips button{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:4px 10px;font-size:12.5px;font-weight:600}
-.chips button.cur{border-color:var(--accent);color:var(--accent)}
-.mrow{display:flex;gap:8px;align-items:center}.mrow input{flex:1;min-width:0}
 td .acts{display:flex;gap:6px;flex-wrap:wrap}
 textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 .ok-dot,.bad-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px}
@@ -63,10 +51,10 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 
 <!-- APP -->
 <div id="app" class="hidden">
-  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IA (Groq e IteraCompute), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
+  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IA (Groq), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" data-t="painel" aria-selected="true">Painel</button>
-    <button role="tab" data-t="ia" aria-selected="false">IA</button>
+    <button role="tab" data-t="ia" aria-selected="false">IA (Groq)</button>
     <button role="tab" data-t="padroes" aria-selected="false">Padrões</button>
     <button role="tab" data-t="historico" aria-selected="false">Histórico</button>
     <button role="tab" data-t="seguranca" aria-selected="false">Segurança</button>
@@ -85,39 +73,35 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 
   <!-- IA -->
   <section id="t-ia" class="hidden">
-    <form id="aif">
+    <div class="grid g2">
       <div class="card">
-        <div class="row sb">
-          <div><h3 style="margin:0">Criação com IA</h3><div class="muted">Os visitantes descrevem uma ideia no gerador e a IA escreve o roteiro e o JSON. As chaves ficam só neste servidor, nunca vão para o navegador.</div></div>
-          <label class="sw"><input id="ai-on" type="checkbox"><span>Ativada para os visitantes</span></label>
-        </div>
-        <div id="ainote" class="notice hidden" style="margin:14px 0 0"></div>
-        <div class="grid g3" style="margin-top:14px">
-          <label class="f">Provedor principal<select id="ai-primary"></select></label>
-          <label class="f">Limite por IP / hora<input id="ai-ph" type="number" min="1" max="1000"></label>
-          <label class="f" style="align-self:end;display:flex;gap:8px;align-items:center;height:38px"><input id="ai-fb" type="checkbox"> Se falhar, tentar o próximo provedor</label>
-        </div>
+        <h3 style="margin-top:0">Integração com a Groq</h3>
+        <p class="muted">Os visitantes descrevem uma ideia no gerador e a Groq escreve o roteiro e o JSON. A chave fica só neste servidor, nunca vai para o navegador.</p>
+        <div id="ainote" class="notice hidden"></div>
+        <form id="aif">
+          <label class="f" style="display:flex;gap:8px;align-items:center"><input id="ai-on" type="checkbox"> Criação com IA ativada</label>
+          <label class="f">Chave da API da Groq<input id="ai-key" type="password" autocomplete="off" placeholder="gsk_… (deixe vazio para manter a atual)"></label>
+          <div id="ai-hint" class="muted" style="margin:-6px 0 12px"></div>
+          <div class="grid g2">
+            <label class="f">Modelo<input id="ai-model" list="ai-models" autocomplete="off"><datalist id="ai-models"><option value="openai/gpt-oss-120b"><option value="llama-3.3-70b-versatile"><option value="openai/gpt-oss-20b"><option value="llama-3.1-8b-instant"></datalist></label>
+            <label class="f">Limite por IP / hora<input id="ai-ph" type="number" min="1" max="1000"></label>
+            <label class="f">Tokens por minuto do modelo (TPM)<input id="ai-tpm" type="number" min="3000" max="200000"></label>
+          </div>
+          <label class="f">Instruções extras para a IA (estilo da casa, opcional)<textarea id="ai-extra" maxlength="2000" rows="4" placeholder="Ex.: Sempre use personagens com chapéu. Termine os vídeos pedindo para seguir o canal. Evite cenários escuros."></textarea></label>
+          <div class="muted" style="margin:-6px 0 12px">Entram no fim do prompt de todas as gerações e têm prioridade sobre o estilo padrão.</div>
+          <div class="row"><button type="submit">Salvar</button><button type="button" class="danger" id="ai-clear">Remover chave</button></div>
+        </form>
       </div>
-
-      <div class="grid g2" id="provs" style="margin-top:14px"></div>
-
-      <div class="card" style="margin-top:14px">
-        <label class="f" style="margin:0">Instruções extras para a IA (estilo da casa, opcional)<textarea id="ai-extra" maxlength="2000" rows="3" placeholder="Ex.: Sempre use personagens com chapéu. Termine os vídeos pedindo para seguir o canal. Evite cenários escuros."></textarea></label>
-        <div class="muted" style="margin:6px 0 14px">Entram no fim do prompt de todas as gerações, em qualquer provedor, e têm prioridade sobre o estilo padrão.</div>
-        <div class="row"><button type="submit">Salvar tudo</button><span class="muted" id="ai-order"></span></div>
+      <div class="card">
+        <h3 style="margin-top:0">Como funciona</h3>
+        <ul style="padding-left:18px;margin:0">
+          <li>Crie a chave em <code>console.groq.com</code> (API Keys).</li>
+          <li>Alternativa: defina a variável <code>GROQ_API_KEY</code> ao iniciar o servidor; ela tem prioridade.</li>
+          <li>O limite por hora protege sua cota gratuita contra abuso.</li>
+          <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
+          <li>Modelo padrão: <code>openai/gpt-oss-120b</code>.</li>
+        </ul>
       </div>
-    </form>
-
-    <div class="card" style="margin-top:14px">
-      <h3 style="margin-top:0">Como funciona</h3>
-      <ul style="padding-left:18px;margin:0">
-        <li><b>Groq</b>: chave em <code>console.groq.com</code>. Modelo padrão: <code>openai/gpt-oss-120b</code>.</li>
-        <li><b>IteraCompute</b>: chave em <code>platform.iteracompute.com</code>. Plano grátis usa o modelo <code>Auto</code>; a saída é limitada a 8192 tokens (o servidor já respeita) e só roda 1 requisição por vez.</li>
-        <li>Cada provedor pode ser ligado ou desligado e ter seu próprio modelo. Com o fallback ligado, se o principal falhar (limite, fora do ar, modelo ruim) o próximo ativo assume na mesma requisição.</li>
-        <li>Alternativa às chaves salvas: variáveis <code>GROQ_API_KEY</code> e <code>ITERACOMPUTE_API_KEY</code> ao iniciar o servidor; elas têm prioridade.</li>
-        <li>Use <b>Buscar modelos</b> para listar o que o provedor oferece e <b>Testar</b> para validar chave, endereço e modelo antes de salvar.</li>
-        <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
-      </ul>
     </div>
   </section>
 
@@ -258,75 +242,15 @@ $('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['da
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));a.download='historico-shorts.csv';a.click()};
 
 /* ---- IA ---- */
-const PV={
-  groq:{models:['openai/gpt-oss-120b','openai/gpt-oss-20b','llama-3.3-70b-versatile','llama-3.1-8b-instant'],keyPh:'gsk_…',desc:'Nuvem, cota gratuita com limite de tokens por minuto.'},
-  iteracompute:{models:['Auto'],keyPh:'Chave da IteraCompute',desc:'Plano gratuito: modelo Auto (o provedor escolhe), 30M de tokens por mês, 1 requisição por vez.'}
-};
-let AI={};
-const pid=()=>Object.keys(PV);
-function provCard(id,c){
-  return `<div class="card pcard ${c.enabled?'':'off'}" data-p="${id}">
-    <div class="row sb"><h3 style="margin:0">${esc(c.label)} <span class="badge" data-st></span></h3><label class="sw"><input type="checkbox" data-f="enabled" aria-label="Ativar ${esc(c.label)}"><span data-sw></span></label></div>
-    <p class="muted" style="margin:4px 0 14px">${esc(PV[id].desc)}</p>
-    <label class="f">${PV[id].acct?'Token da API':'Chave da API'}<input type="password" data-f="key" autocomplete="off" placeholder="${esc(PV[id].keyPh)} (deixe vazio para manter a atual)"></label>
-    <div class="muted" data-hint style="margin:-6px 0 12px"></div>
-    <label class="f">Modelo
-      <span class="mrow"><input data-f="model" list="dl-${id}" autocomplete="off" spellcheck="false">${PV[id].nolist?'':'<button type="button" class="sec sm" data-act="models">Buscar modelos</button>'}</span>
-      <datalist id="dl-${id}">${PV[id].models.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>
-    </label>
-    <div class="chips hidden" data-chips></div>
-    <div class="grid g2">
-      <label class="f">Endereço da API<input data-f="baseUrl" autocomplete="off" spellcheck="false" placeholder="${esc(c.defaultUrl||'automático, pelo ID da conta')}"></label>
-      <label class="f">Tokens por minuto (TPM)<input type="number" data-f="tpm" min="3000" max="2000000"></label>
-    </div>
-    <div class="row"><button type="button" class="sec" data-act="test">Testar conexão</button><button type="button" class="danger" data-act="clear">Remover chave</button></div>
-    <div class="res hidden" data-res role="status"></div>
-  </div>`}
-const card=id=>document.querySelector(`.pcard[data-p="${id}"]`),fld=(id,f)=>card(id).querySelector(`[data-f="${f}"]`);
-function paintCard(id){const c=AI.providers[id],el=card(id);
-  fld(id,'enabled').checked=c.enabled;fld(id,'model').value=c.model;fld(id,'baseUrl').value=(c.baseUrl===c.defaultUrl||(PV[id].acct&&c.baseUrl.includes('/accounts/')))?'':c.baseUrl;if(PV[id].acct){fld(id,'accountId').value=c.accountId;fld(id,'accountId').disabled=c.accountFromEnv}fld(id,'tpm').value=c.tpm;fld(id,'key').value='';
-  fld(id,'baseUrl').disabled=c.urlFromEnv;fld(id,'key').disabled=c.keyFromEnv;
-  el.querySelector('[data-hint]').textContent=c.hasKey?`Chave configurada (${c.keyHint})${c.keyFromEnv?' via '+c.keyEnv:''}.${c.urlFromEnv?' Endereço vem do ambiente.':''}`:'Nenhuma chave configurada.';
-  el.querySelector('[data-act="clear"]').classList.toggle('hidden',!c.hasKey||c.keyFromEnv);
-  paintState(id)}
-function paintState(id){const c=AI.providers[id],el=card(id),on=fld(id,'enabled').checked,st=el.querySelector('[data-st]');
-  el.classList.toggle('off',!on);el.querySelector('[data-sw]').textContent=on?'Ligada':'Desligada';
-  const ready=on&&c.hasKey&&c.hasAccount;st.className='badge '+(ready?'ok':on?'warn':'');st.textContent=ready?'pronta':on?(c.hasAccount?'falta a chave':'falta o ID da conta'):'desligada'}
-function paintOrder(){const pr=$('ai-primary').value,on=$('ai-on').checked,fb=$('ai-fb').checked;
-  const q=[pr,...pid().filter(i=>i!==pr)].filter(i=>fld(i,'enabled').checked&&((AI.providers[i].hasKey||fld(i,'key').value.trim())&&(AI.providers[i].hasAccount||(fld(i,'accountId')&&fld(i,'accountId').value.trim()))));
-  const use=fb?q:q.slice(0,1);
-  $('ai-order').textContent=on?(use.length?'Ordem de uso: '+use.map(i=>AI.providers[i].label).join(' → '):'Nenhum provedor pronto.'):'IA desativada para os visitantes.'}
-async function loadAi(){AI=await api('/api/admin/ai');
-  if(!$('provs').children.length)$('provs').innerHTML=pid().map(i=>provCard(i,AI.providers[i])).join('');
-  $('ai-primary').innerHTML=pid().map(i=>`<option value="${i}">${esc(AI.providers[i].label)}</option>`).join('');
-  $('ai-on').checked=AI.enabled;$('ai-primary').value=AI.primary;$('ai-ph').value=AI.perHour;$('ai-fb').checked=AI.fallback;$('ai-extra').value=AI.extra||'';
-  pid().forEach(paintCard);
-  const n=$('ainote');n.classList.remove('hidden','ok','warn','bad');
-  const rdy=pid().filter(i=>AI.providers[i].ready).map(i=>AI.providers[i].label);
-  n.classList.add(AI.available?'ok':'warn');
-  n.textContent=AI.available?'A criação com IA está ativa para os visitantes ('+rdy.join(' e ')+').':(rdy.length?'A criação com IA está desativada.':'Nenhum provedor pronto (ligue um e informe a chave): a criação com IA fica indisponível.');
-  const u=pid().map(i=>`${AI.providers[i].label}: ${AI.providers[i].uses}`).join(' · ');n.textContent+=' Usos até agora — '+u+'.';
-  paintOrder()}
-function aiPayload(){const d={enabled:$('ai-on').checked,primary:$('ai-primary').value,fallback:$('ai-fb').checked,perHour:+$('ai-ph').value,extra:$('ai-extra').value,providers:{}};
-  pid().forEach(i=>{const p={enabled:fld(i,'enabled').checked,model:fld(i,'model').value.trim(),tpm:+fld(i,'tpm').value||undefined};
-    if(!AI.providers[i].urlFromEnv)p.baseUrl=fld(i,'baseUrl').value.trim();
-    if(PV[i].acct)p.accountId=fld(i,'accountId').value.trim();
-    const k=fld(i,'key').value.trim();if(k)p.key=k;d.providers[i]=p});return d}
-$('aif').onsubmit=e=>{e.preventDefault();run(async()=>{await api('/api/admin/ai','PUT',aiPayload());toast('Configuração de IA salva.');await Promise.all([loadAi(),loadStatus()])})};
-$('aif').addEventListener('input',e=>{const el=e.target.closest('.pcard');if(el&&e.target.dataset.f==='enabled')paintState(el.dataset.p);paintOrder()});
-$('aif').addEventListener('change',paintOrder);
-function showChips(id,list){const box=card(id).querySelector('[data-chips]'),cur=fld(id,'model').value.trim();
-  box.innerHTML=list.map(m=>`<button type="button" class="${m===cur?'cur':''}" data-m="${esc(m)}">${esc(m)}</button>`).join('');box.classList.remove('hidden')}
-function showRes(id,ok,msg){const r=card(id).querySelector('[data-res]');r.className='res '+(ok?'ok':'bad');r.textContent=msg}
-$('provs').onclick=e=>{const ch=e.target.closest('button[data-m]');if(ch){const id=ch.closest('.pcard').dataset.p;fld(id,'model').value=ch.dataset.m;ch.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('cur',x===ch));paintOrder();return}
-  const b=e.target.closest('button[data-act]');if(!b)return;const id=b.closest('.pcard').dataset.p,act=b.dataset.act;
-  const ov={provider:id,model:fld(id,'model').value.trim(),baseUrl:fld(id,'baseUrl').value.trim(),key:fld(id,'key').value.trim()};if(PV[id].acct)ov.accountId=fld(id,'accountId').value.trim();
-  if(act==='clear'){if(confirm('Remover a chave de '+AI.providers[id].label+' deste servidor?'))run(async()=>{await api('/api/admin/ai','PUT',{providers:{[id]:{clearKey:true}}});toast('Chave removida.');await loadAi()});return}
-  const label=b.textContent;b.disabled=true;b.textContent=act==='test'?'Testando…':'Buscando…';
-  run(async()=>{try{
-    if(act==='test'){const r=await api('/api/admin/ai/test','POST',ov);showRes(id,r.ok,r.ok?`Conexão OK com o modelo ${r.model} em ${(r.ms/1000).toFixed(1)} s (resposta: "${r.reply}").`:'Falhou: '+r.error)}
-    else{const r=await api('/api/admin/ai/models','POST',ov);$('dl-'+id).innerHTML=r.models.map(m=>`<option value="${esc(m)}">`).join('');showChips(id,r.models);showRes(id,true,r.models.length+' modelo(s) encontrados. Clique em um para usar e depois em "Salvar tudo".')}
-  }catch(x){if(x.message!=='Sessão expirada.')showRes(id,false,x.message);else throw x}finally{b.disabled=false;b.textContent=label}})};
+async function loadAi(){const a=await api('/api/admin/ai');
+  $('ai-on').checked=a.enabled;$('ai-model').value=a.model;$('ai-ph').value=a.perHour;$('ai-tpm').value=a.tpm||8000;$('ai-extra').value=a.extra||'';$('ai-key').value='';
+  $('ai-hint').textContent=a.hasKey?`Chave configurada (${a.keyHint})${a.keyFromEnv?' via GROQ_API_KEY':''}.`:'Nenhuma chave configurada.';
+  const n=$('ainote');n.classList.remove('hidden','ok','warn','bad');n.classList.add(a.enabled&&a.hasKey?'ok':'warn');
+  n.textContent=a.enabled&&a.hasKey?'A criação com IA está ativa para os visitantes.':(a.hasKey?'A criação com IA está desativada.':'Falta a chave da Groq: a criação com IA fica indisponível.');
+  $('ai-clear').classList.toggle('hidden',!a.hasKey||a.keyFromEnv)}
+$('aif').onsubmit=e=>{e.preventDefault();run(async()=>{const d={enabled:$('ai-on').checked,model:$('ai-model').value,perHour:+$('ai-ph').value,tpm:+$('ai-tpm').value,extra:$('ai-extra').value};if($('ai-key').value.trim())d.key=$('ai-key').value;
+  await api('/api/admin/ai','PUT',d);toast('IA atualizada.');await Promise.all([loadAi(),loadStatus()])})};
+$('ai-clear').onclick=()=>{if(confirm('Remover a chave da Groq deste servidor?'))run(async()=>{await api('/api/admin/ai','PUT',{clearKey:true});toast('Chave removida.');await loadAi()})};
 
 /* ---- padrões ---- */
 function fillLooks(){$('s-look').innerHTML=S.LOOKS.map(l=>`<option value="${l.id}">${esc(l.label)}</option>`).join('')}fillLooks();

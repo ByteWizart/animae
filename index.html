@@ -76,7 +76,13 @@ footer{max-width:1100px;margin:28px auto 0;color:#6f6c86;font-size:12px;text-ali
 <div id="aireviewout"></div>
 <div class="row"><label class="fld">Traduzir tudo para<select id="aitr"></select></label><button class="sec" id="aitrgo">Traduzir</button></div>
 <div class="muted">Cada uso conta no limite por hora da IA. A história atual (JSON) é enviada para a IA e a resposta substitui a atual: salve na biblioteca antes se quiser guardar a versão anterior.</div></div></details>
-<label class="fld">Áudio da narração (mp3, wav ou m4a)<input type="file" id="audio" accept="audio/*"></label></section>
+<details class="adv" id="ttsbox" open><summary>Voz com IA: gerar a narração a partir do roteiro</summary><div class="in">
+<div class="row"><label class="fld">Voz<select id="ttsvoice"><option value="">Carregando vozes...</option></select></label>
+<label class="fld">Velocidade <span id="ttsratev">0%</span><input type="range" id="ttsrate" min="-30" max="40" value="0"></label>
+<label class="fld">Tom <span id="ttspitchv">0 Hz</span><input type="range" id="ttspitch" min="-20" max="20" value="0"></label></div>
+<div class="row"><button id="ttsgo">Gerar voz com IA</button><button class="sec" id="ttsplay" disabled>Ouvir</button><a id="ttsdl" class="sec" download="narracao.mp3" hidden style="color:#6ab0ff;align-self:center">Baixar MP3</a></div>
+<div class="muted" id="ttsst">A voz é gerada a partir do texto do roteiro e já fica carregada como áudio da narração.</div></div></details>
+<label class="fld">Ou envie sua própria gravação (mp3, wav ou m4a)<input type="file" id="audio" accept="audio/*"></label></section>
 
 <section class="step"><div class="sh"><span class="n">3</span><h2>Vídeo</h2></div>
 <div class="row"><label class="fld">Estilo visual<select id="look"><option value="cartoon">Cartoon</option><option value="sketch">Desenho a lápis</option><option value="comic">Quadrinhos</option><option value="noir">Preto e branco</option><option value="neon">Neon</option><option value="retro">Retrô VHS</option><option value="pixel">Pixel art</option><option value="blueprint">Planta azul</option><option value="pastel">Pastel</option><option value="vintage">Filme antigo</option></select></label>
@@ -826,8 +832,29 @@ const readStory=()=>{try{story=JSON.parse($('story').value);WARN=validate(story)
 show();drawFrame(story,2.5);
 $('look').onchange=()=>{if(!readStory())return;story.style=story.style||{};story.style.look=$('look').value;show();drawFrame(story,Math.min(2.5,story.total-.1))};
 $('jf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('story').value=await f.text();if(readStory()){drawFrame(story,.5);log('História carregada.'+WARN)}};
-$('audio').onchange=async e=>{const f=e.target.files[0];if(!f)return;ac=new(window.AudioContext||window.webkitAudioContext)({sampleRate:SR});
-  try{voiceBuf=await ac.decodeAudioData(await f.arrayBuffer());log(`Áudio: ${voiceBuf.duration.toFixed(1)} s`)}catch(x){log('Áudio inválido: '+x.message)}};
+async function setVoice(ab,label){ac=new(window.AudioContext||window.webkitAudioContext)({sampleRate:SR});
+  try{voiceBuf=await ac.decodeAudioData(ab);log((label||'Áudio')+`: ${voiceBuf.duration.toFixed(1)} s`);return true}catch(x){log('Áudio inválido: '+x.message);return false}}
+$('audio').onchange=async e=>{const f=e.target.files[0];if(!f)return;await setVoice(await f.arrayBuffer())};
+/* ---- voz com IA (TTS no servidor): texto do roteiro -> MP3 -> mesmo caminho do áudio enviado ---- */
+let ttsUrl=null,ttsOk=false;
+(async()=>{const st=$('ttsst');
+  try{const s=await (await fetch('/api/tts/status')).json();
+    if(!s.available){st.textContent=s.installed?'A voz com IA está desativada neste site. Envie sua gravação abaixo.':'A voz com IA não está instalada no servidor (rode \"npm install\" e reinicie). Envie sua gravação abaixo.';$('ttsgo').disabled=true;return}
+    ttsOk=true;const v=await (await fetch('/api/tts/voices')).json();
+    $('ttsvoice').innerHTML=v.voices.map(x=>`<option value=\"${x.id}\">${x.lang} · ${x.label}</option>`).join('');
+    if(v.voices.some(x=>x.id===v.default))$('ttsvoice').value=v.default}
+  catch{st.textContent='Voz com IA indisponível (abra pelo servidor: node server.js). Envie sua gravação abaixo.';$('ttsgo').disabled=true}})();
+$('ttsrate').oninput=()=>{$('ttsratev').textContent=($('ttsrate').value>0?'+':'')+$('ttsrate').value+'%'};
+$('ttspitch').oninput=()=>{$('ttspitchv').textContent=($('ttspitch').value>0?'+':'')+$('ttspitch').value+' Hz'};
+$('ttsgo').onclick=async()=>{if(busy||!ttsOk)return;const text=$('script').value.trim();if(text.length<2)return log('Escreva ou gere o roteiro primeiro: a voz é feita a partir dele.');
+  const b=$('ttsgo'),st=$('ttsst');b.disabled=true;st.textContent='Gerando a voz... (textos longos levam alguns segundos)';
+  try{const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:$('ttsvoice').value,rate:+$('ttsrate').value,pitch:+$('ttspitch').value})});
+    if(!r.ok){let m='Falha ao gerar a voz.';try{m=(await r.json()).error||m}catch{}throw new Error(m)}
+    const blob=await r.blob();if(ttsUrl)URL.revokeObjectURL(ttsUrl);ttsUrl=URL.createObjectURL(blob);
+    if(await setVoice(await blob.arrayBuffer(),'Voz com IA pronta')){st.textContent='Pronto. Agora clique em \"Ajustar ao áudio\", depois em \"Prévia\" e \"Gerar vídeo\".';$('ttsplay').disabled=false;$('ttsdl').href=ttsUrl;$('ttsdl').hidden=false}}
+  catch(e){st.textContent=e.message;log(e.message)}finally{b.disabled=false}};
+$('ttsplay').onclick=()=>{if(!ttsUrl)return;if(window._ttsA){window._ttsA.pause();window._ttsA=null;$('ttsplay').textContent='Ouvir';return}
+  const a=new Audio(ttsUrl);window._ttsA=a;$('ttsplay').textContent='Parar';a.onended=()=>{window._ttsA=null;$('ttsplay').textContent='Ouvir'};a.play()};
 $('fit').onclick=()=>{if(!voiceBuf)return log('Escolha o áudio.');if(!readStory())return;if(story.scenes.some(s=>s&&s.caption)){const m=smartFit(story,voiceBuf,$('autotalk')?$('autotalk').checked:true);show();return log(m)}const f=voiceBuf.duration/story.total,r=v=>+(v*f).toFixed(2);
   story.scenes.forEach(s=>{s.t0=r(s.t0);s.t1=r(s.t1)});(story.sfx||[]).forEach(x=>x.t=r(x.t));story.total=+voiceBuf.duration.toFixed(2);show();log('Tempos ajustados (fator '+f.toFixed(2)+'). Marque as falas dos personagens (talk) à mão se precisar.')};
 $('pauses').onclick=()=>{if(!voiceBuf)return log('Escolha o áudio.');log('Pausas (s):\n'+detectPauses(voiceBuf).map(p=>p.join(' – ')).join('\n'))};

@@ -1,7 +1,8 @@
 {
   "name": "shorts-animados",
-  "version": "0.3.0",
-  "description": "Gera shorts animados verticais no navegador, sem dependências e sem API paga.",
+  "version": "0.4.0",
+  "description": "Gera shorts animados verticais no navegador. Voz com IA opcional (msedge-tts).",
   "scripts": { "start": "node server.js" },
+  "dependencies": { "msedge-tts": "^2.1.1" },
   "license": "MIT"
 }
