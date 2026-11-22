@@ -98,3 +98,10 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 - O servidor faz de proxy e guarda cada ícone em `.cache-icones/` (pasta oculta, não é servida): só a primeira vez usa internet, depois funciona offline. O gerador baixa os ícones antes de gravar o vídeo.
 - Precisa abrir o site pelo servidor (`node server.js`). Se o ícone não carregar, o objeto simplesmente não aparece e o log avisa.
 - Licenças: cada conjunto tem a sua (Noto: Apache 2.0; Twemoji: CC BY 4.0, exige crédito; OpenMoji: CC BY-SA 4.0). Confira antes de publicar de forma comercial.
+
+### Qualidade dos vídeos (também no build 10)
+
+- **Marcos e obras desenhados em código:** `pisa` (Torre de Pisa), `eiffel`, `pyramid` e `crane`. A Torre de Pisa aceita `lean` (inclinação em rad: 0 reta, 0.07 realista, 0.1 bem torta) e `lean2` + `leanAt` + `leanDur` para **entortar ou endireitar durante a cena**. A IA do Groq já sabe usar esses objetos.
+- **Enquadramento automático:** ao ler a história, o gerador move personagens parados que ficariam cortados pela câmera e afasta os que estão colados (as etiquetas dos nomes não se sobrepõem). O log avisa quando corrige algo.
+- **Correções:** cenários como `city`, `night` e `space` não quebram mais quando a cena não traz `bg`; colar o JSON completo da IA (plano, roteiro, story, publicacao) agora funciona e preenche o roteiro; `total` ausente ou 0 é recalculado; a duração inválida mostra uma mensagem em vez de erro técnico.
+- **Dica para etiquetas:** use nomes curtos nos personagens (ex.: "Zé"), porque a etiqueta cresce com o nome.

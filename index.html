@@ -123,7 +123,7 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
     anim:pop|float|spin|shake|pulse|fall|none, to:{x,y}, dur, front:true
 </pre></details></div></details>
 </div></main>
-<footer>Shorts Animados · build 9</footer>
+<footer>Shorts Animados · build 10</footer>
 <script src="audio.js"></script>
 <script src="schema.js"></script>
 <script>
@@ -148,7 +148,7 @@ const EMO='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 function cloud(x,y,k){c.fillStyle='rgba(255,255,255,.85)';for(const[dx,dy,r]of[[0,0,50],[55,-20,65],[115,0,50],[55,15,55]]){c.beginPath();c.arc(x+dx*k,y+dy*k,r*k,0,7);c.fill()}}
 function scenery(s,t){if(s.scenery==='room'){room(s,t);return}
   if(SCN[s.scenery]){const P=SCNP[s.scenery]||{};sbg(s,s.scenery);SCN[s.scenery](s,t,s.gy||1480,s.ground||P.ground||'#5fb46a');return}
-  const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,s.bg[0]);g.addColorStop(1,s.bg[1]);
+  const g=c.createLinearGradient(0,0,0,H);const bgc=Array.isArray(s.bg)&&s.bg.length>1?s.bg:(({night:['#0b1030','#2a2f6b'],space:['#05050f','#1b1140'],none:['#2b2b3a','#181622']})[s.scenery]||['#7ec8ff','#e9f6ff']);g.addColorStop(0,bgc[0]);g.addColorStop(1,bgc[1]);
   c.fillStyle=g;c.fillRect(-500,-500,W+1000,H+1000);
   const k=s.scenery||'hills',r=mulberry32(5),gy=s.gy||1480;
   if(k==='space'||k==='night')for(let i=0;i<80;i++){const x=r()*W,y=r()*gy*.9;c.fillStyle=`rgba(255,255,255,${.25+.75*(.5+.5*Math.sin(t*3+i*2))})`;c.beginPath();c.arc(x,y,1.5+r()*3,0,7);c.fill()}
@@ -517,6 +517,35 @@ PN.rock=(p,s)=>{poly([[-s*.4,0],[-s*.3,-s*.3],[-s*.05,-s*.42],[s*.25,-s*.32],[s*
 PN.palm=(p,s,k)=>{c.beginPath();c.moveTo(-s*.05,0);c.quadraticCurveTo(s*.08,-s*.4,s*.04,-s*.8);c.lineTo(s*.1,-s*.8);c.quadraticCurveTo(s*.16,-s*.4,s*.06,0);c.closePath();c.fillStyle='#9c6a38';c.fill();c.stroke();
   for(let i=0;i<5;i++){c.save();c.translate(s*.07,-s*.8);c.rotate(-Math.PI/2+(i-2)*.62+Math.sin(k*1.5+i)*.05);c.beginPath();c.moveTo(0,0);c.quadraticCurveTo(s*.2,-s*.2,s*.45,0);c.quadraticCurveTo(s*.2,-s*.08,0,0);c.fillStyle=p.color||'#3fa34d';c.fill();c.stroke();c.restore()}};
 
+/* ---- marcos e construção (y = chão) ---- */
+// Torre de Pisa: "lean" = inclinação em rad (0 reta, 0.07 realista, 0.1 bem torta). "lean2" + "leanAt" + "leanDur": ela entorta durante a cena.
+PN.pisa=(p,s,k)=>{const L0=p.lean!=null?p.lean:.07,L1=p.lean2!=null?p.lean2:L0,lean=lerp(L0,L1,eio((k-(p.leanAt||0))/Math.max(.05,p.leanDur||1.2)));
+  const mar=p.color||'#f4ecd6',sh='#d9cca6',dk='#6a5744',w=s*.34,shade='rgba(110,80,30,.17)';
+  rr(-w*.66,-s*.045,w*1.32,s*.045,'#cdbf9d',3);c.rotate(lean);let y=-s*.045;
+  const th0=s*.2;rr(-w/2,y-th0,w,th0,mar,4);c.fillStyle=shade;c.fillRect(w*.24,y-th0+4,w*.24,th0-8);
+  for(let i=0;i<6;i++){const ax=-w/2+w*(i+.5)/6;c.beginPath();c.roundRect(ax-w*.04,y-th0*.8,w*.08,th0*.62,w*.04);c.fillStyle=sh;c.fill()}
+  c.beginPath();c.roundRect(-w*.06,y-th0*.5,w*.12,th0*.5,[w*.06,w*.06,0,0]);c.fillStyle=dk;c.fill();
+  y-=th0;const th=s*.158;
+  for(let g=0;g<6;g++){rr(-w*.54,y-s*.014,w*1.08,s*.016,sh,2);rr(-w/2,y-th,w,th,mar,4);c.fillStyle=shade;c.fillRect(w*.24,y-th+4,w*.24,th-8);
+    for(let i=0;i<8;i++){const cx=-w/2+w*(i+.5)/8;c.beginPath();c.roundRect(cx-w*.032,y-th*.86,w*.064,th*.7,w*.03);c.fillStyle=dk;c.fill()}
+    y-=th}
+  rr(-w*.45,y-s*.014,w*.9,s*.016,sh,2);const bh=s*.19;rr(-w*.37,y-bh,w*.74,bh,mar,4);c.fillStyle=shade;c.fillRect(w*.14,y-bh+4,w*.2,bh-8);
+  for(let i=0;i<5;i++){const cx=-w*.37+w*.74*(i+.5)/5;c.beginPath();c.roundRect(cx-w*.036,y-bh*.82,w*.072,bh*.62,w*.036);c.fillStyle=dk;c.fill()}
+  y-=bh;rr(-w*.42,y-s*.03,w*.84,s*.03,sh,2);poly([[-w*.36,y-s*.03],[0,y-s*.11],[w*.36,y-s*.03]],'#c8553d')};
+PN.eiffel=(p,s)=>{const col=p.color||'#6b5a4c',h=s*1.5,T=[[0,.32],[.5,.12],[.8,.05],[1,.012]],hw=t=>{for(let i=1;i<T.length;i++)if(t<=T[i][0]){const a=T[i-1],b=T[i],q=(t-a[0])/(b[0]-a[0]);return lerp(a[1],b[1],q)*s}return T[3][1]*s};
+  poly([[-s*.32,0],[-hw(.5),-h*.5],[-hw(.8),-h*.8],[-s*.012,-h],[s*.012,-h],[hw(.8),-h*.8],[hw(.5),-h*.5],[s*.32,0],[s*.2,0],[0,-h*.28],[-s*.2,0]],col);
+  const lv=[.07,.15,.23,.33,.42,.55,.64,.72,.88];lv.forEach((t,i)=>{const a=hw(t),y=-t*h;if(t<.28){const ii=s*.2*(1-t/.28);ln([[-a,y],[-ii,y]],4,'#3b2f26');ln([[a,y],[ii,y]],4,'#3b2f26')}else ln([[-a,y],[a,y]],4,'#3b2f26');
+    if(i>0&&t>.3){const t0=lv[i-1],b=hw(t0);if(t0>.28){ln([[-b,-t0*h],[a,y]],3,'#3b2f26');ln([[b,-t0*h],[-a,y]],3,'#3b2f26')}}});
+  rr(-hw(.5)-s*.02,-h*.5-s*.02,hw(.5)*2+s*.04,s*.04,'#8a7766',2);rr(-hw(.8)-s*.015,-h*.8-s*.015,hw(.8)*2+s*.03,s*.03,'#8a7766',2);ln([[0,-h],[0,-h-s*.08]],6,K)};
+PN.pyramid=(p,s)=>{const col=p.color||'#e8c46a';poly([[-s*.95,0],[-s*.55,-s*.42],[-s*.15,0]],'#d6b055');poly([[-s*.6,0],[0,-s*.85],[s*.6,0]],col);poly([[0,-s*.85],[s*.6,0],[s*.08,0]],'rgba(120,80,20,.28)');
+  for(let i=1;i<6;i++){const y=-s*.85*i/6,hw=s*.6*(1-i/6);ln([[-hw,y],[hw,y]],3,'rgba(90,60,20,.55)')}};
+PN.crane=(p,s,k)=>{const Y='#f4b400',m=s*.045,top=-s*1.25,hx=s*(.45+Math.sin(k*.9)*.12),hy=top+s*.3+Math.sin(k*1.3)*s*.08;
+  rr(-s*.14,-s*.06,s*.28,s*.06,'#5b5f68',3);rr(-m,top,m*2,-top,Y,2);
+  for(let i=0;i<10;i++){const y0=-s*.06-i*(-top-s*.06)/10,y1=-s*.06-(i+1)*(-top-s*.06)/10;ln([[-m,y0],[m,y1]],3,K);ln([[m,y0],[-m,y1]],3,K)}
+  poly([[-s*.3,top+m*.5],[s*.75,top+m*.5],[s*.75,top-m*.6],[-s*.3,top-m*.6]],Y);for(let i=0;i<9;i++){const x=-s*.3+i*s*1.05/9;ln([[x,top+m*.5],[x+s*.058,top-m*.6]],3,K)}
+  poly([[-s*.3,top+m*.5],[-s*.3,top+s*.12],[-s*.18,top+s*.12],[-s*.18,top+m*.5]],'#8a8f9c');rr(-m*2.4,top-m*1.6,m*2.8,m*1.8,'#2f6fa8',3);
+  ln([[0,top-m*.6],[0,top-s*.18],[s*.75,top-m*.6]],3,K);ln([[hx,top+m*.5],[hx,hy]],4,K);rr(hx-m*.8,hy,m*1.6,m*1.4,'#d94a3a',2);rr(hx-s*.09,hy+m*1.4,s*.18,s*.11,'#c68b59',3)};
+
 /* ---- veículos e animais (viram para a esquerda com "flip":true) ---- */
 PN.bus=FL((p,s)=>{rr(-s*.8,-s*.65,s*1.6,s*.6,p.color||'#ffc22e',s*.06);for(let i=0;i<5;i++)rr(-s*.7+i*s*.27,-s*.55,s*.2,s*.22,'#bfe3ff',4);rr(s*.55,-s*.55,s*.2,s*.35,'#bfe3ff',4);for(const x of[-.45,.45]){ci(x*s,-s*.02,s*.14,'#222');dot(x*s,-s*.02,s*.05,'#bbb')}});
 PN.plane=FL((p,s,k)=>{c.translate(0,Math.sin(k*2)*s*.02);c.beginPath();c.moveTo(-s*.6,-s*.1);c.lineTo(s*.35,-s*.12);c.quadraticCurveTo(s*.65,-s*.1,s*.7,0);c.quadraticCurveTo(s*.5,s*.1,s*.2,s*.12);c.lineTo(-s*.5,s*.08);c.closePath();c.fillStyle=p.color||'#f2f2f8';c.fill();c.stroke();
@@ -834,7 +863,26 @@ let WARN='';
 function validate(st){const ok=new Set([...Object.keys(PR),...Object.keys(PX),...Object.keys(PN),'icon','emoji','circle','rect','star']),bad=new Set();
   arr(st.scenes).forEach(sc=>arr(sc&&sc.props).forEach(p=>{if(p&&!ok.has(p.type))bad.add(p.type)}));
   return bad.size?`\nAviso: tipo(s) de objeto desconhecido(s): ${[...bad].join(', ')} (não serão desenhados). Se for car/tree, seu index.html está desatualizado: use o do zip novo.`:''}
-const readStory=()=>{try{story=JSON.parse($('story').value);WARN=validate(story);{const ms=$('music');if(ms){const m=story&&story.style&&story.style.music;ms.value=(m&&typeof m==='object'?m.type:m)||''}}return true}catch(e){log('JSON inválido: '+e.message);return false}};
+/* Enquadramento automático: personagens parados precisam caber na janela visível da câmera e ficar afastados (as etiquetas não podem se sobrepor). */
+function autoFrame(o){let n=0;arr(o.scenes).forEach(sc=>{if(!sc||typeof sc!=='object')return;const cm=sc.cam||{};if(cm.follow!=null)return;
+  let pts=[[+cm.z0||1,+cm.x0||540],[+cm.z1||+cm.z0||1,+cm.x1||+cm.x0||540]];
+  if(Array.isArray(cm.keys)&&cm.keys.length)pts=cm.keys.map(k=>[+k.z||1,+k.x||540]);
+  const lo=Math.max(0,...pts.map(q=>q[1]-540/Math.max(1,q[0]))),hi=Math.min(1080,...pts.map(q=>q[1]+540/Math.max(1,q[0])));
+  const act=arr(sc.actors).filter(a=>a&&typeof a.x==='number'&&!a.to&&!a.move);if(!act.length)return;
+  const hw=a=>Math.max(120,(+a.h||500)*.34),GAP=260;
+  const L=a=>lo+hw(a)+20,R=a=>hi-hw(a)-20;
+  act.forEach(a=>{if(L(a)<R(a)){const x=Math.max(L(a),Math.min(R(a),a.x));if(Math.abs(x-a.x)>1){a.x=Math.round(x);n++}}});
+  const srt=[...act].sort((a,b)=>a.x-b.x);
+  for(let i=1;i<srt.length;i++){const need=srt[i-1].x+GAP;if(srt[i].x<need){const nx=Math.min(need,R(srt[i]));if(nx>srt[i].x){srt[i].x=Math.round(nx);n++}}}
+  for(let i=srt.length-2;i>=0;i--){const need=srt[i+1].x-GAP;if(srt[i].x>need){const nx=Math.max(need,L(srt[i]));if(nx<srt[i].x){srt[i].x=Math.round(nx);n++}}}
+});return n}
+const readStory=()=>{try{let o=JSON.parse($('story').value);
+  if(o&&!Array.isArray(o.scenes)&&o.story&&Array.isArray(o.story.scenes)){ // colaram o JSON completo da IA: usa só a história e aproveita o roteiro
+    if(typeof o.roteiro==='string'&&o.roteiro.trim()&&!$('script').value.trim())$('script').value=o.roteiro;o=o.story;$('story').value=JSON.stringify(o,null,1)}
+  if(!o||!Array.isArray(o.scenes)||!o.scenes.length){log('Este JSON não tem a lista \"scenes\". Carregue o arquivo da história (só o objeto com total, style, scenes e sfx).');return false}
+  if(!(+o.total>0)){const m=Math.max(0,...o.scenes.map(sc=>+(sc&&sc.t1)||0));if(!(m>0)){log('Este JSON não tem \"total\" nem tempos t0/t1 nas cenas.');return false}o.total=+m.toFixed(2);$('story').value=JSON.stringify(o,null,1)}
+  {const nf=autoFrame(o);if(nf){$('story').value=JSON.stringify(o,null,1);log('Enquadramento ajustado: '+nf+' correção(ões) de posição (personagens cortados ou colados).')}}
+  story=o;WARN=validate(story);{const ms=$('music');if(ms){const m=story&&story.style&&story.style.music;ms.value=(m&&typeof m==='object'?m.type:m)||''}}return true}catch(e){log('JSON inválido: '+e.message);return false}};
 show();drawFrame(story,2.5);
 $('look').onchange=()=>{if(!readStory())return;story.style=story.style||{};story.style.look=$('look').value;show();drawFrame(story,Math.min(2.5,story.total-.1))};
 $('jf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('story').value=await f.text();if(readStory()){drawFrame(story,.5);log('História carregada.'+WARN)}};
@@ -868,6 +916,7 @@ const pickMime=()=>['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/
 async function run(rec_){try{await run0(rec_)}catch(e){console.error(e);busy=false;$('gen').disabled=$('prev').disabled=false;log('Erro ao gerar: '+e.message)}}
 async function run0(rec_){ENGERR.clear();
   if(busy||!readStory())return;if(!voiceBuf)return log('Escolha o arquivo de voz primeiro.');
+  if(!(Math.min(story.total,voiceBuf.duration+.5)>.5))return log('Duração inválida (história: '+story.total+' s, voz: '+voiceBuf.duration.toFixed(1)+' s). Gere a voz ou carregue um áudio com som e confira o "total" da história.');
   busy=true;$('gen').disabled=$('prev').disabled=true;{const R=+$('res').value||720;cv.width=R;cv.height=Math.round(R*16/9);S=R/W}await ac.resume();await preloadIcons(story);
   const total=Math.min(story.total,voiceBuf.duration+.5),bd=synthBed({...story,total}),bed=ac.createBuffer(1,bd.length,SR);bed.copyToChannel(bd,0);
   const gain=.5*rms(voiceBuf.getChannelData(0),Math.floor(total*voiceBuf.sampleRate))/Math.max(1e-6,rms(bd,bd.length));
