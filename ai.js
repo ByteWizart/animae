@@ -328,7 +328,9 @@ async function listModels({ key, baseUrl, label, kind }) {
     let j = {}; try { j = await r.json(); } catch {}
     if (r.status === 401 || r.status === 403) throw httpErr(502, `A chave de ${label} foi recusada.`);
     if (!r.ok) throw httpErr(502, `${label} respondeu ${r.status} ao listar modelos.`);
-    let ids = (Array.isArray(j.data) ? j.data : Array.isArray(j) ? j : []).map(m => (typeof m === 'string' ? m : m && m.id)).filter(Boolean).map(String);
+    const arr = Array.isArray(j.data) ? j.data : Array.isArray(j.models) ? j.models : Array.isArray(j.result) ? j.result : Array.isArray(j) ? j : [];
+    let ids = arr.map(m => (typeof m === 'string' ? m : m && (m.id || m.name || m.model))).filter(Boolean).map(String);
+    if (!ids.length) throw httpErr(502, `${label} respondeu, mas não vi nenhum modelo na lista.`);
     if (kind === 'groq') ids = ids.filter(id => !/whisper|tts|guard|playai|orpheus|embed/i.test(id));
     return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
   } catch (e) {

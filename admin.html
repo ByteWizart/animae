@@ -36,6 +36,9 @@
 .pcard.off{opacity:.78}
 .pcard .res{font-size:13px;margin-top:10px}
 .pcard .res.ok{color:var(--ok)}.pcard .res.bad{color:var(--bad)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px;max-height:150px;overflow:auto}
+.chips button{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:4px 10px;font-size:12.5px;font-weight:600}
+.chips button.cur{border-color:var(--accent);color:var(--accent)}
 .mrow{display:flex;gap:8px;align-items:center}.mrow input{flex:1;min-width:0}
 td .acts{display:flex;gap:6px;flex-wrap:wrap}
 textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
@@ -271,6 +274,7 @@ function provCard(id,c){
       <span class="mrow"><input data-f="model" list="dl-${id}" autocomplete="off" spellcheck="false">${PV[id].nolist?'':'<button type="button" class="sec sm" data-act="models">Buscar modelos</button>'}</span>
       <datalist id="dl-${id}">${PV[id].models.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>
     </label>
+    <div class="chips hidden" data-chips></div>
     <div class="grid g2">
       <label class="f">Endereço da API<input data-f="baseUrl" autocomplete="off" spellcheck="false" placeholder="${esc(c.defaultUrl||'automático, pelo ID da conta')}"></label>
       <label class="f">Tokens por minuto (TPM)<input type="number" data-f="tpm" min="3000" max="2000000"></label>
@@ -311,14 +315,17 @@ function aiPayload(){const d={enabled:$('ai-on').checked,primary:$('ai-primary')
 $('aif').onsubmit=e=>{e.preventDefault();run(async()=>{await api('/api/admin/ai','PUT',aiPayload());toast('Configuração de IA salva.');await Promise.all([loadAi(),loadStatus()])})};
 $('aif').addEventListener('input',e=>{const el=e.target.closest('.pcard');if(el&&e.target.dataset.f==='enabled')paintState(el.dataset.p);paintOrder()});
 $('aif').addEventListener('change',paintOrder);
+function showChips(id,list){const box=card(id).querySelector('[data-chips]'),cur=fld(id,'model').value.trim();
+  box.innerHTML=list.map(m=>`<button type="button" class="${m===cur?'cur':''}" data-m="${esc(m)}">${esc(m)}</button>`).join('');box.classList.remove('hidden')}
 function showRes(id,ok,msg){const r=card(id).querySelector('[data-res]');r.className='res '+(ok?'ok':'bad');r.textContent=msg}
-$('provs').onclick=e=>{const b=e.target.closest('button[data-act]');if(!b)return;const id=b.closest('.pcard').dataset.p,act=b.dataset.act;
+$('provs').onclick=e=>{const ch=e.target.closest('button[data-m]');if(ch){const id=ch.closest('.pcard').dataset.p;fld(id,'model').value=ch.dataset.m;ch.parentNode.querySelectorAll('button').forEach(x=>x.classList.toggle('cur',x===ch));paintOrder();return}
+  const b=e.target.closest('button[data-act]');if(!b)return;const id=b.closest('.pcard').dataset.p,act=b.dataset.act;
   const ov={provider:id,model:fld(id,'model').value.trim(),baseUrl:fld(id,'baseUrl').value.trim(),key:fld(id,'key').value.trim()};if(PV[id].acct)ov.accountId=fld(id,'accountId').value.trim();
   if(act==='clear'){if(confirm('Remover a chave de '+AI.providers[id].label+' deste servidor?'))run(async()=>{await api('/api/admin/ai','PUT',{providers:{[id]:{clearKey:true}}});toast('Chave removida.');await loadAi()});return}
   const label=b.textContent;b.disabled=true;b.textContent=act==='test'?'Testando…':'Buscando…';
   run(async()=>{try{
     if(act==='test'){const r=await api('/api/admin/ai/test','POST',ov);showRes(id,r.ok,r.ok?`Conexão OK com o modelo ${r.model} em ${(r.ms/1000).toFixed(1)} s (resposta: "${r.reply}").`:'Falhou: '+r.error)}
-    else{const r=await api('/api/admin/ai/models','POST',ov);$('dl-'+id).innerHTML=r.models.map(m=>`<option value="${esc(m)}">`).join('');showRes(id,true,r.models.length+' modelo(s) encontrados. Clique no campo Modelo e escolha na lista.');fld(id,'model').focus();try{fld(id,'model').showPicker&&fld(id,'model').showPicker()}catch{}}
+    else{const r=await api('/api/admin/ai/models','POST',ov);$('dl-'+id).innerHTML=r.models.map(m=>`<option value="${esc(m)}">`).join('');showChips(id,r.models);showRes(id,true,r.models.length+' modelo(s) encontrados. Clique em um para usar e depois em "Salvar tudo".')}
   }catch(x){if(x.message!=='Sessão expirada.')showRes(id,false,x.message);else throw x}finally{b.disabled=false;b.textContent=label}})};
 
 /* ---- padrões ---- */
