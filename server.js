@@ -25,7 +25,7 @@ const DEFAULTS = () => ({
   },
   auth: null,
   adminPath: null,
-  ai: { enabled: true, provider: 'groq', fallback: [], providers: {}, perHour: 20, maxTokens: 12000, extra: '' },
+  ai: { enabled: true, provider: 'gemini', fallback: [], providers: {}, perHour: 20, maxTokens: 12000, extra: '' },
   tts: { enabled: true, perHour: 60, voice: 'pt-BR-FranciscaNeural' },
   history: [],
 });
@@ -45,7 +45,8 @@ function load() {
       if (a.tpm && !g.tpm) g.tpm = a.tpm;
     }
     delete a.key; delete a.model; delete a.tpm;
-    if (!PROV.isId(a.provider)) a.provider = 'groq';
+    for (const k of Object.keys(a.providers)) if (!PROV.isId(k)) delete a.providers[k]; // provedores que saíram do catálogo (ex.: Cerebras, SambaNova, Hugging Face, GitHub Models)
+    if (!PROV.isId(a.provider)) a.provider = PROV.IDS.find(id => PROV.PROVIDERS[id].env.some(e => process.env[e]) || (a.providers[id] && a.providers[id].key)) || 'gemini';
     a.fallback = Array.isArray(a.fallback) ? a.fallback.filter((id, i, arr) => PROV.isId(id) && id !== a.provider && arr.indexOf(id) === i) : [];
     if (a.maxTokens < 12000) a.maxTokens = 12000;
   } catch (e) { if (e.code !== 'ENOENT') console.warn('Aviso: dados.json ilegível, começando vazio (' + e.message + ')'); }
@@ -120,29 +121,71 @@ const publicSettings = () => db.settings;
 const aiCfg = id => db.ai.providers[id] || {};
 const provKey = id => { for (const e of PROV.PROVIDERS[id].env) if (process.env[e]) return process.env[e]; return aiCfg(id).key || ''; }; // variável de ambiente tem prioridade
 const provFromEnv = id => PROV.PROVIDERS[id].env.some(e => process.env[e]);
-const provUrl = id => { const P = PROV.PROVIDERS[id]; return (P.editableUrl && PROV.validUrl(aiCfg(id).url || '')) || P.url; };
+const provAccount = id => { const P = PROV.PROVIDERS[id]; for (const e of (P.accountEnv || [])) if (process.env[e]) return process.env[e]; return aiCfg(id).account || ''; };
+const provUrl = id => {
+  const P = PROV.PROVIDERS[id];
+  let u = (P.editableUrl && PROV.validUrl(aiCfg(id).url || '')) || P.url;
+  if (P.account) u = provAccount(id) ? u.replace('{account}', encodeURIComponent(provAccount(id))) : '';
+  return u;
+};
 const provModel = id => aiCfg(id).model || PROV.PROVIDERS[id].model;
+const provExtra = id => (Array.isArray(aiCfg(id).extraModels) ? aiCfg(id).extraModels : []).filter(m => PROV.validModel(m) && m !== provModel(id));
 const provTpm = id => aiCfg(id).tpm || PROV.PROVIDERS[id].tpm;
 const provReady = id => { const P = PROV.PROVIDERS[id]; return !!(provUrl(id) && provModel(id) && (P.keyless || P.keyOptional || provKey(id))); };
-const chainEntry = id => { const P = PROV.PROVIDERS[id]; return { id, label: P.label, url: provUrl(id), key: provKey(id), model: provModel(id), tpm: provTpm(id), headers: P.headers, tune: P.tune }; };
+// Um provedor vira uma ou mais entradas na cadeia: o modelo principal e, depois, os modelos de reserva do mesmo provedor.
+const chainEntry = id => {
+  const P = PROV.PROVIDERS[id], base = { pid: id, label: P.label, url: provUrl(id), key: provKey(id), tpm: provTpm(id), headers: P.headers, tune: P.tune };
+  return [provModel(id), ...provExtra(id)].map((model, i) => ({ ...base, id: i ? id + '#' + model : id, model }));
+};
 // Ordem de tentativa: o provedor principal e, depois, os de reserva (só os que estão prontos para usar).
 const aiChain = () => {
   let ids = [db.ai.provider, ...db.ai.fallback].filter((id, i, a) => PROV.isId(id) && a.indexOf(id) === i && provReady(id));
   if (!ids.length) ids = PROV.IDS.filter(id => provKey(id) && provReady(id)); // o principal não está pronto: usa qualquer provedor que já tenha chave
-  return ids.map(chainEntry);
+  return ids.flatMap(chainEntry);
 };
 const aiInfo = () => {
   const chain = aiChain(), top = chain[0];
   return {
     enabled: !!db.ai.enabled, perHour: db.ai.perHour, extra: db.ai.extra || '', provider: db.ai.provider, fallback: db.ai.fallback,
-    hasKey: chain.length > 0, active: chain.map(p => p.label), model: top ? top.model : '', tpm: top ? top.tpm : 0,
+    hasKey: chain.length > 0, active: [...new Set(chain.map(p => p.label))], model: top ? top.model : '', tpm: top ? top.tpm : 0,
     providers: PROV.IDS.map(id => {
       const P = PROV.PROVIDERS[id], k = provKey(id);
-      return { id, label: P.label, model: aiCfg(id).model || '', defaultModel: P.model, models: P.models, tpm: aiCfg(id).tpm || 0, defaultTpm: P.tpm, url: P.editableUrl ? (aiCfg(id).url || '') : '', defaultUrl: P.url,
+      return { id, label: P.label, families: P.families || [], onlyFree: !!P.onlyFree, needsAccount: !!P.account, account: P.account ? (aiCfg(id).account || '') : '', accountFromEnv: (P.accountEnv || []).some(e => process.env[e]), accountEnv: P.accountEnv || [], accountHelp: P.accountHelp || '', extraModels: Array.isArray(aiCfg(id).extraModels) ? aiCfg(id).extraModels : [],
+        model: aiCfg(id).model || '', defaultModel: P.model, models: P.models, tpm: aiCfg(id).tpm || 0, defaultTpm: P.tpm, url: P.editableUrl ? (aiCfg(id).url || '') : '', defaultUrl: P.url,
         editableUrl: !!P.editableUrl, keyless: !!P.keyless, keyOptional: !!P.keyOptional, hasKey: !!k, keyHint: k ? '…' + k.slice(-4) : '', keyFromEnv: provFromEnv(id), env: P.env, signup: P.signup || '', free: P.free, ready: provReady(id) };
     }),
   };
 };
+
+// Pergunta ao próprio provedor quais modelos existem agora (GET /models). Se falhar, devolve a lista sugerida do catálogo.
+const NOT_CHAT = /embed|whisper|tts|speech|transcri|rerank|moderation|guard|safety|dall-e|diffusion|image-gen|imagen|veo|lyria|audio|vision-preview|ocr|pixtral-large-embed/i;
+async function listModels(id, onlyFree) {
+  const P = PROV.PROVIDERS[id], fallback = (src, note) => ({ source: src, note, models: P.models.map(m => ({ id: m })) });
+  const url = PROV.modelsUrl(P, provUrl(id));
+  if (!url || !/^https?:/.test(url)) return fallback('static', 'Configure o endereço' + (P.account ? ' e o ID da conta' : '') + ' para carregar a lista do provedor.');
+  const headers = { Accept: 'application/json', ...(P.headers || {}) }, k = provKey(id);
+  if (k) headers.Authorization = 'Bearer ' + k;
+  if (!k && !P.keyless && !P.keyOptional && id !== 'openrouter') return fallback('static', 'Cole a chave para carregar a lista completa de modelos do provedor.');
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 15e3);
+  try {
+    const r = await fetch(url, { headers, signal: ctl.signal });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return fallback('static', 'O provedor não deixou listar os modelos (' + r.status + '). Mostrando as sugestões; você pode digitar qualquer nome.');
+    const raw = Array.isArray(j.data) ? j.data : Array.isArray(j.models) ? j.models : Array.isArray(j) ? j : [];
+    let out = raw.map(m => {
+      const mid = String(typeof m === 'string' ? m : (m.id || m.name || '')).replace(/^models\//, '');
+      const pr = m && m.pricing, free = pr ? (+pr.prompt === 0 && +pr.completion === 0) || /:free$/.test(mid) : undefined;
+      return { id: mid, free, ctx: m && (m.context_length || m.context_window || m.inputTokenLimit || 0) || 0 };
+    }).filter(m => m.id && m.id.length <= 160 && !NOT_CHAT.test(m.id));
+    if (P.onlyFree && onlyFree !== false) out = out.filter(m => m.free !== false && (m.free === true || m.id === 'openrouter/free'));
+    if (P.onlyFree && !out.some(m => m.id === 'openrouter/free')) out.unshift({ id: 'openrouter/free', free: true, ctx: 0 });
+    out = [...new Map(out.map(m => [m.id, m])).values()].sort((a, b) => a.id.localeCompare(b.id)).slice(0, 600);
+    if (!out.length) return fallback('static', 'A lista veio vazia. Mostrando as sugestões.');
+    return { source: 'live', note: out.length + ' modelos' + (P.onlyFree && onlyFree !== false ? ' gratuitos' : '') + ' disponíveis agora.', models: out };
+  } catch (e) {
+    return fallback('static', e.name === 'AbortError' ? 'O provedor demorou para responder a lista de modelos.' : 'Não consegui carregar a lista (sem internet?). Mostrando as sugestões.');
+  } finally { clearTimeout(timer); }
+}
 const aiHits = new Map(); // ip -> [timestamps]
 const ttsHits = new Map(); // ip -> [timestamps]
 let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
@@ -330,11 +373,16 @@ async function api(req, res, p) {
       save(); return send(res, 200, { ok: true });
     }
 
+    if (r[0] === 'ai' && r[1] === 'models' && m === 'GET') { // lista os modelos que o provedor oferece agora
+      const qs = new URL(req.url, 'http://x').searchParams, pid = qs.get('provider') || '';
+      if (!PROV.isId(pid)) return send(res, 400, { error: 'Provedor desconhecido.' });
+      return send(res, 200, await listModels(pid, qs.get('free') !== '0'));
+    }
     if (r[0] === 'ai' && m === 'GET') return send(res, 200, aiInfo());
     if (r[0] === 'ai' && r[1] === 'test' && m === 'POST') { // testa um provedor com um pedido minúsculo
       const b = await body(req, 1e3), id = str(b.provider, 30);
       if (!PROV.isId(id) || !provReady(id)) return send(res, 400, { error: 'Esse provedor ainda não está configurado (falta a chave, o modelo ou o endereço).' });
-      const t0 = Date.now(), llm = { chain: [chainEntry(id)] };
+      const t0 = Date.now(), llm = { chain: [chainEntry(id)[0]] };
       const sample = await AI.ping({ llm });
       return send(res, 200, { ok: true, ms: Date.now() - t0, model: llm.chain[0].model, sample: String(sample).slice(0, 120) });
     }
@@ -352,7 +400,12 @@ async function api(req, res, p) {
           const P = PROV.PROVIDERS[id], c = a.providers[id] = a.providers[id] || {};
           if (typeof v.key === 'string' && v.key.trim()) c.key = v.key.trim().slice(0, 300);
           if (v.clearKey) delete c.key;
-          if (typeof v.model === 'string') { const mm = v.model.trim(); if (!mm) delete c.model; else if (/^[\w.\/:@+-]{1,120}$/.test(mm)) c.model = mm; }
+          if (typeof v.model === 'string') { const mm = v.model.trim(); if (!mm) delete c.model; else if (PROV.validModel(mm)) c.model = mm; else return send(res, 400, { error: 'Nome de modelo inválido em ' + P.label + ' (sem espaços ou aspas).' }); }
+          if (v.extraModels !== undefined) {
+            const list = (Array.isArray(v.extraModels) ? v.extraModels : String(v.extraModels).split(/[\n,;]+/)).map(x => String(x).trim()).filter((x, i, arr) => x && PROV.validModel(x) && arr.indexOf(x) === i).slice(0, 6);
+            if (list.length) c.extraModels = list; else delete c.extraModels;
+          }
+          if (P.account && typeof v.account === 'string') { const ac = v.account.trim(); if (!ac) delete c.account; else if (/^[A-Za-z0-9_-]{6,80}$/.test(ac)) c.account = ac; else return send(res, 400, { error: 'ID da conta inválido em ' + P.label + '.' }); }
           if (v.tpm !== undefined) { const t = +v.tpm; if (!t) delete c.tpm; else c.tpm = Math.round(clampN(t, 3000, 2000000, P.tpm)); }
           if (P.editableUrl && typeof v.url === 'string') {
             const u = v.url.trim();
@@ -416,7 +469,7 @@ http.createServer((req, res) => {
   console.log('  Gerador: http://localhost:' + PORT);
   console.log('  Docs:    http://localhost:' + PORT + '/docs');
   console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
-  { const c = aiChain(); console.log('  IA: ' + (c.length ? c.map(p => p.label + ' (' + p.model + ')').join(' → ') : 'nenhum provedor configurado (use uma variável como GROQ_API_KEY / ZAI_API_KEY ou o Admin > IA)')); }
+  { const c = aiChain(); console.log('  IA: ' + (c.length ? c.map(p => p.label + ' (' + p.model + ')').join(' → ') : 'nenhum provedor configurado (use uma variável como GEMINI_API_KEY / GROQ_API_KEY ou o Admin > IA)')); }
   if (firstRunPassword) console.log('\n  >>> Senha inicial do admin: ' + firstRunPassword + '\n  >>> (aparece só desta vez; troque em Admin > Segurança)\n');
   else if (process.env.ADMIN_PASSWORD) console.log('  Senha do admin vem de ADMIN_PASSWORD.');
 });

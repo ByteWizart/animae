@@ -8,12 +8,12 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | docs.html | Documentação (guia, referência do JSON, solução de problemas), em `/docs` |
 | admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
 | ai.js | Integração com a IA (roteiro + JSON a partir da ideia do usuário), com troca automática de provedor |
-| providers.js | Catálogo dos provedores de IA grátis (Groq, Z.ai, Gemini, Cerebras, OpenRouter...) |
+| providers.js | Catálogo dos provedores de IA grátis e sem recarga (Gemini, Groq, OpenRouter, Cloudflare, NVIDIA, Mistral, Cohere, Z.ai...) |
 | server.js | Servidor local + API do Admin |
 | schema.js | Catálogo do formato de história e validador (usado por Docs, Admin e servidor) |
 | tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
 | audio.js | Trilha e efeitos sonoros gerados por código |
-| ui.css | Estilos compartilhados |
+| ui.css | Estilos compartilhados (visual novo: degradê violeta/rosa/âmbar, claro e escuro automático) |
 | PROMPT-MOVIMENTOS.md | Bloco para colar no seu prompt de IA |
 | historia-teste.json | História de exemplo simples |
 | historia-demo-v9.json | História de 30 s que mostra os recursos novos (rua em movimento, gráfico, chat, glitch, holofote, palco...). Carregue em Avançado > Carregar história |
@@ -27,34 +27,37 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 4. **Criar com IA**: descreva a ideia; a IA escreve o roteiro e o JSON. Grave a voz, carregue o áudio, "Ajustar ao áudio", "Prévia" e "Gerar vídeo" (aba aberta e visível: a gravação é em tempo real).
 5. O arquivo é baixado sozinho (short.mp4 ou short.webm).
 
-## Ativar a IA (vários provedores grátis)
+## Ativar a IA (só provedores grátis, sem cartão e sem recarga)
 
-O site fala com qualquer provedor que aceite o formato de chat da OpenAI. Já vêm configurados:
+O site fala com qualquer provedor que aceite o formato de chat da OpenAI. Só ficaram no catálogo serviços com plano grátis **permanente** (conferidos em novembro de 2026):
 
-| Provedor | Variável de ambiente | Onde criar a chave | Modelo padrão |
-|---|---|---|---|
-| Groq | `GROQ_API_KEY` | console.groq.com | `openai/gpt-oss-120b` |
-| **Z.ai (GLM)** | `ZAI_API_KEY` | z.ai (API keys) | `glm-4.7-flash` |
-| Google Gemini | `GEMINI_API_KEY` | aistudio.google.com/apikey | `gemini-2.5-flash` |
-| Cerebras | `CEREBRAS_API_KEY` | cloud.cerebras.ai | `gpt-oss-120b` |
-| OpenRouter | `OPENROUTER_API_KEY` | openrouter.ai/keys | `z-ai/glm-4.7-flash:free` |
-| Mistral | `MISTRAL_API_KEY` | console.mistral.ai | `mistral-small-latest` |
-| NVIDIA NIM | `NVIDIA_API_KEY` | build.nvidia.com | `openai/gpt-oss-120b` |
-| GitHub Models | `GITHUB_MODELS_TOKEN` | token do GitHub com permissão "models" | `openai/gpt-4.1-mini` |
-| SambaNova | `SAMBANOVA_API_KEY` | cloud.sambanova.ai | `Meta-Llama-3.3-70B-Instruct` |
-| Hugging Face | `HF_TOKEN` | huggingface.co/settings/tokens | `openai/gpt-oss-120b` |
-| Ollama (no seu PC) | sem chave | ollama.com | `llama3.1` |
-| Outro (compatível com OpenAI) | `CUSTOM_API_KEY` | LM Studio, vLLM, Together, Cloudflare Workers AI... | o que você informar |
+| Provedor | Famílias de IA | Variável de ambiente | Onde criar a chave | Modelo padrão |
+|---|---|---|---|---|
+| **Google Gemini** | Gemini, Gemma | `GEMINI_API_KEY` | aistudio.google.com/apikey | `gemini-2.5-flash` |
+| Groq | GPT-OSS, Qwen, Llama | `GROQ_API_KEY` | console.groq.com/keys | `openai/gpt-oss-120b` |
+| **OpenRouter** | Llama, DeepSeek, Qwen, Gemma, Nemotron... | `OPENROUTER_API_KEY` | openrouter.ai/keys | `openrouter/free` (escolhe um modelo grátis) |
+| **Cloudflare Workers AI** | Llama, GPT-OSS, Qwen, Gemma | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | dash.cloudflare.com | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
+| **NVIDIA NIM** | Llama, DeepSeek, Qwen, Kimi, Nemotron | `NVIDIA_API_KEY` | build.nvidia.com | `meta/llama-3.3-70b-instruct` |
+| Mistral | Mistral, Codestral | `MISTRAL_API_KEY` | console.mistral.ai | `mistral-small-latest` |
+| Cohere | Command | `COHERE_API_KEY` | dashboard.cohere.com | `command-a-03-2025` |
+| Z.ai (GLM) | GLM | `ZAI_API_KEY` | z.ai | `glm-4.7-flash` |
+| LLM7.io | vários (comunitário) | `LLM7_API_KEY` (opcional) | token.llm7.io | `default` |
+| Ollama (no seu PC) | Llama, Qwen, Gemma... | sem chave | ollama.com | `llama3.1` |
+| Outro (compatível com OpenAI) | qualquer | `CUSTOM_API_KEY` | LM Studio, vLLM, Kilo, Together... | o que você informar |
+
+**Removidos** por não serem mais grátis sem recarga: Cerebras (virou crédito de teste com cartão), SambaNova (exige compra de crédito), Hugging Face (só US$ 0,10 de crédito por mês) e GitHub Models. Os limites mudam sem aviso: confira no site de cada provedor.
 
 - Informe a chave por variável de ambiente (prioridade) ou em **Admin > IA**. As chaves ficam só no servidor.
+- **Aceita qualquer modelo.** O campo **Modelo** aceita qualquer nome. O botão **Carregar modelos** pergunta ao provedor o que ele oferece agora (no OpenRouter, só os gratuitos), com busca; **Usar** troca o modelo e **+ Reserva** adiciona aos modelos de reserva.
+- **Modelos de reserva por provedor:** se um modelo sumir ou estourar o limite, o próximo do mesmo provedor é tentado antes de passar a outro provedor. Muitos limites são por modelo, então isso soma cotas.
 - Em **Admin > IA** escolha o provedor **principal** e os de **reserva**. Se o principal estourar o limite grátis, recusar a chave, cair ou demorar demais, o site passa sozinho para a reserva. Pedidos grandes são enviados só a provedores com cota suficiente.
-- Se o principal não tiver chave mas outro provedor tiver, o site usa o que estiver pronto (ex.: só `ZAI_API_KEY` definida já basta).
-- **Salvar e testar** confirma que chave e modelo funcionam. O campo **Modelo** aceita qualquer nome: os planos grátis mudam sem aviso, então se um modelo sumir é só trocar.
+- Se o principal não tiver chave mas outro provedor tiver, o site usa o que estiver pronto (ex.: só `GEMINI_API_KEY` definida já basta).
+- **Salvar e testar** confirma que chave e modelo funcionam.
 - **TPM** (tokens por minuto) é o limite do seu plano; o prompt é compactado e a duração do vídeo reduzida para caber. Cada provedor traz um valor padrão que você pode ajustar.
-- A **Z.ai** libera os modelos Flash de graça, mas só com 1 pedido por vez: com vários visitantes ao mesmo tempo, deixe um provedor de reserva.
+- A **Groq** só libera ~8.000 tokens por minuto e a **Z.ai** só 1 pedido por vez: com vários visitantes, use também o Gemini, o OpenRouter ou o NVIDIA como reserva.
 - Há limite de gerações por hora por IP (padrão 20) para proteger a cota.
 - O servidor valida o JSON da IA e pede uma correção automática se vier com erro.
-- Quem usava só a Groq não precisa fazer nada: a chave e o modelo antigos são migrados sozinhos para o provedor Groq.
+- Configurações antigas continuam valendo (a chave da Groq é migrada sozinha). Provedores removidos são apagados do `dados.json` ao iniciar.
 
 ## Páginas
 

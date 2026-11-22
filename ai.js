@@ -1,4 +1,4 @@
-// Integração com IAs gratuitas (Groq, Z.ai, Gemini, Cerebras, OpenRouter...; todas compatíveis com a API da OpenAI): ideia -> roteiro + direção + JSON de história.
+// Integração com IAs gratuitas (Gemini, Groq, OpenRouter, Cloudflare, NVIDIA, Mistral, Cohere, Z.ai...; todas compatíveis com a API da OpenAI): ideia -> roteiro + direção + JSON de história.
 // Roda só no servidor, para a chave nunca chegar ao navegador. Requer Node 18+ (fetch embutido). build 9
 // Recebe `llm = { chain: [provedores] }`: tenta o primeiro e, se ele falhar (limite, chave, queda), passa para o próximo.
 const SCHEMA = require('./schema.js');
@@ -270,8 +270,8 @@ async function callOne(p, { messages, maxTokens, temperature, json, canFailover 
     const msg = (j.error && (j.error.message || (typeof j.error === 'string' ? j.error : ''))) || j.message || '';
     if (r.status === 400 && /response_format|json/i.test(msg) && body.response_format) { delete body.response_format; continue; } // modelo sem modo JSON
     if (r.status === 400 && extras.some(k => k in body) && /reasoning|thinking|unknown|unrecognized|unsupported|extra|not permitted/i.test(msg)) { extras.forEach(k => delete body[k]); continue; }
-    if (r.status === 401 || r.status === 403) throw failErr(502, 'A chave de ' + p.label + ' foi recusada. Peça ao administrador para conferir a chave.', 600e3);
-    if (r.status === 402) throw failErr(502, p.label + ' pede crédito ou pagamento para este modelo.', 600e3);
+    if (r.status === 401 || r.status === 403) throw { ...failErr(502, 'A chave de ' + p.label + ' foi recusada. Peça ao administrador para conferir a chave.', 600e3), wide: true };
+    if (r.status === 402) throw failErr(502, p.label + ' pede crédito ou pagamento para o modelo ' + p.model + '. Troque por um modelo gratuito.', 600e3);
     if (r.status === 404 || (r.status === 400 && /model/i.test(msg))) throw failErr(502, 'Modelo de ' + p.label + ' indisponível: ' + msg, 600e3);
     // limite de tokens por minuto no formato da Groq ("Limit N, Requested M")
     const lim = /Limit (\d+)/i.exec(msg), req = /Requested (\d+)/i.exec(msg), wait = /try again in ([\d.]+)\s*(ms|s|m)/i.exec(msg);
@@ -307,18 +307,22 @@ async function callLLM({ llm, messages, maxTokens, temperature, json }) {
   const fit = cands.filter(p => need <= (p.tpm || 8000)); // não manda pedido grande para quem tem cota pequena
   if (fit.length) cands = fit;
   let last = null;
+  const dead = new Set(); // provedores cuja chave foi recusada: não adianta tentar outro modelo deles
+  cands = cands.filter(p => !dead.has(p.pid));
   for (let i = 0; i < cands.length; i++) {
     const p = cands[i];
+    if (dead.has(p.pid)) continue;
     try {
-      const txt = await callOne(p, { messages, maxTokens, temperature, json, canFailover: i < cands.length - 1 });
-      if (llm) llm.lastUsed = p.label;
+      const txt = await callOne(p, { messages, maxTokens, temperature, json, canFailover: cands.slice(i + 1).some(q => !dead.has(q.pid)) });
+      if (llm) llm.lastUsed = p.label + ' · ' + p.model;
       cooldown.delete(p.id);
       return txt;
     } catch (e) {
       last = e;
       if (!e || !e.failover) throw e;
       cooldown.set(p.id, Date.now() + (e.cool || 60e3));
-      console.warn('IA: ' + p.label + ' falhou (' + e.msg + ')' + (i < cands.length - 1 ? '; tentando o próximo provedor.' : '.'));
+      if (e.wide) { dead.add(p.pid); for (const q of chain) if (q.pid === p.pid) cooldown.set(q.id, Date.now() + (e.cool || 60e3)); }
+      console.warn('IA: ' + p.label + ' / ' + p.model + ' falhou (' + e.msg + ')' + (i < cands.length - 1 ? '; tentando o próximo provedor.' : '.'));
     }
   }
   throw httpErr(last.code || 502, last.msg);
