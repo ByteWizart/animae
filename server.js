@@ -27,7 +27,7 @@ const DEFAULTS = () => ({
   adminPath: null,
   ai: { enabled: true, provider: 'gemini', fallback: [], providers: {}, perHour: 20, maxTokens: 12000, extra: '' },
   tts: { enabled: true, perHour: 60, voice: 'pt-BR-FranciscaNeural' },
-  history: [],
+  history: [], aiLog: [], aiStats: { total: 0, ok: 0, fail: 0, ms: 0 },
 });
 let db = DEFAULTS();
 function load() {
@@ -186,22 +186,63 @@ async function listModels(id, onlyFree) {
     return fallback('static', e.name === 'AbortError' ? 'O provedor demorou para responder a lista de modelos.' : 'Não consegui carregar a lista (sem internet?). Mostrando as sugestões.');
   } finally { clearTimeout(timer); }
 }
+// Aplica uma configuração de IA (vinda do painel ou de uma importação). Devolve o texto do erro, ou '' se deu certo.
+function applyAi(b) {
+  const a = db.ai;
+  if (b.enabled !== undefined) a.enabled = !!b.enabled;
+  if (typeof b.extra === 'string') a.extra = str(b.extra, 2000);
+  if (b.perHour !== undefined) a.perHour = Math.round(clampN(+b.perHour, 1, 1000, a.perHour));
+  if (typeof b.provider === 'string' && PROV.isId(b.provider)) a.provider = b.provider;
+  if (Array.isArray(b.fallback)) a.fallback = b.fallback;
+  a.fallback = a.fallback.filter((id, i, arr) => PROV.isId(id) && id !== a.provider && arr.indexOf(id) === i);
+  if (b.providers && typeof b.providers === 'object') {
+    for (const [id, v] of Object.entries(b.providers)) {
+  if (!PROV.isId(id) || !v || typeof v !== 'object') continue;
+  const P = PROV.PROVIDERS[id], c = a.providers[id] = a.providers[id] || {};
+  if (typeof v.key === 'string' && v.key.trim()) c.key = v.key.trim().slice(0, 300);
+  if (v.clearKey) delete c.key;
+  if (typeof v.model === 'string') { const mm = v.model.trim(); if (!mm) delete c.model; else if (PROV.validModel(mm)) c.model = mm; else return 'Nome de modelo inválido em ' + P.label + ' (sem espaços ou aspas).'; }
+  if (v.extraModels !== undefined) {
+    const list = (Array.isArray(v.extraModels) ? v.extraModels : String(v.extraModels).split(/[\n,;]+/)).map(x => String(x).trim()).filter((x, i, arr) => x && PROV.validModel(x) && arr.indexOf(x) === i).slice(0, 6);
+    if (list.length) c.extraModels = list; else delete c.extraModels;
+  }
+  if (P.account && typeof v.account === 'string') { const ac = v.account.trim(); if (!ac) delete c.account; else if (/^[A-Za-z0-9_-]{6,80}$/.test(ac)) c.account = ac; else return 'ID da conta inválido em ' + P.label + '.'; }
+  if (v.tpm !== undefined) { const t = +v.tpm; if (!t) delete c.tpm; else c.tpm = Math.round(clampN(t, 3000, 2000000, P.tpm)); }
+  if (P.editableUrl && typeof v.url === 'string') {
+    const u = v.url.trim();
+    if (!u) delete c.url;
+    else { const ok = PROV.validUrl(u); if (!ok) return 'Endereço inválido para ' + P.label + ': use https:// (http:// só para localhost ou rede local).'; c.url = ok; }
+  }
+    }
+  }
+  return '';
+}
+
+// Registro de atividade da IA (últimos 200 usos) e totais, mostrados no painel.
+function logAi(op, who, ok, ms, err) {
+  db.aiLog = db.aiLog || []; db.aiStats = db.aiStats || { total: 0, ok: 0, fail: 0, ms: 0 };
+  db.aiLog.unshift({ at: Date.now(), op, who: who || '', ok, ms, err: ok ? '' : String(err || '').slice(0, 300) }); db.aiLog.length = Math.min(db.aiLog.length, 200);
+  const t = db.aiStats; t.total++; if (ok) { t.ok++; t.ms += ms; } else t.fail++;
+}
 const aiHits = new Map(); // ip -> [timestamps]
 const ttsHits = new Map(); // ip -> [timestamps]
 let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
 const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
 
 function status() {
-  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
+  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'theme.js', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
   db.history.forEach(h => { byLook[h.look] = (byLook[h.look] || 0) + 1; secs += h.duration || 0; });
+  const byDay = []; // vídeos e segundos nos últimos 14 dias
+  for (let d = 13; d >= 0; d--) { const t = new Date(); t.setHours(0, 0, 0, 0); t.setDate(t.getDate() - d); byDay.push({ day: t.getTime(), n: 0 }); }
+  db.history.forEach(h => { const t = new Date(h.at); t.setHours(0, 0, 0, 0); const e = byDay.find(x => x.day === t.getTime()); if (e) e.n++; });
   return {
     build: BUILD, node: process.version, platform: process.platform, port: PORT, uptime: Math.round((Date.now() - STARTED) / 1000),
     passwordFromEnv: !!process.env.ADMIN_PASSWORD, dataBytes, files,
     tts: ttsInfo(), counts: { videos: db.history.length, seconds: Math.round(secs), ideas: db.aiCount || 0 }, byLook,
-    ai: aiInfo(), adminPath: adminPath(), adminPathFromEnv: !!process.env.ADMIN_PATH,
+    byDay, aiStats: db.aiStats || { total: 0, ok: 0, fail: 0, ms: 0 }, ai: aiInfo(), adminPath: adminPath(), adminPathFromEnv: !!process.env.ADMIN_PATH,
   };
 }
 
@@ -350,12 +391,13 @@ async function api(req, res, p) {
         else job = () => AI.translate({ ...common, story: b.story, script, lang: str(b.lang, 8) });
       }
       hits.push(now); aiHits.set(ip, hits);
+      const t0 = Date.now();
       try {
         const out = await job();
         if (out && typeof out === 'object') out.provider = llm.lastUsed || ''; // qual IA respondeu (útil quando há reserva)
-        db.aiCount = (db.aiCount || 0) + 1; save();
+        db.aiCount = (db.aiCount || 0) + 1; logAi(aiOp, llm.lastUsed, true, Date.now() - t0); save();
         return send(res, 200, out);
-      } catch (e) { hits.pop(); throw e; }
+      } catch (e) { hits.pop(); logAi(aiOp, llm.lastUsed, false, Date.now() - t0, e && (e.msg || e.message)); save(); throw e; }
     }
 
     // ---- daqui para baixo exige login ----
@@ -387,34 +429,23 @@ async function api(req, res, p) {
       return send(res, 200, { ok: true, ms: Date.now() - t0, model: llm.chain[0].model, sample: String(sample).slice(0, 120) });
     }
     if (r[0] === 'ai' && m === 'PUT') {
-      const b = await body(req, 3e4), a = db.ai;
-      if (b.enabled !== undefined) a.enabled = !!b.enabled;
-      if (typeof b.extra === 'string') a.extra = str(b.extra, 2000);
-      if (b.perHour !== undefined) a.perHour = Math.round(clampN(+b.perHour, 1, 1000, a.perHour));
-      if (typeof b.provider === 'string' && PROV.isId(b.provider)) a.provider = b.provider;
-      if (Array.isArray(b.fallback)) a.fallback = b.fallback;
-      a.fallback = a.fallback.filter((id, i, arr) => PROV.isId(id) && id !== a.provider && arr.indexOf(id) === i);
-      if (b.providers && typeof b.providers === 'object') {
-        for (const [id, v] of Object.entries(b.providers)) {
-          if (!PROV.isId(id) || !v || typeof v !== 'object') continue;
-          const P = PROV.PROVIDERS[id], c = a.providers[id] = a.providers[id] || {};
-          if (typeof v.key === 'string' && v.key.trim()) c.key = v.key.trim().slice(0, 300);
-          if (v.clearKey) delete c.key;
-          if (typeof v.model === 'string') { const mm = v.model.trim(); if (!mm) delete c.model; else if (PROV.validModel(mm)) c.model = mm; else return send(res, 400, { error: 'Nome de modelo inválido em ' + P.label + ' (sem espaços ou aspas).' }); }
-          if (v.extraModels !== undefined) {
-            const list = (Array.isArray(v.extraModels) ? v.extraModels : String(v.extraModels).split(/[\n,;]+/)).map(x => String(x).trim()).filter((x, i, arr) => x && PROV.validModel(x) && arr.indexOf(x) === i).slice(0, 6);
-            if (list.length) c.extraModels = list; else delete c.extraModels;
-          }
-          if (P.account && typeof v.account === 'string') { const ac = v.account.trim(); if (!ac) delete c.account; else if (/^[A-Za-z0-9_-]{6,80}$/.test(ac)) c.account = ac; else return send(res, 400, { error: 'ID da conta inválido em ' + P.label + '.' }); }
-          if (v.tpm !== undefined) { const t = +v.tpm; if (!t) delete c.tpm; else c.tpm = Math.round(clampN(t, 3000, 2000000, P.tpm)); }
-          if (P.editableUrl && typeof v.url === 'string') {
-            const u = v.url.trim();
-            if (!u) delete c.url;
-            else { const ok = PROV.validUrl(u); if (!ok) return send(res, 400, { error: 'Endereço inválido para ' + P.label + ': use https:// (http:// só para localhost ou rede local).' }); c.url = ok; }
-          }
-        }
-      }
+      const err = applyAi(await body(req, 3e4));
+      if (err) return send(res, 400, { error: err });
       save(); return send(res, 200, aiInfo());
+    }
+    if (r[0] === 'ailog' && m === 'GET') return send(res, 200, db.aiLog);
+    if (r[0] === 'ailog' && m === 'DELETE') { db.aiLog = []; db.aiStats = { total: 0, ok: 0, fail: 0, ms: 0 }; save(); return send(res, 200, { ok: true }); }
+    if (r[0] === 'export' && m === 'GET') { // backup das configurações (sem as chaves, a menos que se peça ?keys=1)
+      const withKeys = new URL(req.url, 'http://x').searchParams.get('keys') === '1';
+      const provs = JSON.parse(JSON.stringify(db.ai.providers)); if (!withKeys) for (const v of Object.values(provs)) delete v.key;
+      return send(res, 200, { app: 'shorts-animados', version: 1, exportedAt: new Date().toISOString(), settings: db.settings, ai: { enabled: db.ai.enabled, provider: db.ai.provider, fallback: db.ai.fallback, perHour: db.ai.perHour, extra: db.ai.extra, providers: provs } });
+    }
+    if (r[0] === 'import' && m === 'POST') {
+      const b = await body(req, 2e5);
+      if (!b || b.app !== 'shorts-animados') return send(res, 400, { error: 'Esse arquivo não é um backup do painel.' });
+      if (b.settings) db.settings = cleanSettings(b.settings, db.settings);
+      if (b.ai && typeof b.ai === 'object') { const err = applyAi(b.ai); if (err) return send(res, 400, { error: err }); }
+      save(); return send(res, 200, { ok: true });
     }
 
     if (r[0] === 'tts' && m === 'GET') return send(res, 200, ttsInfo());

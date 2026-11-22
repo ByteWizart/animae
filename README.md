@@ -13,6 +13,7 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | schema.js | Catálogo do formato de história e validador (usado por Docs, Admin e servidor) |
 | tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
 | audio.js | Trilha e efeitos sonoros gerados por código |
+| theme.js | Botão de tema claro/escuro (lua/sol na barra); a escolha fica salva no navegador |
 | ui.css | Estilos compartilhados (visual novo: degradê violeta/rosa/âmbar, claro e escuro automático) |
 | PROMPT-MOVIMENTOS.md | Bloco para colar no seu prompt de IA |
 | historia-teste.json | História de exemplo simples |
@@ -58,6 +59,12 @@ O site fala com qualquer provedor que aceite o formato de chat da OpenAI. Só fi
 - Há limite de gerações por hora por IP (padrão 20) para proteger a cota.
 - O servidor valida o JSON da IA e pede uma correção automática se vier com erro.
 - Configurações antigas continuam valendo (a chave da Groq é migrada sozinha). Provedores removidos são apagados do `dados.json` ao iniciar.
+
+## Modo escuro e painel novo
+
+- **Modo escuro:** botão de lua/sol no canto da barra, em todas as páginas. Sem escolha salva, o site segue o tema do sistema.
+- **Painel (barra lateral):** Visão geral (vídeos, usos da IA, tempo médio, gráfico dos últimos 14 dias, **saúde dos provedores** com "Testar todos" e interruptor rápido da IA), Provedores de IA, **Atividade da IA** (últimos 200 usos: qual IA respondeu, tempo e erros), Padrões, Histórico (com **busca e paginação**) e Segurança.
+- **Backup:** em Segurança, baixe as configurações (padrões + IA) com ou sem as chaves e restaure em outro servidor. Há também o botão para copiar o link secreto do painel.
 
 ## Páginas
 

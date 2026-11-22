@@ -17,7 +17,7 @@
   --mono:ui-monospace,SFMono-Regular,"JetBrains Mono",Menlo,Consolas,monospace;
   color-scheme:light;
 }
-@media(prefers-color-scheme:dark){:root{
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
   --bg:#0b0a12;--panel:#14121d;--panel2:#1b1928;--line:#262338;--line2:#38344f;
   --text:#f5f3ff;--muted:#9d99b6;
   --accent:#9b84ff;--accent-ink:#0b0a12;
@@ -29,6 +29,18 @@
   --mesh:radial-gradient(900px 520px at 8% -8%,rgba(124,92,255,.28),transparent 60%),radial-gradient(760px 480px at 100% 0%,rgba(255,79,154,.18),transparent 60%),radial-gradient(700px 420px at 60% 110%,rgba(255,176,32,.10),transparent 60%);
   color-scheme:dark;
 }}
+:root[data-theme=dark]{
+  --bg:#0b0a12;--panel:#14121d;--panel2:#1b1928;--line:#262338;--line2:#38344f;
+  --text:#f5f3ff;--muted:#9d99b6;
+  --accent:#9b84ff;--accent-ink:#0b0a12;
+  --ok:#4ade80;--warn:#fbbf24;--bad:#ff7a8a;--info:#a5a0ff;
+  --ok-bg:#0f2218;--warn-bg:#261d0a;--bad-bg:#2a1118;--info-bg:#1a1838;
+  --code-bg:#1b1928;--code-fg:#d9d5f0;
+  --glow:0 10px 34px -10px rgba(155,132,255,.6);
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 16px 40px -20px rgba(0,0,0,.7);
+  --mesh:radial-gradient(900px 520px at 8% -8%,rgba(124,92,255,.28),transparent 60%),radial-gradient(760px 480px at 100% 0%,rgba(255,79,154,.18),transparent 60%),radial-gradient(700px 420px at 60% 110%,rgba(255,176,32,.10),transparent 60%);
+  color-scheme:dark;
+}
 
 /* base */
 body.page{font-family:var(--font);background:var(--bg) var(--mesh) fixed no-repeat;color:var(--text);margin:0;padding:0 22px 48px;line-height:1.6;font-size:15px;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:clip}
@@ -45,6 +57,15 @@ body.page{font-family:var(--font);background:var(--bg) var(--mesh) fixed no-repe
 .page pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--r);padding:14px;overflow:auto;font:12.5px/1.6 var(--mono);color:var(--code-fg);margin:0 0 14px;max-width:100%}
 .page pre code{background:none;border:0;padding:0;color:inherit;font-size:inherit}
 .shell{max-width:1120px;margin:0 auto}
+
+/* botão de tema (claro/escuro), inserido pelo theme.js */
+.page button.themebtn,.themebtn{box-sizing:border-box;cursor:pointer;width:36px;height:36px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:none;color:var(--muted);box-shadow:none;margin-left:6px;transition:background .15s,color .15s,transform .2s}
+.page button.themebtn:hover{background:var(--panel2);color:var(--text);filter:none;transform:none}
+.page button.themebtn:active{transform:rotate(25deg) scale(.92)}
+.themebtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.themebtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.themebtn .sun{display:none}
+:root[data-theme=dark] .themebtn .sun{display:block}:root[data-theme=dark] .themebtn .moon{display:none}
 
 /* navegação (barra de vidro) */
 .topnav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:4px;margin:0 calc(50% - 50vw) 30px;padding:14px max(22px,calc(50vw - 560px));font-family:var(--font);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);background:color-mix(in srgb,var(--bg) 72%,transparent);border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
@@ -87,7 +108,7 @@ body.page{font-family:var(--font);background:var(--bg) var(--mesh) fixed no-repe
 .tbl td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 .tbl tr:last-child td{border-bottom:0}
 .tbl-wrap{overflow-x:auto}
-.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 10px;border-radius:99px;background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.badge{display:inline-block;white-space:nowrap;font-size:11.5px;font-weight:700;padding:2px 10px;border-radius:99px;background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
 .badge.ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}.badge.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}.badge.bad{color:var(--bad);background:var(--bad-bg);border-color:transparent}.badge.info{color:var(--info);background:var(--info-bg);border-color:transparent}
 
 .notice{border:1px solid color-mix(in srgb,var(--info) 25%,transparent);background:var(--info-bg);border-radius:12px;padding:11px 15px;margin:0 0 14px;font-size:14px}

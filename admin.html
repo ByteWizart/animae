@@ -2,16 +2,53 @@
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Painel · Shorts Animados</title>
 <meta name="robots" content="noindex,nofollow">
+<script src="theme.js"></script>
 <link rel="stylesheet" href="ui.css">
 <style>
 .login{max-width:380px;margin:8vh auto 0}
 .login h1{font-size:22px}
-.tabs{display:inline-flex;gap:4px;padding:5px;background:var(--panel2);border:1px solid var(--line);border-radius:14px;margin-bottom:22px;max-width:100%;overflow-x:auto}
-.tabs button{background:none;color:var(--muted);border-radius:10px;border:0;box-shadow:none;padding:8px 18px;font-weight:700;white-space:nowrap}
-.tabs button[aria-selected="true"]{color:var(--text);background:var(--panel);box-shadow:0 1px 3px rgba(20,10,60,.14),inset 0 0 0 1px var(--line)}
-.tabs button:hover{filter:none;transform:none;color:var(--text)}
-.tabs .sp{flex:1}
-.kpi{padding:16px}
+.adm{display:grid;grid-template-columns:236px minmax(0,1fr);gap:30px;align-items:start}
+.sidebar{position:sticky;top:84px;display:flex;flex-direction:column;gap:14px}
+.sidebar .who{padding:2px 8px 10px;border-bottom:1px solid var(--line)}
+.sidebar .who b{display:block;font-size:17px;letter-spacing:-.3px}
+.tabs{display:flex;flex-direction:column;gap:3px}
+.tabs button{background:none;color:var(--muted);border-radius:11px;border:0;box-shadow:none;padding:10px 12px;font-weight:600;justify-content:flex-start;gap:11px;width:100%;text-align:left}
+.tabs button svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tabs button .cnt{margin-left:auto;font-size:11px;font-weight:700;background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:0 7px;color:var(--muted)}
+.tabs button[aria-selected="true"]{color:var(--text);background:var(--panel);box-shadow:0 1px 3px rgba(20,10,60,.12),inset 0 0 0 1px var(--line)}
+.tabs button[aria-selected="true"] svg{stroke:var(--accent)}
+.tabs button:hover{filter:none;transform:none;color:var(--text);background:var(--panel2)}
+.tabs button[aria-selected="true"]:hover{background:var(--panel)}
+.sidebar .foot{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--line)}
+@media(max-width:900px){.adm{grid-template-columns:1fr;gap:16px}.sidebar{position:static}.sidebar .who,.sidebar .foot{display:none}.tabs{flex-direction:row;overflow-x:auto;padding:5px;background:var(--panel2);border:1px solid var(--line);border-radius:14px}.tabs button{width:auto;white-space:nowrap}.tabs button .cnt{display:none}}
+.pagehead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.pagehead h1{margin:0;font-size:30px}
+.sw{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;font-size:14px;user-select:none}
+.sw input{position:absolute;opacity:0;pointer-events:none}
+.sw .tk{width:42px;height:24px;border-radius:99px;background:var(--line2);position:relative;transition:background .2s;flex:none}
+.sw .tk::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0004;transition:transform .2s}
+.sw input:checked+.tk{background:var(--grad)}.sw input:checked+.tk::after{transform:translateX(18px)}
+.sw input:focus-visible+.tk{outline:2px solid var(--accent);outline-offset:2px}
+.chart{display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:8px}
+.chart .c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;height:100%;min-width:0}
+.chart .c i{display:block;width:100%;max-width:30px;border-radius:7px 7px 3px 3px;background:var(--grad);min-height:3px;transition:height .4s}
+.chart .c i.z{background:var(--line2);opacity:.6}
+.chart .c span{font-size:10.5px;color:var(--muted)}
+.chart .c b{font-size:11px;font-weight:700}
+.kpi{position:relative;overflow:hidden}
+.kpi .ic{position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 13%,transparent);color:var(--accent)}
+.kpi .ic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.kpi .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px}
+.srch{max-width:260px}
+.ms{font-variant-numeric:tabular-nums;color:var(--muted)}
+.errtxt{color:var(--bad);font-size:12.5px;max-width:420px;word-break:break-word}
+.empty{text-align:center;padding:30px 10px;color:var(--muted)}
+.login .card{padding:30px;text-align:center}
+.login .lock{width:52px;height:52px;border-radius:16px;background:var(--grad);display:grid;place-items:center;margin:0 auto 14px;box-shadow:var(--glow)}
+.login .lock svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.login form{text-align:left}
+.kpi{padding:18px}
 .kpi .n{font-size:32px;font-weight:800;letter-spacing:-1px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 .kpi .l{color:var(--muted);font-size:13px}
 .bars{display:grid;gap:8px}
@@ -54,6 +91,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 <!-- LOGIN -->
 <div id="login" class="login hidden">
   <div class="card">
+    <div class="lock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
     <h1>Painel administrativo</h1>
     <p class="muted">Entre com a senha do administrador. Na primeira execução, ela é mostrada no terminal onde você rodou <code>node server.js</code>.</p>
     <form id="lf">
@@ -65,31 +103,45 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 </div>
 
 <!-- APP -->
-<div id="app" class="hidden">
-  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IAs gratuitas (Gemini, Groq, OpenRouter e outras), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
-  <div class="tabs" role="tablist" id="tabs">
-    <button role="tab" data-t="painel" aria-selected="true">Painel</button>
-    <button role="tab" data-t="ia" aria-selected="false">IA</button>
-    <button role="tab" data-t="padroes" aria-selected="false">Padrões</button>
-    <button role="tab" data-t="historico" aria-selected="false">Histórico</button>
-    <button role="tab" data-t="seguranca" aria-selected="false">Segurança</button>
-  </div>
+<div id="app" class="hidden"><div class="adm">
+  <aside class="sidebar">
+    <div class="who"><b>Painel</b><span class="muted">Shorts Animados</span></div>
+    <nav class="tabs" role="tablist" id="tabs" aria-orientation="vertical">
+      <button role="tab" data-t="painel" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Visão geral</button>
+      <button role="tab" data-t="ia" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>Provedores de IA</button>
+      <button role="tab" data-t="atividade" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Atividade da IA<span class="cnt" id="cnt-log"></span></button>
+      <button role="tab" data-t="padroes" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Padrões</button>
+      <button role="tab" data-t="historico" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Histórico<span class="cnt" id="cnt-hist"></span></button>
+      <button role="tab" data-t="seguranca" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Segurança e backup</button>
+    </nav>
+    <div class="foot"><a class="btn sec sm" href="/" target="_blank" rel="noopener">Abrir o gerador ↗</a><button class="sec sm" id="logout">Sair</button></div>
+  </aside>
+  <div class="main">
 
   <!-- PAINEL -->
   <section id="t-painel">
+    <div class="pagehead"><div><h1>Visão geral</h1><div class="muted" id="hello">Resumo do site, das IAs e dos vídeos gerados.</div></div>
+      <label class="sw"><input type="checkbox" id="quick-ai"><span class="tk"></span>Criação com IA ativada</label></div>
     <div class="grid g4" id="kpis"></div>
-    <div class="grid g2" style="margin-top:14px">
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h3 style="margin-top:0">Vídeos nos últimos 14 dias</h3><div class="chart" id="chart"></div></div>
       <div class="card"><h3 style="margin-top:0">Vídeos por estilo</h3><div class="bars" id="bars"></div></div>
-      <div class="card"><h3 style="margin-top:0">Sistema</h3><div id="sys"></div></div>
     </div>
-    <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Arquivos do projeto</h3><div class="grid g3" id="files"></div></div>
-    <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Últimos vídeos</h3><div class="tbl-wrap" id="recent"></div></div>
+    <div class="card" style="margin-top:16px">
+      <div class="row sb" style="margin-bottom:10px"><h3 style="margin:0">Saúde dos provedores de IA</h3><button class="sec sm" id="testall">Testar todos</button></div>
+      <div class="tbl-wrap" id="health"></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h3 style="margin-top:0">Sistema</h3><div id="sys"></div></div>
+      <div class="card"><h3 style="margin-top:0">Arquivos do projeto</h3><div class="grid g2" id="files" style="gap:6px"></div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h3 style="margin-top:0">Últimos vídeos</h3><div class="tbl-wrap" id="recent"></div></div>
   </section>
 
   <!-- IA -->
   <section id="t-ia" class="hidden">
     <div class="card" style="margin-bottom:14px">
-      <h3 style="margin-top:0">Provedores de IA</h3>
+      <div class="pagehead" style="margin-bottom:10px"><h1 style="font-size:24px">Provedores de IA</h1></div>
       <p class="muted">Todos os provedores abaixo têm plano <b>grátis permanente, sem cartão e sem recarga</b>. Os visitantes descrevem uma ideia e a IA escreve o roteiro e o JSON. Escolha um provedor <b>principal</b> e, se quiser, <b>reservas</b>: quando o principal estourar o limite grátis, recusar a chave ou cair, o site passa sozinho para o próximo. As chaves ficam só neste servidor.</p>
       <div id="ainote" class="notice hidden"></div>
       <form id="aif">
@@ -117,6 +169,14 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
         <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
       </ul>
     </div>
+  </section>
+
+  <!-- ATIVIDADE -->
+  <section id="t-atividade" class="hidden">
+    <div class="pagehead"><div><h1>Atividade da IA</h1><div class="muted">Os últimos usos da criação com IA: qual provedor respondeu, quanto demorou e os erros.</div></div>
+      <div class="row"><label class="sw"><input type="checkbox" id="log-err"><span class="tk"></span>Só erros</label><button class="sec sm" id="log-reload">Atualizar</button><button class="danger sm" id="log-clear">Limpar</button></div></div>
+    <div class="grid g3" id="logkpi" style="margin-bottom:16px"></div>
+    <div class="card"><div class="tbl-wrap" id="logtbl"></div></div>
   </section>
 
   <!-- PADRÕES -->
@@ -152,10 +212,10 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
   <section id="t-historico" class="hidden">
     <div class="card">
       <div class="row sb" style="margin-bottom:12px">
-        <div class="row"><select id="hf" style="width:auto" aria-label="Filtrar por estilo"><option value="">Todos os estilos</option></select><span class="muted" id="hcount"></span></div>
+        <div class="row"><input id="hq" class="srch" type="search" placeholder="Buscar por título…" aria-label="Buscar por título"><select id="hf" style="width:auto" aria-label="Filtrar por estilo"><option value="">Todos os estilos</option></select><span class="muted" id="hcount"></span></div>
         <div class="row"><button class="sec" id="hcsv">Exportar CSV</button><button class="danger" id="hclear">Limpar tudo</button></div>
       </div>
-      <div class="tbl-wrap" id="hist"></div>
+      <div class="tbl-wrap" id="hist"></div><div class="pager" id="hpager"></div>
     </div>
   </section>
 
@@ -175,9 +235,16 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
       <div class="card">
         <h3 style="margin-top:0">Endereço secreto deste painel</h3>
         <p class="muted">Não há link para este painel no site. Só quem souber o endereço chega até a tela de login.</p>
-        <p>Atual: <code id="curpath"></code></p>
+        <p>Atual: <code id="curpath"></code> <button class="sec sm" id="cpurl" type="button">Copiar link</button></p>
         <div id="pathenv" class="notice warn hidden">O endereço vem de <code>ADMIN_PATH</code>. Altere-o no ambiente.</div>
         <form id="pathf"><label class="f">Novo caminho (4–40 letras, números, - ou _)<input id="newpath" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{3,39}" required></label><button type="submit">Trocar endereço</button></form>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Backup das configurações</h3>
+        <p class="muted">Baixe um arquivo com os padrões, a configuração de IA e os modelos escolhidos. Serve para migrar de computador ou voltar atrás.</p>
+        <label class="sw" style="margin-bottom:12px"><input type="checkbox" id="bk-keys"><span class="tk"></span>Incluir as chaves de API</label>
+        <div class="notice warn hidden" id="bk-warn">Com as chaves incluídas, guarde o arquivo em local seguro e não o compartilhe.</div>
+        <div class="row"><button class="sec" id="bk-dl">Baixar backup</button><label class="btn sec" style="cursor:pointer">Restaurar backup<input type="file" id="bk-up" accept=".json,application/json" hidden></label></div>
       </div>
       <div class="card">
         <h3 style="margin-top:0">Boas práticas</h3>
@@ -190,6 +257,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
       </div>
     </div>
   </section>
+  </div></div>
 </div>
 <div id="toasts" aria-live="polite"></div>
 </div>
@@ -220,40 +288,80 @@ $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST',headers:{
 (async()=>{try{const s=await api('/api/session');s.admin?showApp():showLogin()}catch{showLogin()}})();
 
 /* ---- abas ---- */
-const TABS=['painel','ia','padroes','historico','seguranca'];
-function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{location.hash=n}catch{}}
+const TABS=['painel','ia','atividade','padroes','historico','seguranca'];
+function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{history.replaceState(null,'','#'+n)}catch{}if(n==='atividade')run(loadLog);window.scrollTo({top:0})}
 $('tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.t)};
 $('tabs').onkeydown=e=>{const bs=[...document.querySelectorAll('#tabs button')],i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true');
-  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){const n=bs[(i+(e.key==='ArrowRight'?1:bs.length-1))%bs.length];tab(n.dataset.t);n.focus()}};
+  const nx=e.key==='ArrowRight'||e.key==='ArrowDown',pv=e.key==='ArrowLeft'||e.key==='ArrowUp';if(nx||pv){e.preventDefault();const n=bs[(i+(nx?1:bs.length-1))%bs.length];tab(n.dataset.t);n.focus()}};
 if(TABS.includes(location.hash.slice(1)))tab(location.hash.slice(1));
 
 let HIST=[];
-async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadSettings(),loadAi()])})}
+async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadSettings(),loadAi(),loadLog()])})}
 
 /* ---- painel ---- */
-async function loadStatus(){const s=await api('/api/admin/status');
-  const k=[[s.counts.videos,'Vídeos gerados'],[fmtDur(s.counts.seconds),'Tempo total de vídeo'],[s.counts.ideas,'Ideias geradas por IA'],[fmtDur(s.uptime),'Servidor ligado há']];
-  $('kpis').innerHTML=k.map(([n,l])=>`<div class="card kpi"><div class="n">${esc(n)}</div><div class="l">${l}</div></div>`).join('');
+const IC={vid:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9l5 3-5 3z"/>',clk:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',ai:'<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/>',up:'<path d="M12 20V10M7 14l5-5 5 5M5 4h14"/>'};
+const kic=p=>`<span class="ic"><svg viewBox="0 0 24 24">${p}</svg></span>`;
+let STAT=null;
+async function loadStatus(){const s=STAT=await api('/api/admin/status');
+  const st=s.aiStats||{total:0,ok:0,fail:0,ms:0},rate=st.total?Math.round(st.ok/st.total*100):null,avg=st.ok?st.ms/st.ok/1000:0;
+  const k=[[s.counts.videos,'Vídeos gerados',fmtDur(s.counts.seconds)+' de vídeo',IC.vid],[st.total,'Usos da IA',rate==null?'ainda sem uso':rate+'% com sucesso',IC.ai],[avg?avg.toFixed(1)+' s':'—','Tempo médio da IA',st.fail+' erro(s) no total',IC.clk],[fmtDur(s.uptime),'Servidor ligado há','build '+s.build,IC.up]];
+  $('kpis').innerHTML=k.map(([n,l,sub,ic])=>`<div class="card kpi">${kic(ic)}<div class="n">${esc(n)}</div><div class="l">${l}</div><div class="sub">${esc(sub)}</div></div>`).join('');
+  $('quick-ai').checked=!!s.ai.enabled;
+  const days=s.byDay||[],mxd=Math.max(1,...days.map(d=>d.n)),wd=['D','S','T','Q','Q','S','S'];
+  $('chart').innerHTML=days.map(d=>{const dt=new Date(d.day);return `<div class="c" title="${dt.toLocaleDateString('pt-BR')}: ${d.n} vídeo(s)"><b>${d.n||''}</b><i class="${d.n?'':'z'}" style="height:${d.n?Math.max(6,d.n/mxd*84):3}%"></i><span>${wd[dt.getDay()]}${dt.getDate()}</span></div>`}).join('');
   const mx=Math.max(1,...Object.values(s.byLook)),ent=Object.entries(s.byLook).sort((a,b)=>b[1]-a[1]);
-  $('bars').innerHTML=ent.length?ent.map(([k,v])=>`<div class="bar"><span>${esc(LOOKN[k]||k)}</span><div class="tr"><i style="width:${v/mx*100}%"></i></div><b>${v}</b></div>`).join(''):'<p class="muted">Ainda não há vídeos. Eles aparecem aqui assim que você gerar o primeiro.</p>';
-  $('sys').innerHTML=`<table class="tbl"><tbody><tr><td class="muted">Build</td><td>${s.build}</td></tr><tr><td class="muted">Node.js</td><td>${esc(s.node)} (${esc(s.platform)})</td></tr><tr><td class="muted">Porta</td><td>${s.port}</td></tr><tr><td class="muted">dados.json</td><td>${fmtBytes(s.dataBytes)}</td></tr><tr><td class="muted">Senha</td><td>${s.passwordFromEnv?'<span class="badge info">variável de ambiente</span>':'<span class="badge ok">armazenada com hash</span>'}</td></tr></tbody></table>`;
+  $('bars').innerHTML=ent.length?ent.map(([k,v])=>`<div class="bar"><span>${esc(LOOKN[k]||k)}</span><div class="tr"><i style="width:${v/mx*100}%"></i></div><b>${v}</b></div>`).join(''):'<div class="empty">Ainda não há vídeos. Eles aparecem aqui assim que você gerar o primeiro.</div>';
+  $('sys').innerHTML=`<table class="tbl"><tbody><tr><td class="muted">Build</td><td>${s.build}</td></tr><tr><td class="muted">Node.js</td><td>${esc(s.node)} (${esc(s.platform)})</td></tr><tr><td class="muted">Porta</td><td>${s.port}</td></tr><tr><td class="muted">dados.json</td><td>${fmtBytes(s.dataBytes)}</td></tr><tr><td class="muted">Voz com IA</td><td>${s.tts&&s.tts.installed?'<span class="badge ok">instalada</span>':'<span class="badge warn">rode npm install</span>'}</td></tr><tr><td class="muted">Senha</td><td>${s.passwordFromEnv?'<span class="badge info">variável de ambiente</span>':'<span class="badge ok">armazenada com hash</span>'}</td></tr></tbody></table>`;
   $('files').innerHTML=s.files.map(f=>`<div><span class="${f.ok?'ok-dot':'bad-dot'}"></span>${esc(f.name)} <span class="muted">${f.ok?fmtBytes(f.bytes):'ausente'}</span></div>`).join('');
   $('envnote').classList.toggle('hidden',!s.passwordFromEnv);$('pwf').classList.toggle('hidden',s.passwordFromEnv);
-  $('curpath').textContent='/'+s.adminPath;$('pathenv').classList.toggle('hidden',!s.adminPathFromEnv);$('pathf').classList.toggle('hidden',s.adminPathFromEnv)}
+  $('curpath').textContent='/'+s.adminPath;$('pathenv').classList.toggle('hidden',!s.adminPathFromEnv);$('pathf').classList.toggle('hidden',s.adminPathFromEnv);
+  $('cnt-hist').textContent=s.counts.videos||'';
+  renderHealth()}
+/* saúde dos provedores: lista os que estão prontos e deixa testar todos de uma vez */
+const HEALTH={};
+function renderHealth(){const ps=(STAT&&STAT.ai.providers||[]).filter(p=>p.hasKey||STAT.ai.provider===p.id||STAT.ai.fallback.includes(p.id));
+  $('health').innerHTML=ps.length?`<table class="tbl"><thead><tr><th>Provedor</th><th>Modelo</th><th>Papel</th><th>Teste</th></tr></thead><tbody>${ps.map(p=>{const m=STAT.ai.provider===p.id?'<span class="badge ok">Principal</span>':STAT.ai.fallback.includes(p.id)?'<span class="badge info">Reserva '+(STAT.ai.fallback.indexOf(p.id)+1)+'</span>':'<span class="badge">fora da fila</span>',h=HEALTH[p.id];
+    return `<tr><td><b>${esc(p.label)}</b></td><td><code>${esc(p.model||p.defaultModel)}</code>${(p.extraModels||[]).length?` <span class="muted">+${p.extraModels.length} reserva(s)</span>`:''}</td><td>${m}</td><td id="h-${p.id}">${h?h:'<span class="muted">não testado</span>'}</td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhum provedor configurado ainda. Abra <b>Provedores de IA</b>, cole uma chave grátis (a do Gemini é a mais fácil) e volte aqui para testar.</div>';
+  $('testall').disabled=!ps.length}
+$('testall').onclick=()=>run(async()=>{const ps=(STAT.ai.providers||[]).filter(p=>p.ready&&(p.hasKey||STAT.ai.provider===p.id||STAT.ai.fallback.includes(p.id)));const b=$('testall');b.disabled=true;
+  for(const p of ps){const el=$('h-'+p.id);if(el)el.innerHTML='<span class="muted">testando…</span>';
+    try{const r=await api('/api/admin/ai/test','POST',{provider:p.id});HEALTH[p.id]=`<span class="badge ok">funcionou</span> <span class="ms">${(r.ms/1000).toFixed(1)} s</span>`}
+    catch(e){if(e.message==='Sessão expirada.')return;HEALTH[p.id]=`<span class="badge bad">falhou</span> <span class="errtxt">${esc(e.message)}</span>`}
+    const el2=$('h-'+p.id);if(el2)el2.innerHTML=HEALTH[p.id]}
+  b.disabled=false});
+$('quick-ai').onchange=e=>run(async()=>{await api('/api/admin/ai','PUT',{enabled:e.target.checked});toast(e.target.checked?'Criação com IA ativada.':'Criação com IA desativada.');await Promise.all([loadStatus(),loadAi()])});
 function histTable(rows,del){return rows.length?`<table class="tbl"><thead><tr><th>Data</th><th>Título</th><th>Duração</th><th>Estilo</th><th>Qualidade</th><th>Arquivo</th>${del?'<th></th>':''}</tr></thead><tbody>${rows.map(h=>`<tr><td>${fmtDate(h.at)}</td><td>${esc(h.name)}</td><td>${fmtDur(h.duration)}</td><td>${esc(LOOKN[h.look]||h.look)}</td><td>${h.res}p · ${h.fps} fps</td><td>${h.format.toUpperCase()} · ${fmtBytes(h.bytes)}</td>${del?`<td><button class="danger sm" data-del="${esc(h.id)}" aria-label="Remover do histórico">Remover</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<p class="muted">Nenhum vídeo registrado ainda.</p>'}
 
 /* ---- histórico ---- */
+let HPAGE=1;const HSIZE=15;
 async function loadHistory(){HIST=await api('/api/admin/history');
   const cur=$('hf').value,ls=[...new Set(HIST.map(h=>h.look))];
   $('hf').innerHTML='<option value="">Todos os estilos</option>'+ls.map(l=>`<option value="${esc(l)}">${esc(LOOKN[l]||l)}</option>`).join('');$('hf').value=ls.includes(cur)?cur:'';
   renderHist();$('recent').innerHTML=histTable(HIST.slice(0,5),false)}
-function renderHist(){const f=$('hf').value,rows=f?HIST.filter(h=>h.look===f):HIST;$('hist').innerHTML=histTable(rows,true);$('hcount').textContent=rows.length+' vídeo(s)'}
-$('hf').onchange=renderHist;
+function histRows(){const f=$('hf').value,q=$('hq').value.trim().toLowerCase();return HIST.filter(h=>(!f||h.look===f)&&(!q||String(h.name).toLowerCase().includes(q)))}
+function renderHist(){const rows=histRows(),pages=Math.max(1,Math.ceil(rows.length/HSIZE));HPAGE=Math.min(HPAGE,pages);
+  $('hist').innerHTML=histTable(rows.slice((HPAGE-1)*HSIZE,HPAGE*HSIZE),true);$('hcount').textContent=rows.length+' vídeo(s)';
+  $('hpager').innerHTML=pages>1?`<button class="sec sm" id="hp-prev" ${HPAGE<=1?'disabled':''}>← Anterior</button><span class="muted">Página ${HPAGE} de ${pages}</span><button class="sec sm" id="hp-next" ${HPAGE>=pages?'disabled':''}>Próxima →</button>`:'';
+  const p=$('hp-prev'),n=$('hp-next');if(p)p.onclick=()=>{HPAGE--;renderHist()};if(n)n.onclick=()=>{HPAGE++;renderHist()}}
+$('hf').onchange=()=>{HPAGE=1;renderHist()};
+$('hq').oninput=()=>{HPAGE=1;renderHist()};
 $('hist').onclick=e=>{const b=e.target.closest('[data-del]');if(b)run(async()=>{await api('/api/admin/history/'+b.dataset.del,'DELETE');toast('Removido.');await Promise.all([loadHistory(),loadStatus()])})};
 $('hclear').onclick=()=>{if(HIST.length&&confirm('Apagar TODO o histórico? Isso não apaga seus arquivos de vídeo.'))run(async()=>{await api('/api/admin/history','DELETE');toast('Histórico limpo.');await Promise.all([loadHistory(),loadStatus()])})};
 $('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['data','titulo','duracao_s','estilo','resolucao','fps','formato','bytes','cenas'];
   const csv=[head.join(','),...HIST.map(h=>[h.at,h.name,h.duration,h.look,h.res,h.fps,h.format,h.bytes,h.scenes].map(q).join(','))].join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));a.download='historico-shorts.csv';a.click()};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download='historico-shorts.csv';a.click()};
+
+/* ---- atividade da IA ---- */
+const OPN={generate:'Roteiro e história',refine:'Edição',ideas:'Ideias',review:'Avaliação',translate:'Tradução'};
+let LOG=[];
+async function loadLog(){LOG=await api('/api/admin/ailog');renderLog()}
+function renderLog(){const only=$('log-err').checked,rows=only?LOG.filter(x=>!x.ok):LOG,ok=LOG.filter(x=>x.ok).length,fail=LOG.length-ok;
+  $('cnt-log').textContent=fail?fail:'';
+  const by={};LOG.filter(x=>x.ok).forEach(x=>{by[x.who]=(by[x.who]||0)+1});const top=Object.entries(by).sort((a,b)=>b[1]-a[1])[0];
+  $('logkpi').innerHTML=[[LOG.length,'usos registrados','últimos 200'],[LOG.length?Math.round(ok/LOG.length*100)+'%':'—','taxa de sucesso',fail+' erro(s)'],[top?top[0]:'—','IA mais usada',top?top[1]+' resposta(s)':'ainda sem uso']].map(([n,l,sub])=>`<div class="card kpi"><div class="n" style="font-size:${String(n).length>12?18:32}px">${esc(n)}</div><div class="l">${l}</div><div class="sub">${esc(sub)}</div></div>`).join('');
+  $('logtbl').innerHTML=rows.length?`<table class="tbl"><thead><tr><th>Quando</th><th>Operação</th><th>IA que respondeu</th><th>Tempo</th><th>Resultado</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${fmtDate(x.at)}</td><td>${esc(OPN[x.op]||x.op)}</td><td>${x.who?esc(x.who):'<span class="muted">—</span>'}</td><td class="ms">${(x.ms/1000).toFixed(1)} s</td><td>${x.ok?'<span class="badge ok">ok</span>':`<span class="badge bad">erro</span><div class="errtxt">${esc(x.err)}</div>`}</td></tr>`).join('')}</tbody></table>`:`<div class="empty">${only?'Nenhum erro registrado. 🎉':'Nenhum uso da IA ainda. Quando alguém gerar um roteiro, ele aparece aqui.'}</div>`}
+$('log-err').onchange=renderLog;$('log-reload').onclick=()=>run(loadLog);
+$('log-clear').onclick=()=>{if(LOG.length&&confirm('Limpar o registro de atividade e os totais da IA?'))run(async()=>{await api('/api/admin/ailog','DELETE');toast('Registro limpo.');await Promise.all([loadLog(),loadStatus()])})};
 
 /* ---- IA ---- */
 let AIS=null,AIMAIN='gemini',AIFB=[];
@@ -332,6 +440,15 @@ $('setf').onsubmit=e=>{e.preventDefault();run(async()=>{
   await api('/api/admin/settings','PUT',{look:$('s-look').value,res:$('s-res').value,fps:$('s-fps').value,historyLimit:+$('s-hl').value,caption:{size:+$('c-size').value,y:+$('c-y').value,color:$('c-color').value,alt:$('c-alt').value,stroke:$('c-stroke').value,upper:$('c-upper').checked}});
   toast('Padrões salvos.');await loadSettings()})};
 
+/* ---- segurança: backup e endereço ---- */
+$('bk-keys').onchange=e=>$('bk-warn').classList.toggle('hidden',!e.target.checked);
+$('bk-dl').onclick=()=>run(async()=>{const j=await api('/api/admin/export'+($('bk-keys').checked?'?keys=1':''));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(j,null,1)],{type:'application/json'}));a.download='backup-shorts-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Backup baixado.')});
+$('bk-up').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  run(async()=>{let j;try{j=JSON.parse(await f.text())}catch{throw new Error('Arquivo inválido: não é um JSON.')}
+    if(!confirm('Restaurar este backup? Os padrões e a configuração de IA atuais serão substituídos.'))return;
+    await api('/api/admin/import','POST',j);toast('Backup restaurado.');await loadAll()})};
+$('cpurl').onclick=async()=>{try{await navigator.clipboard.writeText(location.origin+$('curpath').textContent);toast('Link copiado.')}catch{toast('Não consegui copiar: '+location.origin+$('curpath').textContent,true)}};
 /* ---- segurança ---- */
 $('pathf').onsubmit=e=>{e.preventDefault();run(async()=>{const r=await api('/api/admin/adminpath','POST',{path:$('newpath').value});toast('Endereço alterado. Abrindo o novo…');setTimeout(()=>{location.href='/'+r.path+'#seguranca'},900)})};
 $('pwf').onsubmit=e=>{e.preventDefault();
