@@ -86,6 +86,8 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
             <label class="f">Modelo<input id="ai-model" list="ai-models" autocomplete="off"><datalist id="ai-models"><option value="openai/gpt-oss-120b"><option value="llama-3.3-70b-versatile"><option value="openai/gpt-oss-20b"><option value="llama-3.1-8b-instant"></datalist></label>
             <label class="f">Limite por IP / hora<input id="ai-ph" type="number" min="1" max="1000"></label>
           </div>
+          <label class="f">Instruções extras para a IA (estilo da casa, opcional)<textarea id="ai-extra" maxlength="2000" rows="4" placeholder="Ex.: Sempre use personagens com chapéu. Termine os vídeos pedindo para seguir o canal. Evite cenários escuros."></textarea></label>
+          <div class="muted" style="margin:-6px 0 12px">Entram no fim do prompt de todas as gerações e têm prioridade sobre o estilo padrão.</div>
           <div class="row"><button type="submit">Salvar</button><button type="button" class="danger" id="ai-clear">Remover chave</button></div>
         </form>
       </div>
@@ -240,12 +242,12 @@ $('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['da
 
 /* ---- IA ---- */
 async function loadAi(){const a=await api('/api/admin/ai');
-  $('ai-on').checked=a.enabled;$('ai-model').value=a.model;$('ai-ph').value=a.perHour;$('ai-key').value='';
+  $('ai-on').checked=a.enabled;$('ai-model').value=a.model;$('ai-ph').value=a.perHour;$('ai-extra').value=a.extra||'';$('ai-key').value='';
   $('ai-hint').textContent=a.hasKey?`Chave configurada (${a.keyHint})${a.keyFromEnv?' via GROQ_API_KEY':''}.`:'Nenhuma chave configurada.';
   const n=$('ainote');n.classList.remove('hidden','ok','warn','bad');n.classList.add(a.enabled&&a.hasKey?'ok':'warn');
   n.textContent=a.enabled&&a.hasKey?'A criação com IA está ativa para os visitantes.':(a.hasKey?'A criação com IA está desativada.':'Falta a chave da Groq: a criação com IA fica indisponível.');
   $('ai-clear').classList.toggle('hidden',!a.hasKey||a.keyFromEnv)}
-$('aif').onsubmit=e=>{e.preventDefault();run(async()=>{const d={enabled:$('ai-on').checked,model:$('ai-model').value,perHour:+$('ai-ph').value};if($('ai-key').value.trim())d.key=$('ai-key').value;
+$('aif').onsubmit=e=>{e.preventDefault();run(async()=>{const d={enabled:$('ai-on').checked,model:$('ai-model').value,perHour:+$('ai-ph').value,extra:$('ai-extra').value};if($('ai-key').value.trim())d.key=$('ai-key').value;
   await api('/api/admin/ai','PUT',d);toast('IA atualizada.');await Promise.all([loadAi(),loadStatus()])})};
 $('ai-clear').onclick=()=>{if(confirm('Remover a chave da Groq deste servidor?'))run(async()=>{await api('/api/admin/ai','PUT',{clearKey:true});toast('Chave removida.');await loadAi()})};
 

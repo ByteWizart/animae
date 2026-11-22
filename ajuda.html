@@ -54,7 +54,7 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 
 <section class="doc" id="inicio" data-g="Começar"><h2>Início rápido</h2>
 <ol class="steps">
-  <li><div><b>Abra o gerador</b>Rode <code>node server.js</code> nesta pasta e acesse <code>http://localhost:3000</code> no <b>Chrome ou Edge</b> (PC). Aperte <span class="kbd code">Ctrl+F5</span>; o rodapé deve mostrar <code>build 8</code>.</div></li>
+  <li><div><b>Abra o gerador</b>Rode <code>node server.js</code> nesta pasta e acesse <code>http://localhost:3000</code> no <b>Chrome ou Edge</b> (PC). Aperte <span class="kbd code">Ctrl+F5</span>; o rodapé deve mostrar <code>build 9</code>.</div></li>
   <li><div><b>Grave e carregue a voz</b>Leia o roteiro e carregue o áudio (mp3, wav ou m4a). Ele define a duração do vídeo.</div></li>
   <li><div><b>Crie ou carregue a história</b>Descreva a ideia em <b>Criar com IA</b> (a IA escreve o roteiro e o JSON), ou envie/cole um <code>.json</code> seu. Depois de gravar a voz, use <b>Ajustar ao áudio</b> para encaixar as cenas na duração dela.</div></li>
   <li><div><b>Escolha estilo, resolução e gere</b>Clique em <b>Prévia</b> para ver com som, depois em <b>Gerar vídeo</b>. Deixe a aba aberta e visível: a gravação acontece em tempo real. O arquivo <code>short.mp4</code> (ou <code>.webm</code>) baixa sozinho.</div></li>
@@ -80,6 +80,22 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 <li>Clique em <b>Gerar roteiro e JSON</b>. O roteiro aparece na caixa de roteiro e o JSON na caixa de história.</li>
 <li>Grave a narração, carregue o áudio e use <b>Ajustar ao áudio</b> e <b>Prévia</b>.</li>
 </ol>
+<h3>Opções da IA</h3>
+<ul>
+<li><b>Formato</b>: curiosidade, história, tutorial, notícia, lista, mito ou verdade, quiz, humor, motivacional, terror, como funciona, diálogo e comparação. Cada um usa uma estrutura de roteiro e recursos visuais próprios.</li>
+<li><b>Tom, idioma, trilha e número de personagens</b>: ficam em <i>Opções da IA</i>. A trilha escolhida vale para o vídeo inteiro.</li>
+<li><b>Sugerir ideias</b>: a IA propõe 6 ideias prontas para o seu assunto; clique em <i>Usar</i> para preenchê-las.</li>
+<li><b>Texto longo</b>: cole uma notícia ou artigo no campo da ideia e a IA resume em um short.</li>
+<li><b>Copiar prompt para outra IA</b>: copia as mesmas regras e o catálogo completo para você usar no ChatGPT, Claude etc. Cole o JSON da resposta em <i>Avançado</i>.</li>
+</ul>
+<h3>Depois de gerar</h3>
+<ul>
+<li><b>Pacote de publicação</b>: 3 títulos, descrição, hashtags, direção de voz (como narrar), texto de miniatura e uma lista de fatos para conferir antes de postar.</li>
+<li><b>Melhorar com a IA</b>: escolha um atalho (mais dinâmico, mais engraçado, mais dramático, melhorar o gancho...) ou escreva o que quer mudar. A IA edita a história atual.</li>
+<li><b>Avaliar a direção</b>: dá uma nota de 0 a 10, aponta problemas por cena e oferece <i>Aplicar as melhorias</i> com um clique.</li>
+<li><b>Traduzir</b>: traduz o roteiro e todos os textos da tela para outro idioma mantendo os tempos.</li>
+<li><b>Ajuste automático</b>: o site corrige sozinho coordenadas, textos longos na faixa da legenda, câmera ausente, transições repetidas e falta de sons nas trocas de cena.</li>
+</ul>
 <div class="notice"><b>Se algo não ficou bom:</b> edite o roteiro ou o JSON à mão, ou gere de novo com uma ideia mais específica. Quanto mais detalhe você der (personagens, cenário, humor), melhor o resultado.</div>
 <p class="muted">A geração leva de 10 a 40 segundos. Há um limite de gerações por hora por pessoa. Sua ideia é enviada à Groq para gerar o texto; o áudio e o vídeo nunca saem do seu computador.</p>
 </section>
@@ -195,14 +211,22 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 <p class="muted" style="margin-top:12px">Nos estilos escuros, use <code>tint</code> e <code>fx</code> com moderação para não escurecer demais.</p>
 </section>
 
+<section class="doc" id="recursos" data-g="Referência do JSON"><h2>Recursos de cena e de personagem</h2>
+<p>Campos extras que dão acabamento profissional: títulos animados, terceiro inferior, holofote, zoom de impacto, clarões, tremores, fundo em movimento e mais.</p>
+<div id="t-feat"></div>
+</section>
+
 <section class="doc" id="sons" data-g="Referência do JSON"><h2>Sons (<code>sfx</code>)</h2>
-<p>Lista no topo do JSON: <code>{ "t": 6.5, "type": "thud", "f": 60, "len": 0.8, "amp": 1 }</code>. A trilha de fundo é gerada automaticamente e ajustada para ficar abaixo da voz.</p>
+<p>Lista no topo do JSON: <code>{ "t": 6.5, "type": "thud", "f": 60, "len": 0.8, "amp": 1 }</code>. Os efeitos são gerados por código (sem arquivos). Parâmetros opcionais: <code>f</code> (frequência), <code>len</code> (duração) e <code>amp</code> (volume).</p>
 <div id="t-sfx"></div>
+<h3>Trilha musical (<code>style.music</code>)</h3>
+<p>Gerada por código e ajustada para ficar abaixo da voz. Use <code>"style":{"music":"happy"}</code> ou <code>{"type":"tense","vol":0.8,"bpm":100}</code>. Também dá para trocar no gerador, no seletor <i>Trilha</i>.</p>
+<div id="t-music"></div>
 </section>
 
 <section class="doc" id="faq" data-g="Ajuda"><h2>Solução de problemas</h2>
 <details class="faq"><summary>"JSON inválido" ao carregar a história</summary><div class="a">Há um erro de sintaxe (vírgula sobrando, aspas faltando). A mensagem indica a posição. Se o JSON veio da IA e deu erro depois de editar, gere de novo ou volte à versão salva na biblioteca.</div></details>
-<details class="faq"><summary>Um objeto não aparece</summary><div class="a">O tipo pode estar escrito errado ou o <code>index.html</code> estar desatualizado. O gerador mostra um aviso com os tipos desconhecidos. Aperte Ctrl+F5 e confira se o rodapé diz <code>build 8</code>.</div></details>
+<details class="faq"><summary>Um objeto não aparece</summary><div class="a">O tipo pode estar escrito errado ou o <code>index.html</code> estar desatualizado. O gerador mostra um aviso com os tipos desconhecidos. Aperte Ctrl+F5 e confira se o rodapé diz <code>build 9</code>.</div></details>
 <details class="faq"><summary>O vídeo sai travando ou pulando</summary><div class="a">Mantenha a aba visível durante a gravação, feche abas pesadas e use 720p/30 fps. Em computadores fracos, evite 1080p/60.</div></details>
 <details class="faq"><summary>O arquivo baixa como .webm em vez de .mp4</summary><div class="a">Depende do navegador. Chrome e Edge recentes gravam MP4; versões antigas caem para WebM, que a maioria das redes aceita, ou converta com qualquer conversor.</div></details>
 <details class="faq"><summary>"Navegador sem gravação"</summary><div class="a">Use Chrome ou Edge no computador. Celulares e alguns navegadores não oferecem a gravação necessária.</div></details>
@@ -222,7 +246,7 @@ details.faq .a{padding:0 14px 12px;color:#cfccdf}
 </section>
 </main></div>
 
-<footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Shorts Animados · build 8 · <a href="/">voltar ao gerador</a></footer>
+<footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Shorts Animados · build 9 · <a href="/">voltar ao gerador</a></footer>
 </div>
 <script src="schema.js"></script>
 <script>
@@ -237,6 +261,8 @@ $('t-anim').innerHTML=table(S.ANIMS);
 $('t-mood').innerHTML=table(S.MOODS);
 $('t-prop').innerHTML=table(S.PROPS);
 $('t-sfx').innerHTML=table(S.SFX);
+$('t-music').innerHTML=table(S.MUSIC);
+$('t-feat').innerHTML=table(S.SCENE_FEATURES,['Recurso','Nome','Como usar']);
 $('c-propanim').innerHTML=chips(S.PROP_ANIMS);
 $('c-look-opts').innerHTML=`<div class="grid g2"><div><b>outfit</b>${chips(S.OUTFITS)}<b>hair</b>${chips(S.HAIRS)}<b>hat</b>${chips(S.HATS)}</div><div><b>hold</b>${chips(S.HOLDS)}<b>marcas (bubbles.mark)</b>${chips(S.MARKS)}</div></div>`;
 $('looks').innerHTML=S.LOOKS.map(l=>`<div class="look"><div class="sw" style="background:linear-gradient(120deg,${l.sw[0]} 55%,${l.sw[1]} 55%)"></div><div class="t"><b>${esc(l.label)}</b><code>${l.id}</code><br><span>${esc(l.desc)}</span></div></div>`).join('');

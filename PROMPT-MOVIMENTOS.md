@@ -41,3 +41,15 @@ Estilos disponíveis em "look":
 - "pastel": cores suaves e claras (histórias calmas, infantil, bem-estar).
 - "vintage": filme antigo sépia com grão (história, biografias, fatos do passado).
 Combine o estilo com o clima da narração; use "tint" e "fx" só com moderação nos estilos escuros para não escurecer demais.
+
+
+=== RECURSOS NOVOS (build 9) ===
+Dica: o botão "Copiar prompt para outra IA" no gerador já entrega o prompt completo e atualizado. Abaixo, o resumo para colar no seu.
+- Novas animações: clap, shrug, bow, flex, sneak, sleep, faint, cry, punch, kick, salute, sit, lookaround, type, call, cower, spin, slump, float, rage.
+- Novos humores: smirk, love, dizzy, sleepy, scared, cry, silly.
+- Aparência: hat beanie|cowboy|hardhat|wizard|chef|party|grad|headphones|pirate|santa|halo|horns; hair long|curly|ponytail|bun|spiky|mohawk; outfit dress|lab|stripe|hawaii|vest|overalls|cape|jersey|police|chef|tux|jacket; skin:"#hex"; tag:"Nome"; holdL; hold umbrella|flag|mic|flower|balloon|bag|wand|torch|camera|trophy|magnifier|sword|tablet|wrench|megaphone.
+- Cenários: desert, beach, forest, mountains, snowfield, street, underwater, stage, cyber, paper, chalkboard, cave, lunar, sunset. "scroll":150 na cena faz o fundo andar.
+- Efeitos fx: stars, bubbles, leaves, petals, fireflies, hearts, embers, lightning, glitch, dust, godrays, matrix, coins, shockwave, birds. Transições tr: slide, slideup, blinds, zoom, spin, glitch, whiteout, pixel, shutter, push, pushup.
+- Objetos com dados: chart {"kind":"bar|line|pie|donut","data":[..],"labels":[..],"t":"título","vals":true}, counter {"from":0,"to":1000,"pre":"R$ "}, checklist {"items":[..]}, chat {"msgs":[{"w":0,"t":".."}]}, gauge/thermo/donut {"v":0.7}, stamp, headline, callout {"t","tx","ty"}, notification, clock, calendar.
+- Cena: "title":{"t":"TEXTO","anim":"slam"} | "lower":{"t":"Nome","sub":"cargo"} | "spot":{"x","y","r"} | "bars":0.08 | "punch":[{"t":2,"z":0.12}] | "flashes":[{"t":2}] | "shakes":[{"t":2,"dur":0.4}] | cam:{"hand":1}.
+- Trilha: "style":{"music":"happy"} (calm, happy, tense, epic, mystery, sad, chill, retro, none). Sons novos: pop, click, tick, coin, ding, bell, success, tada, fail, error, alarm, cash, boing, sparkle, laser, riser, boom, explosion, splash, shatter, heartbeat, typing, camera, horn, drumroll, scratch, wind, steps.

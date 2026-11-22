@@ -7,7 +7,7 @@ const AI = require('./ai.js');
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
 const DATA_FILE = path.join(dir, 'dados.json');
-const BUILD = 8;
+const BUILD = 9;
 const STARTED = Date.now();
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
@@ -23,7 +23,7 @@ const DEFAULTS = () => ({
   },
   auth: null,
   adminPath: null,
-  ai: { enabled: true, model: 'openai/gpt-oss-120b', key: '', perHour: 8, maxTokens: 12000 },
+  ai: { enabled: true, model: 'openai/gpt-oss-120b', key: '', perHour: 20, maxTokens: 12000, extra: '' },
   history: [],
 });
 let db = DEFAULTS();
@@ -104,11 +104,11 @@ function cleanSettings(s, cur) {
 }
 const publicSettings = () => db.settings;
 
-const aiInfo = () => { const k = groqKey(); return { enabled: !!db.ai.enabled, model: db.ai.model, perHour: db.ai.perHour, hasKey: !!k, keyHint: k ? '…' + k.slice(-4) : '', keyFromEnv: !!process.env.GROQ_API_KEY }; };
+const aiInfo = () => { const k = groqKey(); return { enabled: !!db.ai.enabled, model: db.ai.model, perHour: db.ai.perHour, hasKey: !!k, keyHint: k ? '…' + k.slice(-4) : '', keyFromEnv: !!process.env.GROQ_API_KEY, extra: db.ai.extra || '' }; };
 const aiHits = new Map(); // ip -> [timestamps]
 
 function status() {
-  const expected = ['index.html', 'ajuda.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'ui.css', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json'];
+  const expected = ['index.html', 'ajuda.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'ui.css', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
@@ -156,17 +156,41 @@ async function api(req, res, p) {
 
     // IA: a chave da Groq fica só no servidor. Limite por IP para ninguém gastar a cota.
     if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.enabled && i.hasKey, perHour: i.perHour }); }
-    if (p === '/api/ai/generate' && m === 'POST') {
+    // Prompt pronto para copiar e usar em outra IA (ChatGPT, Claude...): as mesmas regras que o site usa.
+    if (p === '/api/ai/prompt' && m === 'GET') {
+      const q = new URL(req.url, 'http://x').searchParams, seconds = [20, 30, 45, 60].includes(+q.get('seconds')) ? +q.get('seconds') : 30;
+      return send(res, 200, { prompt: AI.systemPrompt({ seconds, look: SCHEMA.SET.look.has(q.get('look')) ? q.get('look') : '', format: q.get('format') || 'auto', tone: q.get('tone') || 'auto', lang: q.get('lang') || '', music: q.get('music') || '', cast: +q.get('cast') || 0, extra: db.ai.extra || '' }) });
+    }
+    const aiOp = p.startsWith('/api/ai/') ? p.slice(8) : '';
+    if (m === 'POST' && { generate: 1, refine: 1, ideas: 1, review: 1, translate: 1 }[aiOp]) {
       const i = aiInfo();
       if (!i.enabled || !i.hasKey) return send(res, 503, { error: 'A criação com IA não está configurada neste site.' });
       const ip = ipOf(req), now = Date.now(), hits = (aiHits.get(ip) || []).filter(t => now - t < 3600e3);
-      if (hits.length >= db.ai.perHour) return send(res, 429, { error: `Limite de ${db.ai.perHour} gerações por hora atingido. Tente mais tarde.` });
-      const b = await body(req, 1e4), idea = str(b.idea, 1500);
-      if (idea.length < 8) return send(res, 400, { error: 'Descreva melhor a ideia do vídeo (pelo menos uma frase).' });
-      const seconds = [20, 30, 45, 60].includes(+b.seconds) ? +b.seconds : 30, look = SCHEMA.SET.look.has(b.look) ? b.look : '';
+      if (hits.length >= db.ai.perHour) return send(res, 429, { error: `Limite de ${db.ai.perHour} usos da IA por hora atingido. Tente mais tarde.` });
+      const b = await body(req, aiOp === 'generate' || aiOp === 'ideas' ? 2e4 : 5e5);
+      const common = { key: groqKey(), model: db.ai.model, maxTokens: db.ai.maxTokens, extra: db.ai.extra || '' };
+      const opt = { seconds: +b.seconds, look: SCHEMA.SET.look.has(b.look) ? b.look : '', format: str(b.format, 20), tone: str(b.tone, 20), lang: str(b.lang, 8), music: str(b.music, 20), cast: +b.cast };
+      const storyOk = v => v && typeof v === 'object' && Array.isArray(v.scenes) && v.scenes.length > 0 && v.scenes.length <= 40;
+      let job;
+      if (aiOp === 'generate') {
+        const idea = str(b.idea, 6000);
+        if (idea.length < 8) return send(res, 400, { error: 'Descreva melhor a ideia do vídeo (pelo menos uma frase).' });
+        job = () => AI.generate({ ...common, ...opt, idea });
+      } else if (aiOp === 'ideas') {
+        job = () => AI.ideas({ key: common.key, model: common.model, topic: str(b.topic, 300), count: +b.count, format: opt.format, tone: opt.tone, seconds: opt.seconds });
+      } else {
+        if (!storyOk(b.story)) return send(res, 400, { error: 'Não há uma história válida para enviar à IA.' });
+        const script = str(b.script, 6000);
+        if (aiOp === 'refine') {
+          const instruction = str(b.instruction, 1200);
+          if (instruction.length < 5) return send(res, 400, { error: 'Diga o que você quer mudar.' });
+          job = () => AI.refine({ ...common, ...opt, story: b.story, script, instruction });
+        } else if (aiOp === 'review') job = () => AI.review({ key: common.key, model: common.model, story: b.story, script });
+        else job = () => AI.translate({ ...common, story: b.story, script, lang: str(b.lang, 8) });
+      }
       hits.push(now); aiHits.set(ip, hits);
       try {
-        const out = await AI.generate({ key: groqKey(), model: db.ai.model, maxTokens: db.ai.maxTokens, idea, seconds, look });
+        const out = await job();
         db.aiCount = (db.aiCount || 0) + 1; save();
         return send(res, 200, out);
       } catch (e) { hits.pop(); throw e; }
@@ -192,6 +216,7 @@ async function api(req, res, p) {
       const b = await body(req, 1e4), a = db.ai;
       if (b.enabled !== undefined) a.enabled = !!b.enabled;
       if (typeof b.model === 'string' && /^[\w.\/:-]{2,80}$/.test(b.model.trim())) a.model = b.model.trim();
+      if (typeof b.extra === 'string') a.extra = str(b.extra, 2000);
       if (b.perHour !== undefined) a.perHour = Math.round(clampN(+b.perHour, 1, 1000, a.perHour));
       if (typeof b.key === 'string' && b.key.trim()) a.key = b.key.trim().slice(0, 200);
       if (b.clearKey) a.key = '';
