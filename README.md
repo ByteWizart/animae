@@ -7,7 +7,7 @@ Pasta única, sem subpastas e sem dependências (não precisa de npm install).
 | index.html | O gerador de vídeo |
 | ajuda.html | Central de ajuda (guia, referência do JSON, solução de problemas) |
 | admin.html | Painel administrativo, em endereço secreto (IA: ligar/desligar provedores e trocar o modelo; padrões, histórico, segurança) |
-| ai.js | Integração com a IA: Groq e FreeLLM API (roteiro + JSON a partir da ideia do usuário) |
+| ai.js | Integração com a IA: Groq, Cerebras e Cloudflare (roteiro + JSON a partir da ideia do usuário) |
 | server.js | Servidor local + API do Admin |
 | schema.js | Catálogo do formato de história e validador (usado por Ajuda, Admin e servidor) |
 | audio.js | Trilha e efeitos sonoros gerados por código |
@@ -85,13 +85,13 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 
 O painel permite **ligar/desligar cada IA** e **trocar o modelo** de cada uma, sem reiniciar o servidor.
 
-| Provedor | Endereço padrão | Chave | Modelo padrão |
+| Provedor | Chave | Modelo padrão | Variáveis de ambiente |
 |---|---|---|---|
-| Groq | `https://api.groq.com/openai/v1` | `gsk_…` (console.groq.com) | `openai/gpt-oss-120b` |
-| FreeLLM API ([tashfeenahmed/freellmapi](https://github.com/tashfeenahmed/freellmapi)) | `http://localhost:3001/v1` | `freellmapi-…` (página Keys do painel dele) | `auto` (também `auto:fast`, `auto:smart` ou um modelo específico) |
+| Groq (`api.groq.com`) | `gsk_…` | `openai/gpt-oss-120b` | `GROQ_API_KEY`, `GROQ_URL` |
+| Cerebras (`api.cerebras.ai`) | `csk-…` | `gpt-oss-120b` | `CEREBRAS_API_KEY`, `CEREBRAS_URL` |
+| Cloudflare Workers AI | token com permissão Workers AI + ID da conta | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
 
-- **Provedor principal + fallback**: a requisição vai ao principal; se ele falhar (limite, fora do ar), o outro assume automaticamente (desligável).
-- **Buscar modelos** lista o que o provedor oferece (`GET /models`); **Testar conexão** valida chave, endereço e modelo antes de salvar.
-- **TPM** é o limite de tokens por minuto usado para dimensionar o prompt (Groq grátis ≈ 8000; FreeLLM padrão 32000).
-- Variáveis de ambiente (têm prioridade sobre o painel): `GROQ_API_KEY`, `GROQ_URL`, `FREELLM_API_KEY`, `FREELLM_URL`.
-- Instalações antigas são migradas sozinhas: a chave/modelo da Groq do `dados.json` continuam valendo.
+- **Principal + fallback**: a requisição vai ao principal; se falhar (limite, fora do ar), tenta os outros ativos, em ordem.
+- **Buscar modelos** lista os modelos do provedor; **Testar conexão** valida chave, conta e modelo antes de salvar.
+- **TPM** (tokens por minuto) dimensiona o prompt (Groq grátis ≈ 8000).
+- Variáveis de ambiente têm prioridade sobre o painel. Instalações antigas migram sozinhas (a chave da Groq continua valendo).

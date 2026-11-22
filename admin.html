@@ -60,7 +60,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 
 <!-- APP -->
 <div id="app" class="hidden">
-  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IA (Groq e FreeLLM API), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
+  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IA (Groq, Cerebras e Cloudflare), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" data-t="painel" aria-selected="true">Painel</button>
     <button role="tab" data-t="ia" aria-selected="false">IA</button>
@@ -92,7 +92,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
         <div class="grid g3" style="margin-top:14px">
           <label class="f">Provedor principal<select id="ai-primary"></select></label>
           <label class="f">Limite por IP / hora<input id="ai-ph" type="number" min="1" max="1000"></label>
-          <label class="f" style="align-self:end;display:flex;gap:8px;align-items:center;height:38px"><input id="ai-fb" type="checkbox"> Se falhar, tentar o outro provedor</label>
+          <label class="f" style="align-self:end;display:flex;gap:8px;align-items:center;height:38px"><input id="ai-fb" type="checkbox"> Se falhar, tentar o próximo provedor</label>
         </div>
       </div>
 
@@ -108,10 +108,11 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
     <div class="card" style="margin-top:14px">
       <h3 style="margin-top:0">Como funciona</h3>
       <ul style="padding-left:18px;margin:0">
-        <li><b>Groq</b>: crie a chave em <code>console.groq.com</code> (API Keys). Modelo padrão: <code>openai/gpt-oss-120b</code>.</li>
-        <li><b>FreeLLM API</b>: roteador compatível com OpenAI que você hospeda (<code>github.com/tashfeenahmed/freellmapi</code>). Padrão: <code>http://localhost:3001/v1</code>; a chave (<code>freellmapi-…</code>) está na página Keys do painel dele. Modelo <code>auto</code> deixa o roteador escolher (também <code>auto:fast</code> e <code>auto:smart</code>).</li>
-        <li>Cada provedor pode ser ligado ou desligado e ter seu próprio modelo. Com o fallback ligado, se o principal falhar (limite, fora do ar, modelo ruim) o outro assume na mesma requisição.</li>
-        <li>Alternativa às chaves salvas: variáveis <code>GROQ_API_KEY</code>, <code>FREELLM_API_KEY</code>, <code>GROQ_URL</code> e <code>FREELLM_URL</code> ao iniciar o servidor; elas têm prioridade.</li>
+        <li><b>Groq</b>: chave em <code>console.groq.com</code>. Modelo padrão: <code>openai/gpt-oss-120b</code>.</li>
+        <li><b>Cerebras</b>: chave em <code>cloud.cerebras.ai</code>. Modelo padrão: <code>gpt-oss-120b</code>.</li>
+        <li><b>Cloudflare Workers AI</b>: informe o ID da conta e um token de API com permissão Workers AI (<code>dash.cloudflare.com</code>). Modelo padrão: <code>@cf/meta/llama-3.3-70b-instruct-fp8-fast</code>. Se "Buscar modelos" não funcionar, digite o nome do modelo.</li>
+        <li>Cada provedor pode ser ligado ou desligado e ter seu próprio modelo. Com o fallback ligado, se o principal falhar (limite, fora do ar, modelo ruim) o próximo ativo assume na mesma requisição.</li>
+        <li>Alternativa às chaves salvas: variáveis <code>GROQ_API_KEY</code>, <code>CEREBRAS_API_KEY</code>, <code>CLOUDFLARE_API_TOKEN</code> e <code>CLOUDFLARE_ACCOUNT_ID</code> ao iniciar o servidor; elas têm prioridade.</li>
         <li>Use <b>Buscar modelos</b> para listar o que o provedor oferece e <b>Testar</b> para validar chave, endereço e modelo antes de salvar.</li>
         <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
       </ul>
@@ -257,7 +258,8 @@ $('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['da
 /* ---- IA ---- */
 const PV={
   groq:{models:['openai/gpt-oss-120b','openai/gpt-oss-20b','llama-3.3-70b-versatile','llama-3.1-8b-instant'],keyPh:'gsk_…',desc:'Nuvem, cota gratuita com limite de tokens por minuto.'},
-  freellm:{models:['auto','auto:fast','auto:smart'],keyPh:'freellmapi-…',desc:'Roteador de vários provedores gratuitos, hospedado por você.'}
+  cerebras:{models:['gpt-oss-120b','llama-3.3-70b','qwen-3-32b','llama3.1-8b'],keyPh:'csk-…',desc:'Nuvem, inferência muito rápida, cota gratuita.'},
+  cloudflare:{models:['@cf/meta/llama-3.3-70b-instruct-fp8-fast','@cf/openai/gpt-oss-120b','@cf/openai/gpt-oss-20b','@cf/meta/llama-3.1-8b-instruct'],keyPh:'Token da API (permissão Workers AI)',desc:'Workers AI, compatível com OpenAI. Precisa do ID da conta.',acct:1}
 };
 let AI={};
 const pid=()=>Object.keys(PV);
@@ -265,14 +267,15 @@ function provCard(id,c){
   return `<div class="card pcard ${c.enabled?'':'off'}" data-p="${id}">
     <div class="row sb"><h3 style="margin:0">${esc(c.label)} <span class="badge" data-st></span></h3><label class="sw"><input type="checkbox" data-f="enabled" aria-label="Ativar ${esc(c.label)}"><span data-sw></span></label></div>
     <p class="muted" style="margin:4px 0 14px">${esc(PV[id].desc)}</p>
-    <label class="f">Chave da API<input type="password" data-f="key" autocomplete="off" placeholder="${esc(PV[id].keyPh)} (deixe vazio para manter a atual)"></label>
+    ${PV[id].acct?`<label class="f">ID da conta Cloudflare<input data-f="accountId" autocomplete="off" spellcheck="false" placeholder="32 caracteres, no painel da Cloudflare"></label>`:''}
+    <label class="f">${PV[id].acct?'Token da API':'Chave da API'}<input type="password" data-f="key" autocomplete="off" placeholder="${esc(PV[id].keyPh)} (deixe vazio para manter a atual)"></label>
     <div class="muted" data-hint style="margin:-6px 0 12px"></div>
     <label class="f">Modelo
       <span class="mrow"><input data-f="model" list="dl-${id}" autocomplete="off" spellcheck="false"><button type="button" class="sec sm" data-act="models">Buscar modelos</button></span>
       <datalist id="dl-${id}">${PV[id].models.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>
     </label>
     <div class="grid g2">
-      <label class="f">Endereço da API<input data-f="baseUrl" autocomplete="off" spellcheck="false" placeholder="${esc(c.defaultUrl)}"></label>
+      <label class="f">Endereço da API<input data-f="baseUrl" autocomplete="off" spellcheck="false" placeholder="${esc(c.defaultUrl||'automático, pelo ID da conta')}"></label>
       <label class="f">Tokens por minuto (TPM)<input type="number" data-f="tpm" min="3000" max="2000000"></label>
     </div>
     <div class="row"><button type="button" class="sec" data-act="test">Testar conexão</button><button type="button" class="danger" data-act="clear">Remover chave</button></div>
@@ -280,16 +283,16 @@ function provCard(id,c){
   </div>`}
 const card=id=>document.querySelector(`.pcard[data-p="${id}"]`),fld=(id,f)=>card(id).querySelector(`[data-f="${f}"]`);
 function paintCard(id){const c=AI.providers[id],el=card(id);
-  fld(id,'enabled').checked=c.enabled;fld(id,'model').value=c.model;fld(id,'baseUrl').value=c.baseUrl===c.defaultUrl?'':c.baseUrl;fld(id,'tpm').value=c.tpm;fld(id,'key').value='';
+  fld(id,'enabled').checked=c.enabled;fld(id,'model').value=c.model;fld(id,'baseUrl').value=(c.baseUrl===c.defaultUrl||(PV[id].acct&&c.baseUrl.includes('/accounts/')))?'':c.baseUrl;if(PV[id].acct){fld(id,'accountId').value=c.accountId;fld(id,'accountId').disabled=c.accountFromEnv}fld(id,'tpm').value=c.tpm;fld(id,'key').value='';
   fld(id,'baseUrl').disabled=c.urlFromEnv;fld(id,'key').disabled=c.keyFromEnv;
   el.querySelector('[data-hint]').textContent=c.hasKey?`Chave configurada (${c.keyHint})${c.keyFromEnv?' via '+c.keyEnv:''}.${c.urlFromEnv?' Endereço vem do ambiente.':''}`:'Nenhuma chave configurada.';
   el.querySelector('[data-act="clear"]').classList.toggle('hidden',!c.hasKey||c.keyFromEnv);
   paintState(id)}
 function paintState(id){const c=AI.providers[id],el=card(id),on=fld(id,'enabled').checked,st=el.querySelector('[data-st]');
   el.classList.toggle('off',!on);el.querySelector('[data-sw]').textContent=on?'Ligada':'Desligada';
-  const ready=on&&c.hasKey;st.className='badge '+(ready?'ok':on?'warn':'');st.textContent=ready?'pronta':on?'falta a chave':'desligada'}
+  const ready=on&&c.hasKey&&c.hasAccount;st.className='badge '+(ready?'ok':on?'warn':'');st.textContent=ready?'pronta':on?(c.hasAccount?'falta a chave':'falta o ID da conta'):'desligada'}
 function paintOrder(){const pr=$('ai-primary').value,on=$('ai-on').checked,fb=$('ai-fb').checked;
-  const q=[pr,...pid().filter(i=>i!==pr)].filter(i=>fld(i,'enabled').checked&&(AI.providers[i].hasKey||fld(i,'key').value.trim()));
+  const q=[pr,...pid().filter(i=>i!==pr)].filter(i=>fld(i,'enabled').checked&&((AI.providers[i].hasKey||fld(i,'key').value.trim())&&(AI.providers[i].hasAccount||(fld(i,'accountId')&&fld(i,'accountId').value.trim()))));
   const use=fb?q:q.slice(0,1);
   $('ai-order').textContent=on?(use.length?'Ordem de uso: '+use.map(i=>AI.providers[i].label).join(' → '):'Nenhum provedor pronto.'):'IA desativada para os visitantes.'}
 async function loadAi(){AI=await api('/api/admin/ai');
@@ -306,13 +309,14 @@ async function loadAi(){AI=await api('/api/admin/ai');
 function aiPayload(){const d={enabled:$('ai-on').checked,primary:$('ai-primary').value,fallback:$('ai-fb').checked,perHour:+$('ai-ph').value,extra:$('ai-extra').value,providers:{}};
   pid().forEach(i=>{const p={enabled:fld(i,'enabled').checked,model:fld(i,'model').value.trim(),tpm:+fld(i,'tpm').value||undefined};
     if(!AI.providers[i].urlFromEnv)p.baseUrl=fld(i,'baseUrl').value.trim();
+    if(PV[i].acct)p.accountId=fld(i,'accountId').value.trim();
     const k=fld(i,'key').value.trim();if(k)p.key=k;d.providers[i]=p});return d}
 $('aif').onsubmit=e=>{e.preventDefault();run(async()=>{await api('/api/admin/ai','PUT',aiPayload());toast('Configuração de IA salva.');await Promise.all([loadAi(),loadStatus()])})};
 $('aif').addEventListener('input',e=>{const el=e.target.closest('.pcard');if(el&&e.target.dataset.f==='enabled')paintState(el.dataset.p);paintOrder()});
 $('aif').addEventListener('change',paintOrder);
 function showRes(id,ok,msg){const r=card(id).querySelector('[data-res]');r.className='res '+(ok?'ok':'bad');r.textContent=msg}
 $('provs').onclick=e=>{const b=e.target.closest('button[data-act]');if(!b)return;const id=b.closest('.pcard').dataset.p,act=b.dataset.act;
-  const ov={provider:id,model:fld(id,'model').value.trim(),baseUrl:fld(id,'baseUrl').value.trim(),key:fld(id,'key').value.trim()};
+  const ov={provider:id,model:fld(id,'model').value.trim(),baseUrl:fld(id,'baseUrl').value.trim(),key:fld(id,'key').value.trim()};if(PV[id].acct)ov.accountId=fld(id,'accountId').value.trim();
   if(act==='clear'){if(confirm('Remover a chave de '+AI.providers[id].label+' deste servidor?'))run(async()=>{await api('/api/admin/ai','PUT',{providers:{[id]:{clearKey:true}}});toast('Chave removida.');await loadAi()});return}
   const label=b.textContent;b.disabled=true;b.textContent=act==='test'?'Testando…':'Buscando…';
   run(async()=>{try{

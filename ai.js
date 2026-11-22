@@ -1,6 +1,6 @@
-// Integração com provedores de IA compatíveis com OpenAI (Groq e FreeLLM API): ideia -> roteiro + direção + JSON de história.
+// Integração com provedores de IA compatíveis com OpenAI (Groq, Cerebras e Cloudflare Workers AI): ideia -> roteiro + direção + JSON de história.
 // Roda só no servidor, para as chaves nunca chegarem ao navegador. Requer Node 18+ (fetch embutido). build 9
-// Cada operação recebe `llm` = { key, model, baseUrl, label, kind } (kind: 'groq' | 'freellm').
+// Cada operação recebe `llm` = { key, model, baseUrl, label, kind } (kind = id do provedor).
 const SCHEMA = require('./schema.js');
 
 /* ------------------------------------------------------------------ opções de criação ------------------------------------------------------------------ */
@@ -258,7 +258,7 @@ async function callLLM({ key, model, baseUrl, label, kind, messages, maxTokens, 
       r = await fetch(chatUrl(baseUrl), { method: 'POST', headers, body: JSON.stringify(body), signal: ctl.signal });
       try { j = await r.json(); } catch {}
     } catch (e) {
-      throw httpErr(504, e.name === 'AbortError' ? `${label} demorou demais para responder. Tente de novo.` : `Não consegui falar com ${label} (${kind === 'freellm' ? 'o FreeLLM API está rodando em ' + baseUrl + '?' : 'sem internet?'}).`);
+      throw httpErr(504, e.name === 'AbortError' ? `${label} demorou demais para responder. Tente de novo.` : `Não consegui falar com ${label} (sem internet?).`);
     } finally { clearTimeout(timer); }
     if (r.ok) return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
     const msg = (j.error && (j.error.message || (typeof j.error === 'string' ? j.error : ''))) || j.message || '';
@@ -293,8 +293,7 @@ async function listModels({ key, baseUrl, label, kind }) {
     if (!r.ok) throw httpErr(502, `${label} respondeu ${r.status} ao listar modelos.`);
     let ids = (Array.isArray(j.data) ? j.data : Array.isArray(j) ? j : []).map(m => (typeof m === 'string' ? m : m && m.id)).filter(Boolean).map(String);
     if (kind === 'groq') ids = ids.filter(id => !/whisper|tts|guard|playai|orpheus|embed/i.test(id));
-    if (kind === 'freellm') ids = ['auto', 'auto:fast', 'auto:smart', ...ids.filter(id => !/^auto(:|$)/.test(id))];
-    return [...new Set(ids)].sort((a, b) => (kind === 'freellm' ? 0 : a.localeCompare(b)));
+    return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
   } catch (e) {
     if (e && e.code) throw e;
     throw httpErr(504, e && e.name === 'AbortError' ? `${label} demorou demais para listar os modelos.` : `Não consegui falar com ${label} em ${baseUrl}.`);
