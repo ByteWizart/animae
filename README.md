@@ -13,6 +13,9 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | schema.js | Catálogo do formato de história e validador (usado por Docs, Admin e servidor) |
 | tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
 | audio.js | Trilha e efeitos sonoros gerados por código |
+| auth.js | Login no navegador (Supabase): janela de entrar/criar conta, sessão e biblioteca na nuvem |
+| supabase.js | Ponte do servidor com o Supabase (confere o login, grava vídeos, lista usuários) |
+| supabase-schema.sql | Tabelas `videos` e `stories` com regras de privacidade (RLS). Rode uma vez no SQL Editor do Supabase |
 | theme.js | Botão de tema claro/escuro (lua/sol na barra); a escolha fica salva no navegador |
 | ui.css | Estilos compartilhados (visual novo: degradê violeta/rosa/âmbar, claro e escuro automático) |
 | PROMPT-MOVIMENTOS.md | Bloco para colar no seu prompt de IA |
@@ -59,6 +62,20 @@ O site fala com qualquer provedor que aceite o formato de chat da OpenAI. Só fi
 - Há limite de gerações por hora por IP (padrão 20) para proteger a cota.
 - O servidor valida o JSON da IA e pede uma correção automática se vier com erro.
 - Configurações antigas continuam valendo (a chave da Groq é migrada sozinha). Provedores removidos são apagados do `dados.json` ao iniciar.
+
+## Login e banco de dados (Supabase)
+
+Com o Supabase configurado, **só quem entrou na conta consegue usar a IA, a voz e gerar vídeos**. O servidor confere o login em cada pedido (IA, voz e histórico respondem 401 sem login) e o botão "Gerar vídeo" abre a janela de entrar. A "Prévia" continua livre.
+
+1. Crie um projeto grátis em supabase.com e, no **SQL Editor**, rode o conteúdo de `supabase-schema.sql` (cria `videos` e `stories`, com RLS: cada pessoa só vê o que é dela).
+2. Informe o **Project URL** e a chave **anon** em **Admin > Conta e banco** (ou `SUPABASE_URL` e `SUPABASE_ANON_KEY`). A chave **service_role** é opcional (`SUPABASE_SERVICE_KEY`): permite listar os usuários no painel. Ela fica só no servidor.
+3. Em **Authentication** do Supabase, deixe *Email* ligado e coloque o endereço do seu site em *Site URL* e *Redirect URLs* (necessário para recuperar senha e para o Google). Para o botão do Google, ative o provedor lá e marque a opção no painel.
+4. Clique em **Salvar e testar conexão**.
+
+- **O que vai para o banco:** os vídeos gerados (histórico de cada conta) e a **biblioteca de histórias**, que passa a acompanhar a pessoa em qualquer aparelho. Quem já tinha histórias salvas no navegador é perguntado se quer enviá-las para a conta.
+- **Limites por conta:** o limite de usos da IA por hora passa a valer por usuário (não mais por IP).
+- `REQUIRE_LOGIN=0` deixa o login opcional. Sem Supabase configurado, o site funciona aberto, como antes.
+- O painel administrativo continua com a própria senha (separada das contas dos usuários).
 
 ## Modo escuro e painel novo
 

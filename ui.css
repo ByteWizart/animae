@@ -122,3 +122,31 @@ body.page{font-family:var(--font);background:var(--bg) var(--mesh) fixed no-repe
 ::selection{background:color-mix(in srgb,var(--g1) 35%,transparent)}
 @media(max-width:560px){.topnav{padding:12px 14px;margin-bottom:22px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* conta: botão/avatar na barra, janela de login e aviso de "entre para gerar" (auth.js) */
+.acct{position:relative;display:flex;align-items:center;margin-left:8px}
+.page .acct button.avatar{width:36px;height:36px;padding:0;border-radius:50%;font-size:14px;box-shadow:var(--glow)}
+.amenu{position:absolute;right:0;top:46px;min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 60px -20px #0007;padding:8px;z-index:40;animation:tin .18s ease}
+.amenu .who{padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:6px;display:flex;flex-direction:column;gap:2px}
+.amenu .who span{font-size:12.5px;color:var(--muted);word-break:break-all}
+.page .amenu button{width:100%;justify-content:flex-start;background:none;color:var(--text);box-shadow:none;font-weight:600;padding:9px 10px}
+.page .amenu button:hover{background:var(--panel2);filter:none;transform:none}
+.amodal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:18px;background:rgba(10,8,22,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fin .2s ease}
+.abox{position:relative;width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:30px 28px 24px;box-shadow:0 40px 90px -30px #000a;animation:tin .25s ease}
+.abox h2{font-size:23px;margin:0 0 4px;letter-spacing:-.5px;text-align:center}
+.abox>.muted{text-align:center;margin:0 0 16px;font-size:14px}
+.abox .logo{width:48px;height:48px;border-radius:15px;background:var(--grad);margin:0 auto 14px;box-shadow:var(--glow);position:relative}
+.abox .logo::after{content:"";position:absolute;left:18px;top:14px;border-left:16px solid #fff;border-top:10px solid transparent;border-bottom:10px solid transparent}
+.page .abox .x{position:absolute;right:12px;top:12px;width:32px;height:32px;padding:0;border-radius:50%;background:none;color:var(--muted);box-shadow:none;font-size:22px;line-height:1}
+.page .abox .x:hover{background:var(--panel2);filter:none;transform:none}
+.amsg{border-radius:11px;padding:9px 13px;margin-bottom:12px;font-size:13.5px;background:var(--bad-bg);color:var(--bad)}
+.amsg.ok{background:var(--ok-bg);color:var(--ok)}
+.abox .or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px;margin:16px 0 12px}
+.abox .or::before,.abox .or::after{content:"";height:1px;background:var(--line);flex:1}
+.alinks{display:flex;justify-content:space-between;gap:10px;margin-top:16px;font-size:13.5px}
+.alinks a{font-weight:600}
+.gate{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 20px;border-radius:18px;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));background:color-mix(in srgb,var(--accent) 9%,var(--panel));box-shadow:var(--shadow)}
+.gate>div{flex:1 1 260px;display:flex;flex-direction:column;gap:2px}
+.gate b{font-size:16px}.gate span{font-size:13.5px;color:var(--muted)}
+@keyframes fin{from{opacity:0}to{opacity:1}}
+@media(max-width:560px){.acct{margin-left:4px}.abox{padding:26px 20px 20px}}

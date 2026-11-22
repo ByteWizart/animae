@@ -4,6 +4,7 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const SCHEMA = require('./schema.js');
 const AI = require('./ai.js');
 const PROV = require('./providers.js');
+const SB = require('./supabase.js');
 const TTS = require('./tts.js');
 
 const dir = __dirname;
@@ -12,9 +13,9 @@ const DATA_FILE = path.join(dir, 'dados.json');
 const BUILD = 10;
 const STARTED = Date.now();
 
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.sql': 'text/plain; charset=utf-8' };
 // Arquivos que nunca são servidos pela web.
-const PRIVATE = new Set(['dados.json', 'dados.json.tmp', 'server.js', 'ai.js', 'providers.js', 'tts.js', 'admin.html']);
+const PRIVATE = new Set(['dados.json', 'dados.json.tmp', 'server.js', 'ai.js', 'providers.js', 'tts.js', 'supabase.js', 'admin.html']);
 
 /* ---------- dados ---------- */
 const DEFAULTS = () => ({
@@ -27,13 +28,14 @@ const DEFAULTS = () => ({
   adminPath: null,
   ai: { enabled: true, provider: 'gemini', fallback: [], providers: {}, perHour: 20, maxTokens: 12000, extra: '' },
   tts: { enabled: true, perHour: 60, voice: 'pt-BR-FranciscaNeural' },
+  supabase: { url: '', anonKey: '', serviceKey: '', required: true, google: false },
   history: [], aiLog: [], aiStats: { total: 0, ok: 0, fail: 0, ms: 0 },
 });
 let db = DEFAULTS();
 function load() {
   try {
     const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')), base = DEFAULTS();
-    db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } }, ai: { ...base.ai, ...(d.ai || {}) }, tts: { ...base.tts, ...(d.tts || {}) } };
+    db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } }, ai: { ...base.ai, ...(d.ai || {}) }, tts: { ...base.tts, ...(d.tts || {}) }, supabase: { ...base.supabase, ...(d.supabase || {}) } };
     delete db.stories; // a biblioteca agora fica no navegador de cada usuário
     // migração: o formato antigo (uma única chave, da Groq) vira o provedor "groq" do novo formato
     const a = db.ai;
@@ -116,6 +118,29 @@ function cleanSettings(s, cur) {
   };
 }
 const publicSettings = () => db.settings;
+
+/* ---------- Supabase: login e banco de dados ---------- */
+// Variáveis de ambiente têm prioridade sobre o que foi salvo no painel.
+function sbCfg() {
+  const c = db.supabase, e = process.env;
+  const url = (e.SUPABASE_URL || c.url || '').trim().replace(/\/+$/, '');
+  const anonKey = (e.SUPABASE_ANON_KEY || e.SUPABASE_KEY || c.anonKey || '').trim();
+  const serviceKey = (e.SUPABASE_SERVICE_KEY || e.SUPABASE_SERVICE_ROLE_KEY || c.serviceKey || '').trim();
+  const required = e.REQUIRE_LOGIN !== undefined ? !/^(0|false|no|nao|não)$/i.test(e.REQUIRE_LOGIN) : c.required !== false;
+  return { url, anonKey, serviceKey, required, google: !!c.google, enabled: !!(PROV_URL_OK(url) && anonKey) };
+}
+const PROV_URL_OK = u => !!PROV.validUrl(u);
+const tokenOf = req => { const m = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || ''); return m ? m[1] : ''; };
+// Usuário logado (ou null). Sem Supabase configurado, ninguém é "usuário" e o site funciona aberto, como antes.
+const authUser = async req => { const c = sbCfg(); return c.enabled ? SB.verify(c, tokenOf(req)) : null; };
+// Barra quem não entrou: devolve o usuário, ou responde 401 e devolve false. { user:null } quando o login não é exigido.
+async function needLogin(req, res) {
+  const c = sbCfg();
+  if (!c.enabled || !c.required) return { user: await authUser(req) };
+  const user = await authUser(req);
+  if (!user) { send(res, 401, { error: 'Entre na sua conta para gerar vídeos.', login: true }); return false; }
+  return { user };
+}
 
 /* ---------- provedores de IA ---------- */
 const aiCfg = id => db.ai.providers[id] || {};
@@ -230,7 +255,7 @@ let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
 const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
 
 function status() {
-  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'theme.js', 'favicon.svg', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
+  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'theme.js', 'favicon.svg', 'supabase.js', 'supabase-schema.sql', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
@@ -242,7 +267,7 @@ function status() {
     build: BUILD, node: process.version, platform: process.platform, port: PORT, uptime: Math.round((Date.now() - STARTED) / 1000),
     passwordFromEnv: !!process.env.ADMIN_PASSWORD, dataBytes, files,
     tts: ttsInfo(), counts: { videos: db.history.length, seconds: Math.round(secs), ideas: db.aiCount || 0 }, byLook,
-    byDay, aiStats: db.aiStats || { total: 0, ok: 0, fail: 0, ms: 0 }, ai: aiInfo(), adminPath: adminPath(), adminPathFromEnv: !!process.env.ADMIN_PATH,
+    supabase: { enabled: sbCfg().enabled, required: sbCfg().required }, byDay, aiStats: db.aiStats || { total: 0, ok: 0, fail: 0, ms: 0 }, ai: aiInfo(), adminPath: adminPath(), adminPathFromEnv: !!process.env.ADMIN_PATH,
   };
 }
 
@@ -308,18 +333,25 @@ async function api(req, res, p) {
 
     // Histórico: o gerador registra cada vídeo pronto (sem login; só guarda metadados).
     if (p === '/api/history' && m === 'POST') {
+      const lg = await needLogin(req, res); if (!lg) return;
       const b = await body(req, 1e4);
       const h = {
         id: crypto.randomBytes(5).toString('hex'), at: new Date().toISOString(), name: str(b.name, 80) || 'Sem título',
         duration: clampN(+b.duration, 0, 3600, 0), look: SCHEMA.SET.look.has(b.look) ? b.look : 'cartoon',
         res: ['720', '1080'].includes(String(b.res)) ? String(b.res) : '720', fps: [30, 60].includes(+b.fps) ? +b.fps : 30,
         format: b.format === 'mp4' ? 'mp4' : 'webm', bytes: Math.round(clampN(+b.bytes, 0, 5e9, 0)), scenes: Math.round(clampN(+b.scenes, 0, 999, 0)),
+        ...(lg.user ? { user: lg.user.email || lg.user.id } : {}),
       };
+      if (lg.user) { // também grava no banco do Supabase, na conta de quem gerou (best effort)
+        const c = sbCfg(), row = { name: h.name, duration: h.duration, look: h.look, res: h.res, fps: h.fps, format: h.format, bytes: h.bytes, scenes: h.scenes };
+        (c.serviceKey ? SB.insert(c, 'videos', { ...row, user_id: lg.user.id }) : SB.insert(c, 'videos', row, tokenOf(req))).then(ok => { if (!ok) console.warn('Supabase: não consegui gravar o vídeo (rodou o supabase-schema.sql?).'); }).catch(() => {});
+      }
       db.history.unshift(h); db.history.length = Math.min(db.history.length, db.settings.historyLimit); save();
       return send(res, 201, { ok: true, id: h.id });
     }
 
     // IA: as chaves dos provedores ficam só no servidor. Limite por IP para ninguém gastar a cota.
+    if (p === '/api/config' && m === 'GET') { const c = sbCfg(); return send(res, 200, { auth: { enabled: c.enabled, required: c.enabled && c.required, url: c.enabled ? c.url : '', anonKey: c.enabled ? c.anonKey : '', google: c.enabled && c.google } }, { 'Cache-Control': 'no-store' }); }
     if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.enabled && i.hasKey, perHour: i.perHour }); }
     // Prompt pronto para copiar e usar em outra IA (ChatGPT, Claude...): as mesmas regras que o site usa.
     if (p === '/api/ai/prompt' && m === 'GET') {
@@ -349,10 +381,11 @@ async function api(req, res, p) {
     if (p === '/api/tts/status' && m === 'GET') { const t = ttsInfo(); return send(res, 200, { available: t.installed && t.enabled, installed: t.installed, maxChars: t.maxChars, voice: t.voice, perHour: t.perHour }); }
     if (p === '/api/tts/voices' && m === 'GET') return send(res, 200, { voices: await TTS.voices(), default: db.tts.voice });
     if (p === '/api/tts' && m === 'POST') {
+      const lg = await needLogin(req, res); if (!lg) return;
       const t = ttsInfo();
       if (!t.enabled) return send(res, 503, { error: 'A voz com IA está desativada neste site.' });
       if (!t.installed) return send(res, 503, { error: 'A voz com IA não está instalada no servidor (rode "npm install" e reinicie).' });
-      const ip = ipOf(req), now = Date.now(), hits = (ttsHits.get(ip) || []).filter(x => now - x < 3600e3);
+      const ip = lg.user ? 'u:' + lg.user.id : ipOf(req), now = Date.now(), hits = (ttsHits.get(ip) || []).filter(x => now - x < 3600e3);
       if (hits.length >= db.tts.perHour) return send(res, 429, { error: `Limite de ${db.tts.perHour} vozes por hora atingido. Tente mais tarde.` });
       if (ttsBusy >= TTS_MAX_PARALLEL) return send(res, 429, { error: 'O servidor de voz está ocupado. Tente de novo em alguns segundos.' });
       const b = await body(req, 3e4);
@@ -365,9 +398,10 @@ async function api(req, res, p) {
     }
     const aiOp = p.startsWith('/api/ai/') ? p.slice(8) : '';
     if (m === 'POST' && { generate: 1, refine: 1, ideas: 1, review: 1, translate: 1 }[aiOp]) {
+      const lg = await needLogin(req, res); if (!lg) return;
       const i = aiInfo();
       if (!i.enabled || !i.hasKey) return send(res, 503, { error: 'A criação com IA não está configurada neste site.' });
-      const ip = ipOf(req), now = Date.now(), hits = (aiHits.get(ip) || []).filter(t => now - t < 3600e3);
+      const ip = lg.user ? 'u:' + lg.user.id : ipOf(req), now = Date.now(), hits = (aiHits.get(ip) || []).filter(t => now - t < 3600e3);
       if (hits.length >= db.ai.perHour) return send(res, 429, { error: `Limite de ${db.ai.perHour} usos da IA por hora atingido. Tente mais tarde.` });
       const b = await body(req, aiOp === 'generate' || aiOp === 'ideas' ? 2e4 : 5e5);
       const llm = { chain: aiChain() }, common = { llm, maxTokens: db.ai.maxTokens, extra: db.ai.extra || '', tpm: llm.chain[0].tpm };
@@ -433,6 +467,28 @@ async function api(req, res, p) {
       if (err) return send(res, 400, { error: err });
       save(); return send(res, 200, aiInfo());
     }
+    if (r[0] === 'supabase') {
+      const e = process.env, c = db.supabase, eff = sbCfg();
+      const info = () => { const eff = sbCfg(); return {  url: c.url, anonKey: c.anonKey ? '…' + c.anonKey.slice(-6) : '', hasAnon: !!eff.anonKey, hasService: !!eff.serviceKey, serviceHint: eff.serviceKey ? '…' + eff.serviceKey.slice(-4) : '', required: eff.required, google: !!c.google, enabled: eff.enabled, effectiveUrl: eff.url,
+        env: { url: !!e.SUPABASE_URL, anon: !!(e.SUPABASE_ANON_KEY || e.SUPABASE_KEY), service: !!(e.SUPABASE_SERVICE_KEY || e.SUPABASE_SERVICE_ROLE_KEY), required: e.REQUIRE_LOGIN !== undefined } }; };
+      if (id === 'test' && m === 'POST') {
+        if (!eff.enabled) return send(res, 400, { error: 'Informe o endereço (https://…supabase.co) e a chave anon.' });
+        const h = await SB.health(eff); let users = null; if (h.ok && eff.serviceKey) { try { users = (await SB.listUsers(eff, 1, 1)).total; } catch (x) { h.serviceError = x.message; } }
+        return send(res, 200, { ...h, users });
+      }
+      if (id === 'users' && m === 'GET') { if (!eff.enabled) return send(res, 200, { users: [], total: 0 }); try { return send(res, 200, await SB.listUsers(eff, 1, 100)); } catch (x) { return send(res, 502, { error: 'Não consegui listar os usuários: ' + x.message }); } }
+      if (!id && m === 'GET') return send(res, 200, info());
+      if (!id && m === 'PUT') {
+        const b = await body(req, 1e4);
+        if (typeof b.url === 'string') { const u = b.url.trim(); if (!u) c.url = ''; else { const ok = PROV.validUrl(u); if (!ok) return send(res, 400, { error: 'Endereço inválido: use https://SEU-PROJETO.supabase.co' }); c.url = ok.replace(/\/+$/, ''); } }
+        if (typeof b.anonKey === 'string' && b.anonKey.trim()) c.anonKey = b.anonKey.trim().slice(0, 2000);
+        if (typeof b.serviceKey === 'string' && b.serviceKey.trim()) c.serviceKey = b.serviceKey.trim().slice(0, 2000);
+        if (b.clearAnon) c.anonKey = ''; if (b.clearService) c.serviceKey = '';
+        if (b.required !== undefined) c.required = !!b.required;
+        if (b.google !== undefined) c.google = !!b.google;
+        save(); return send(res, 200, info());
+      }
+    }
     if (r[0] === 'ailog' && m === 'GET') return send(res, 200, db.aiLog);
     if (r[0] === 'ailog' && m === 'DELETE') { db.aiLog = []; db.aiStats = { total: 0, ok: 0, fail: 0, ms: 0 }; save(); return send(res, 200, { ok: true }); }
     if (r[0] === 'export' && m === 'GET') { // backup das configurações (sem as chaves, a menos que se peça ?keys=1)
@@ -497,6 +553,7 @@ http.createServer((req, res) => {
   });
 }).listen(PORT, () => {
   console.log('Animaê · build ' + BUILD);
+  { const c = sbCfg(); console.log('  Login: ' + (c.enabled ? 'Supabase ' + c.url + (c.required ? ' (obrigatório para gerar vídeos)' : ' (opcional)') : 'desligado (configure o Supabase em Admin > Conta e banco ou com SUPABASE_URL e SUPABASE_ANON_KEY)')); }
   console.log('  Gerador: http://localhost:' + PORT);
   console.log('  Docs:    http://localhost:' + PORT + '/docs');
   console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());

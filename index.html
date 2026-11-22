@@ -103,7 +103,7 @@ footer{max-width:1120px;margin:44px auto 0;color:var(--muted);font-size:12.5px;t
 <progress id="bar" value="0" max="100"></progress><pre id="log">Escolha o áudio e clique em Gerar vídeo. Deixe a aba aberta e visível (Chrome ou Edge).</pre></section>
 
 <details class="adv" id="libp"><summary>Minha biblioteca <span class="muted" id="libn"></span></summary><div class="in">
-<div class="muted">Fica só neste navegador. Exporte um backup para não perder se limpar os dados.</div>
+<div class="muted" id="libnote">Fica só neste navegador. Entre na sua conta para guardá-la na nuvem, ou exporte um backup.</div>
 <div class="row"><button class="sec" id="lib">Salvar história atual</button></div>
 <div id="libl"></div>
 <div class="row"><button class="sec" id="libexp">Exportar backup</button><label class="fld">Importar backup<input type="file" id="libimp" accept=".json,application/json"></label></div></div></details>
@@ -136,6 +136,7 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
 <footer>Animaê · build 10</footer>
 <script src="audio.js"></script>
 <script src="schema.js"></script>
+<script src="auth.js"></script>
 <script>
 const W=1080,H=1920,$=i=>document.getElementById(i);let K='#181622';
 const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t,eio=t=>(t=clamp(t))*t*(3-2*t);
@@ -925,6 +926,7 @@ $('pauses').onclick=()=>{if(!voiceBuf)return log('Escolha o áudio.');log('Pausa
 const pickMime=()=>['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));
 async function run(rec_){try{await run0(rec_)}catch(e){console.error(e);busy=false;$('gen').disabled=$('prev').disabled=false;log('Erro ao gerar: '+e.message)}}
 async function run0(rec_){ENGERR.clear();
+  if(rec_&&window.Auth&&Auth.required&&!Auth.user){Auth.open('login','Entre na sua conta para gerar e baixar o vídeo.');return log('Entre na sua conta para gerar vídeos.')}
   if(busy||!readStory())return;if(!voiceBuf)return log('Escolha o arquivo de voz primeiro.');
   if(!(Math.min(story.total,voiceBuf.duration+.5)>.5))return log('Duração inválida (história: '+story.total+' s, voz: '+voiceBuf.duration.toFixed(1)+' s). Gere a voz ou carregue um áudio com som e confira o "total" da história.');
   busy=true;$('gen').disabled=$('prev').disabled=true;{const R=+$('res').value||720;cv.width=R;cv.height=Math.round(R*16/9);S=R/W}await ac.resume();await preloadIcons(story);
@@ -966,8 +968,27 @@ $('jf').addEventListener('change',e=>{const f=e.target.files[0];if(f){storyName=
 
 /* ---- biblioteca do usuário (localStorage) ---- */
 const LIBK='shorts.library.v1';
-const libGet=()=>{try{const a=JSON.parse(localStorage.getItem(LIBK));return Array.isArray(a)?a:[]}catch{return[]}};
-const libSet=a=>{try{localStorage.setItem(LIBK,JSON.stringify(a));return true}catch{log('Não consegui salvar: o armazenamento do navegador está cheio ou bloqueado. Exporte um backup e apague itens antigos.');return false}};
+/* Sem login a biblioteca fica no navegador (localStorage). Logado, ela vive na conta (tabela "stories" do Supabase):
+   o resto do código continua síncrono sobre o cache LIBC, e libSet() envia só o que mudou. */
+let LIBC=null;
+const localGet=()=>{try{const a=JSON.parse(localStorage.getItem(LIBK));return Array.isArray(a)?a:[]}catch{return[]}};
+const localSet=a=>{try{localStorage.setItem(LIBK,JSON.stringify(a));return true}catch{log('Não consegui salvar: o armazenamento do navegador está cheio ou bloqueado. Exporte um backup e apague itens antigos.');return false}};
+const libGet=()=>LIBC?LIBC.map(i=>({...i})):localGet(); // cópia: quem edita a lista não mexe no cache, e assim libSet() enxerga o que mudou
+const libSet=a=>{if(!LIBC)return localSet(a);const prev=LIBC;LIBC=a;cloudSync(prev,a);return true};
+const rowOf=i=>({id:i.id,name:i.name,story:i.story,script:i.script||'',created_at:new Date(i.createdAt||Date.now()).toISOString(),updated_at:new Date(i.updatedAt||Date.now()).toISOString()});
+const itemOf=r=>({id:r.id,name:r.name,story:r.story,script:r.script||'',createdAt:Date.parse(r.created_at)||Date.now(),updatedAt:Date.parse(r.updated_at)||Date.now()});
+async function cloudSync(prev,next){try{
+  const pm=new Map(prev.map(i=>[i.id,i])),nm=new Map(next.map(i=>[i.id,i]));
+  const up=next.filter(i=>{const p=pm.get(i.id);return !p||p.updatedAt!==i.updatedAt||p.name!==i.name});
+  if(up.length)await Auth.rest('POST','/stories?on_conflict=id',up.map(rowOf),{Prefer:'resolution=merge-duplicates,return=minimal'});
+  for(const p of prev)if(!nm.has(p.id))await Auth.rest('DELETE','/stories?id=eq.'+encodeURIComponent(p.id));
+}catch(e){log('Não consegui sincronizar a biblioteca com a sua conta: '+e.message)}}
+async function cloudLoad(){const rows=await Auth.rest('GET','/stories?select=*&order=updated_at.desc&limit=500');LIBC=(rows||[]).map(itemOf);
+  const loc=localGet().filter(i=>i&&i.story&&!LIBC.some(x=>x.id===i.id));
+  if(loc.length&&confirm('Encontramos '+loc.length+' história(s) salva(s) só neste navegador. Enviar para a sua conta?')){
+    LIBC=[...loc,...LIBC];await Auth.rest('POST','/stories?on_conflict=id',loc.map(rowOf),{Prefer:'resolution=merge-duplicates,return=minimal'});try{localStorage.removeItem(LIBK)}catch{}}}
+function libNote(){const n=$('libnote');if(n)n.textContent=LIBC?'Fica salva na sua conta e acompanha você em qualquer aparelho. Também dá para exportar um backup.':'Fica só neste navegador. Entre na sua conta para guardá-la na nuvem, ou exporte um backup.'}
+if(window.Auth)Auth.onChange(async u=>{try{if(u)await cloudLoad();else LIBC=null}catch(e){LIBC=null;log('Biblioteca na nuvem indisponível: '+e.message+' (rodou o supabase-schema.sql?)')}libNote();libRender()});
 const fmtD=d=>new Date(d).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
 function libRender(){const a=libGet();$('libn').textContent=a.length?`(${a.length})`:'';
   $('libl').innerHTML=a.length?a.map(i=>{const sm=(window.SCHEMA?SCHEMA.summarize(i.story):{total:i.story.total,scenes:(i.story.scenes||[]).length});

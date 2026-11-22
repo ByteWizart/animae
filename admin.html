@@ -18,6 +18,7 @@
 .tabs button svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .tabs button .cnt{margin-left:auto;font-size:11px;font-weight:700;background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:0 7px;color:var(--muted)}
 .tabs button[aria-selected="true"]{color:var(--text);background:var(--panel);box-shadow:0 1px 3px rgba(20,10,60,.12),inset 0 0 0 1px var(--line)}
+.tabs button .cnt:empty{display:none}
 .tabs button[aria-selected="true"] svg{stroke:var(--accent)}
 .tabs button:hover{filter:none;transform:none;color:var(--text);background:var(--panel2)}
 .tabs button[aria-selected="true"]:hover{background:var(--panel)}
@@ -112,6 +113,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
       <button role="tab" data-t="painel" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Visão geral</button>
       <button role="tab" data-t="ia" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>Provedores de IA</button>
       <button role="tab" data-t="atividade" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Atividade da IA<span class="cnt" id="cnt-log"></span></button>
+      <button role="tab" data-t="conta" aria-selected="false"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>Conta e banco<span class="cnt" id="cnt-sb"></span></button>
       <button role="tab" data-t="padroes" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Padrões</button>
       <button role="tab" data-t="historico" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Histórico<span class="cnt" id="cnt-hist"></span></button>
       <button role="tab" data-t="seguranca" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Segurança e backup</button>
@@ -170,6 +172,46 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
         <li>Em <b>Outro (compatível com OpenAI)</b> cabem LM Studio, vLLM, Kilo, Together e qualquer serviço parecido. O <b>Ollama</b> roda no seu PC, sem chave e sem internet.</li>
         <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
       </ul>
+    </div>
+  </section>
+
+  <!-- CONTA E BANCO (Supabase) -->
+  <section id="t-conta" class="hidden">
+    <div class="pagehead"><div><h1>Conta e banco de dados</h1><div class="muted">Login dos usuários e armazenamento no Supabase. Com isso ligado, só quem entrou consegue usar a IA, a voz e gerar vídeos.</div></div>
+      <span id="sb-state"></span></div>
+    <div class="grid g2">
+      <div class="card">
+        <h3 style="margin-top:0">Conexão com o Supabase</h3>
+        <div id="sb-env" class="notice warn hidden"></div>
+        <form id="sbf">
+          <label class="f">Endereço do projeto (Project URL)<input id="sb-url" type="url" autocomplete="off" placeholder="https://abcdxyz.supabase.co"></label>
+          <label class="f">Chave pública (anon / publishable)<input id="sb-anon" type="password" autocomplete="off" placeholder="cole a chave anon"></label>
+          <div class="muted" id="sb-anon-h" style="margin:-6px 0 12px"></div>
+          <label class="f">Chave secreta (service_role) — opcional<input id="sb-svc" type="password" autocomplete="off" placeholder="cole a chave service_role"></label>
+          <div class="muted" id="sb-svc-h" style="margin:-6px 0 12px">Só fica neste servidor. Serve para listar usuários aqui e gravar vídeos de qualquer conta.</div>
+          <label class="sw" style="margin-bottom:12px"><input type="checkbox" id="sb-req"><span class="tk"></span>Exigir login para gerar vídeos</label><br>
+          <label class="sw" style="margin-bottom:16px"><input type="checkbox" id="sb-google"><span class="tk"></span>Mostrar o botão "Continuar com o Google"</label>
+          <div class="row"><button type="submit">Salvar</button><button type="button" class="sec" id="sb-test">Salvar e testar conexão</button><button type="button" class="danger sm" id="sb-clear">Remover chaves</button></div>
+        </form>
+        <div id="sb-result" style="margin-top:14px"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Como configurar (5 minutos)</h3>
+        <ol style="padding-left:18px;margin:0;display:grid;gap:8px">
+          <li>Crie um projeto grátis em <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer">supabase.com/dashboard</a>.</li>
+          <li>Em <b>Project Settings &gt; API</b> copie o <b>Project URL</b> e a chave <b>anon</b> (e, se quiser, a <b>service_role</b>) para o formulário ao lado.</li>
+          <li>Em <b>SQL Editor</b>, cole o SQL abaixo e clique em <b>Run</b> (cria as tabelas <code>videos</code> e <code>stories</code> com regras de privacidade).</li>
+          <li>Em <b>Authentication &gt; Providers</b>, deixe <b>Email</b> ligado. Para testar sem e-mail de confirmação, desligue <i>Confirm email</i>.</li>
+          <li>Em <b>Authentication &gt; URL Configuration</b>, coloque o endereço do seu site em <b>Site URL</b> e em <b>Redirect URLs</b> (necessário para o Google e a recuperação de senha).</li>
+          <li>Clique em <b>Salvar e testar conexão</b>.</li>
+        </ol>
+        <div class="row" style="margin-top:14px"><button class="sec sm" id="sb-sql">Copiar o SQL</button><a class="btn sec sm" href="/supabase-schema.sql" target="_blank" rel="noopener">Ver o arquivo</a></div>
+        <p class="muted" style="margin-top:14px">Variáveis de ambiente (têm prioridade): <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_KEY</code> e <code>REQUIRE_LOGIN=0</code> para o login não ser obrigatório.</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="row sb" style="margin-bottom:10px"><h3 style="margin:0">Usuários cadastrados <span class="muted" id="sb-ucount"></span></h3><button class="sec sm" id="sb-ureload">Atualizar</button></div>
+      <div class="tbl-wrap" id="sb-users"><div class="empty">Salve a conexão e a chave service_role para listar os usuários aqui.</div></div>
     </div>
   </section>
 
@@ -290,15 +332,15 @@ $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST',headers:{
 (async()=>{try{const s=await api('/api/session');s.admin?showApp():showLogin()}catch{showLogin()}})();
 
 /* ---- abas ---- */
-const TABS=['painel','ia','atividade','padroes','historico','seguranca'];
-function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{history.replaceState(null,'','#'+n)}catch{}if(n==='atividade')run(loadLog);window.scrollTo({top:0})}
+const TABS=['painel','ia','atividade','conta','padroes','historico','seguranca'];
+function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{history.replaceState(null,'','#'+n)}catch{}if(n==='atividade')run(loadLog);if(n==='conta')run(loadSb);window.scrollTo({top:0})}
 $('tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.t)};
 $('tabs').onkeydown=e=>{const bs=[...document.querySelectorAll('#tabs button')],i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true');
   const nx=e.key==='ArrowRight'||e.key==='ArrowDown',pv=e.key==='ArrowLeft'||e.key==='ArrowUp';if(nx||pv){e.preventDefault();const n=bs[(i+(nx?1:bs.length-1))%bs.length];tab(n.dataset.t);n.focus()}};
 if(TABS.includes(location.hash.slice(1)))tab(location.hash.slice(1));
 
 let HIST=[];
-async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadSettings(),loadAi(),loadLog()])})}
+async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadSettings(),loadAi(),loadLog(),loadSb()])})}
 
 /* ---- painel ---- */
 const IC={vid:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9l5 3-5 3z"/>',clk:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',ai:'<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/>',up:'<path d="M12 20V10M7 14l5-5 5 5M5 4h14"/>'};
@@ -332,7 +374,7 @@ $('testall').onclick=()=>run(async()=>{const ps=(STAT.ai.providers||[]).filter(p
     const el2=$('h-'+p.id);if(el2)el2.innerHTML=HEALTH[p.id]}
   b.disabled=false});
 $('quick-ai').onchange=e=>run(async()=>{await api('/api/admin/ai','PUT',{enabled:e.target.checked});toast(e.target.checked?'Criação com IA ativada.':'Criação com IA desativada.');await Promise.all([loadStatus(),loadAi()])});
-function histTable(rows,del){return rows.length?`<table class="tbl"><thead><tr><th>Data</th><th>Título</th><th>Duração</th><th>Estilo</th><th>Qualidade</th><th>Arquivo</th>${del?'<th></th>':''}</tr></thead><tbody>${rows.map(h=>`<tr><td>${fmtDate(h.at)}</td><td>${esc(h.name)}</td><td>${fmtDur(h.duration)}</td><td>${esc(LOOKN[h.look]||h.look)}</td><td>${h.res}p · ${h.fps} fps</td><td>${h.format.toUpperCase()} · ${fmtBytes(h.bytes)}</td>${del?`<td><button class="danger sm" data-del="${esc(h.id)}" aria-label="Remover do histórico">Remover</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<p class="muted">Nenhum vídeo registrado ainda.</p>'}
+function histTable(rows,del){return rows.length?`<table class="tbl"><thead><tr><th>Data</th>${rows.some(h=>h.user)?'<th>Usuário</th>':''}<th>Título</th><th>Duração</th><th>Estilo</th><th>Qualidade</th><th>Arquivo</th>${del?'<th></th>':''}</tr></thead><tbody>${rows.map(h=>`<tr><td>${fmtDate(h.at)}</td>${rows.some(x=>x.user)?`<td>${esc(h.user||'—')}</td>`:''}<td>${esc(h.name)}</td><td>${fmtDur(h.duration)}</td><td>${esc(LOOKN[h.look]||h.look)}</td><td>${h.res}p · ${h.fps} fps</td><td>${h.format.toUpperCase()} · ${fmtBytes(h.bytes)}</td>${del?`<td><button class="danger sm" data-del="${esc(h.id)}" aria-label="Remover do histórico">Remover</button></td>`:''}</tr>`).join('')}</tbody></table>`:'<p class="muted">Nenhum vídeo registrado ainda.</p>'}
 
 /* ---- histórico ---- */
 let HPAGE=1;const HSIZE=15;
@@ -352,6 +394,35 @@ $('hclear').onclick=()=>{if(HIST.length&&confirm('Apagar TODO o histórico? Isso
 $('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['data','titulo','duracao_s','estilo','resolucao','fps','formato','bytes','cenas'];
   const csv=[head.join(','),...HIST.map(h=>[h.at,h.name,h.duration,h.look,h.res,h.fps,h.format,h.bytes,h.scenes].map(q).join(','))].join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download='historico-shorts.csv';a.click()};
+
+/* ---- conta e banco (Supabase) ---- */
+let SB=null;
+async function loadSb(){SB=await api('/api/admin/supabase');
+  $('sb-url').value=SB.url||'';$('sb-url').placeholder=SB.env.url?'definido no ambiente: '+SB.effectiveUrl:'https://abcdxyz.supabase.co';
+  $('sb-anon').value='';$('sb-anon').placeholder=SB.env.anon?'definida no ambiente':SB.hasAnon?'deixe vazio para manter a atual':'cole a chave anon';
+  $('sb-anon-h').textContent=SB.anonKey?'Chave salva ('+SB.anonKey+').':'';
+  $('sb-svc').value='';$('sb-svc').placeholder=SB.env.service?'definida no ambiente':SB.hasService?'deixe vazio para manter a atual':'cole a chave service_role';
+  $('sb-req').checked=SB.required;$('sb-google').checked=SB.google;$('sb-req').disabled=SB.env.required;
+  const env=[SB.env.url&&'SUPABASE_URL',SB.env.anon&&'SUPABASE_ANON_KEY',SB.env.service&&'SUPABASE_SERVICE_KEY',SB.env.required&&'REQUIRE_LOGIN'].filter(Boolean);
+  $('sb-env').classList.toggle('hidden',!env.length);$('sb-env').innerHTML='Vindo de variável de ambiente (tem prioridade sobre o painel): <code>'+env.join('</code>, <code>')+'</code>.';
+  $('sb-state').innerHTML=SB.enabled?(SB.required?'<span class="badge ok">Login obrigatório ativo</span>':'<span class="badge info">Login opcional</span>'):'<span class="badge warn">Não configurado: o site está aberto a todos</span>';
+  $('cnt-sb').textContent=SB.enabled?'':'!';
+  if(SB.enabled&&SB.hasService)loadUsers();else $('sb-users').innerHTML='<div class="empty">'+(SB.enabled?'Informe a chave <b>service_role</b> para listar os usuários aqui.':'Salve a conexão e a chave service_role para listar os usuários aqui.')+'</div>'}
+function sbBody(){const d={url:$('sb-url').value,required:$('sb-req').checked,google:$('sb-google').checked},a=$('sb-anon').value.trim(),k=$('sb-svc').value.trim();if(a)d.anonKey=a;if(k)d.serviceKey=k;return d}
+$('sbf').onsubmit=e=>{e.preventDefault();run(async()=>{await api('/api/admin/supabase','PUT',sbBody());toast('Configuração salva.');await Promise.all([loadSb(),loadStatus()])})};
+$('sb-clear').onclick=()=>{if(confirm('Remover as chaves do Supabase deste servidor? O login será desligado.'))run(async()=>{await api('/api/admin/supabase','PUT',{clearAnon:true,clearService:true});toast('Chaves removidas.');await loadSb()})};
+const chk=(ok,t,warn)=>`<div class="free-note" style="margin:6px 0"><span class="badge ${ok?'ok':warn?'warn':'bad'}">${ok?'ok':warn?'atenção':'erro'}</span><span>${t}</span></div>`;
+$('sb-test').onclick=()=>run(async()=>{const b=$('sb-test');b.disabled=true;$('sb-result').innerHTML='<span class="muted">Testando…</span>';
+  try{await api('/api/admin/supabase','PUT',sbBody());await loadSb();const r=await api('/api/admin/supabase/test','POST',{});
+    $('sb-result').innerHTML=r.ok?[chk(r.auth,'Login (Auth) respondendo.'),chk(r.signup,r.signup?'Cadastro de novas contas liberado.':'Cadastros desativados no Supabase (Authentication > Sign In).',!r.signup),chk(r.autoconfirm,r.autoconfirm?'Entra direto após criar a conta (sem e-mail de confirmação).':'Exige confirmar o e-mail após o cadastro.',true),chk(r.google,r.google?'Google ativado no Supabase.':'Google não ativado (opcional).',true),
+      chk(!!r.tables.videos,r.tables.videos?'Tabela <code>videos</code> encontrada.':'Tabela <code>videos</code> não existe: rode o SQL.'),chk(!!r.tables.stories,r.tables.stories?'Tabela <code>stories</code> encontrada.':'Tabela <code>stories</code> não existe: rode o SQL.'),
+      r.users!=null?chk(true,r.users+' usuário(s) cadastrado(s).'):(SB.hasService?chk(false,'A chave service_role não funcionou'+(r.serviceError?': '+esc(r.serviceError):'.')):'')].join(''):chk(false,esc(r.error||'Não consegui conectar.'));
+  }catch(e){$('sb-result').innerHTML=chk(false,esc(e.message))}finally{b.disabled=false}});
+$('sb-sql').onclick=async()=>{try{const t=await (await fetch('/supabase-schema.sql')).text();await navigator.clipboard.writeText(t);toast('SQL copiado. Cole no SQL Editor do Supabase.')}catch{toast('Não consegui copiar. Abra o arquivo e copie à mão.',true)}};
+async function loadUsers(){try{const r=await api('/api/admin/supabase/users');$('sb-ucount').textContent=r.total?'('+r.total+')':'';
+  $('sb-users').innerHTML=r.users.length?`<table class="tbl"><thead><tr><th>E-mail</th><th>Entrou por</th><th>Cadastro</th><th>Último acesso</th><th></th></tr></thead><tbody>${r.users.map(u=>`<tr><td>${esc(u.email||u.id)}</td><td>${esc(u.provider||'email')}</td><td>${u.createdAt?fmtDate(u.createdAt):'—'}</td><td>${u.lastSignIn?fmtDate(u.lastSignIn):'<span class="muted">nunca</span>'}</td><td>${u.confirmed?'':'<span class="badge warn">e-mail não confirmado</span>'}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum usuário ainda.</div>'}
+  catch(e){$('sb-users').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}}
+$('sb-ureload').onclick=()=>run(async()=>{if(SB&&SB.hasService)await loadUsers();else toast('Informe a chave service_role.',true)});
 
 /* ---- atividade da IA ---- */
 const OPN={generate:'Roteiro e história',refine:'Edição',ideas:'Ideias',review:'Avaliação',translate:'Tradução'};
