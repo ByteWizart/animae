@@ -1,4 +1,4 @@
-// Integração com provedores de IA compatíveis com OpenAI (Groq, Cerebras e Cloudflare Workers AI): ideia -> roteiro + direção + JSON de história.
+// Integração com provedores de IA compatíveis com OpenAI (Groq e IteraCompute): ideia -> roteiro + direção + JSON de história.
 // Roda só no servidor, para as chaves nunca chegarem ao navegador. Requer Node 18+ (fetch embutido). build 9
 // Cada operação recebe `llm` = { key, model, baseUrl, label, kind } (kind = id do provedor).
 const SCHEMA = require('./schema.js');
@@ -242,6 +242,7 @@ function autoDirect(st) {
 
 /* ------------------------------------------------------------------ chamadas à Groq ------------------------------------------------------------------ */
 const httpErr = (code, msg) => ({ code, msg });
+const LLM_TIMEOUT = +process.env.LLM_TIMEOUT_MS || 50e3; // sem resposta em 50 s = erro (e o fallback passa para o próximo provedor)
 const chatUrl = base => String(base || '').replace(/\/+$/, '') + '/chat/completions';
 async function callLLM({ key, model, baseUrl, label, kind, messages, maxTokens, temperature, json }) {
   label = label || 'a IA';
@@ -251,14 +252,16 @@ async function callLLM({ key, model, baseUrl, label, kind, messages, maxTokens, 
   if (kind === 'groq' && /gpt-oss/i.test(model)) { body.reasoning_effort = 'low'; body.include_reasoning = false; }
   const headers = { 'Content-Type': 'application/json' };
   if (key) headers.Authorization = 'Bearer ' + key;
+  const t0 = Date.now(), left = () => LLM_TIMEOUT - (Date.now() - t0);
   for (let attempt = 0; attempt < 5; attempt++) {
-    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 120e3);
+    if (left() < 1500) throw httpErr(504, `${label} demorou mais de ${Math.round(LLM_TIMEOUT / 1000)} s sem responder.`);
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), left());
     let r, j = {};
     try {
       r = await fetch(chatUrl(baseUrl), { method: 'POST', headers, body: JSON.stringify(body), signal: ctl.signal });
       try { j = await r.json(); } catch {}
     } catch (e) {
-      throw httpErr(504, e.name === 'AbortError' ? `${label} demorou demais para responder. Tente de novo.` : `Não consegui falar com ${label} (sem internet?).`);
+      throw httpErr(504, e.name === 'AbortError' ? `${label} demorou mais de ${Math.round(LLM_TIMEOUT / 1000)} s sem responder.` : `Não consegui falar com ${label} (sem internet?).`);
     } finally { clearTimeout(timer); }
     if (r.ok) return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
     const msg = (j.error && (j.error.message || (typeof j.error === 'string' ? j.error : ''))) || j.message || '';
@@ -274,7 +277,7 @@ async function callLLM({ key, model, baseUrl, label, kind, messages, maxTokens, 
         if (nm >= 2500) { body.max_tokens = nm; continue; }
         throw httpErr(502, `O pedido é grande demais para o limite do seu plano em ${label} (${L} tokens por minuto). Reduza a duração ou o tamanho da ideia, ou use um modelo/plano com limite maior.`);
       }
-      if (wait && attempt < 4) { const ms = Math.min(45000, Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400); await new Promise(res => setTimeout(res, ms)); continue; } // limite do minuto: espera e repete
+      if (wait && attempt < 4 && Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400 < left() - 1500) { const ms = Math.min(45000, Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400); await new Promise(res => setTimeout(res, ms)); continue; } // limite do minuto: espera e repete
     }
     if (r.status === 413) throw httpErr(502, `O pedido ficou grande demais para ${label}. Reduza a duração ou o tamanho da ideia.`);
     if (r.status === 429) throw httpErr(429, `${label} atingiu o limite de uso. Tente novamente em instantes.`);

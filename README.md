@@ -7,7 +7,7 @@ Pasta única, sem subpastas e sem dependências (não precisa de npm install).
 | index.html | O gerador de vídeo |
 | ajuda.html | Central de ajuda (guia, referência do JSON, solução de problemas) |
 | admin.html | Painel administrativo, em endereço secreto (IA: ligar/desligar provedores e trocar o modelo; padrões, histórico, segurança) |
-| ai.js | Integração com a IA: Groq, Cerebras e Cloudflare (roteiro + JSON a partir da ideia do usuário) |
+| ai.js | Integração com a IA: Groq e IteraCompute (roteiro + JSON a partir da ideia do usuário) |
 | server.js | Servidor local + API do Admin |
 | schema.js | Catálogo do formato de história e validador (usado por Ajuda, Admin e servidor) |
 | audio.js | Trilha e efeitos sonoros gerados por código |
@@ -88,10 +88,11 @@ O painel permite **ligar/desligar cada IA** e **trocar o modelo** de cada uma, s
 | Provedor | Chave | Modelo padrão | Variáveis de ambiente |
 |---|---|---|---|
 | Groq (`api.groq.com`) | `gsk_…` | `openai/gpt-oss-120b` | `GROQ_API_KEY`, `GROQ_URL` |
-| Cerebras (`api.cerebras.ai`) | `csk-…` | `gpt-oss-120b` | `CEREBRAS_API_KEY`, `CEREBRAS_URL` |
-| Cloudflare Workers AI | token com permissão Workers AI + ID da conta | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
+| IteraCompute (`api.iteracompute.com`) | chave da plataforma | `Auto` (saída máx. 8192 tokens) | `ITERACOMPUTE_API_KEY`, `ITERACOMPUTE_URL` |
 
-- **Principal + fallback**: a requisição vai ao principal; se falhar (limite, fora do ar), tenta os outros ativos, em ordem.
-- **Buscar modelos** lista os modelos do provedor; **Testar conexão** valida chave, conta e modelo antes de salvar.
+- **Principal + fallback**: a requisição vai ao principal; se falhar (limite, fora do ar), tenta o outro, se ativo.
+- **Buscar modelos** lista os modelos da Groq; **Testar conexão** valida chave e modelo antes de salvar.
 - **TPM** (tokens por minuto) dimensiona o prompt (Groq grátis ≈ 8000).
 - Variáveis de ambiente têm prioridade sobre o painel. Instalações antigas migram sozinhas (a chave da Groq continua valendo).
+
+**Tempo limite:** se um provedor ficar 50 s sem responder, a chamada falha e o fallback tenta o próximo (ajustável com a variável `LLM_TIMEOUT_MS`, em milissegundos).

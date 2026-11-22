@@ -28,8 +28,7 @@ const DEFAULTS = () => ({
     primary: 'groq', fallback: true, // provedor principal; se falhar, tenta o outro (quando ativo)
     providers: {
       groq: { enabled: true, model: 'openai/gpt-oss-120b', key: '', baseUrl: '', tpm: 8000 },
-      cerebras: { enabled: false, model: 'gpt-oss-120b', key: '', baseUrl: '', tpm: 30000 },
-      cloudflare: { enabled: false, model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', key: '', baseUrl: '', accountId: '', tpm: 32000 },
+      iteracompute: { enabled: false, model: 'Auto', key: '', baseUrl: '', tpm: 60000 },
     },
   },
   history: [],
@@ -38,8 +37,7 @@ const DEFAULTS = () => ({
 // Provedores de IA compatíveis com OpenAI. A chave e o endereço podem vir do ambiente (têm prioridade sobre o dados.json).
 const PROVIDERS = {
   groq: { label: 'Groq', keyEnv: 'GROQ_API_KEY', urlEnv: 'GROQ_URL', defaultUrl: 'https://api.groq.com/openai/v1' },
-  cerebras: { label: 'Cerebras', keyEnv: 'CEREBRAS_API_KEY', urlEnv: 'CEREBRAS_URL', defaultUrl: 'https://api.cerebras.ai/v1' },
-  cloudflare: { label: 'Cloudflare Workers AI', keyEnv: 'CLOUDFLARE_API_TOKEN', urlEnv: 'CLOUDFLARE_URL', defaultUrl: '', accountEnv: 'CLOUDFLARE_ACCOUNT_ID' },
+  iteracompute: { label: 'IteraCompute', keyEnv: 'ITERACOMPUTE_API_KEY', urlEnv: 'ITERACOMPUTE_URL', defaultUrl: 'https://api.iteracompute.com/v1', maxOut: 8192 }, // saída máx. 8192 tokens
 };
 const PIDS = Object.keys(PROVIDERS);
 let db = DEFAULTS();
@@ -86,11 +84,9 @@ const validPath = v => /^[a-z0-9][a-z0-9_-]{3,39}$/i.test(v) && !['api', 'ajuda'
 if (!db.adminPath) { db.adminPath = 'painel-' + crypto.randomBytes(5).toString('hex'); save(); }
 const adminPath = () => (process.env.ADMIN_PATH && validPath(process.env.ADMIN_PATH) ? process.env.ADMIN_PATH : db.adminPath);
 const provKey = id => process.env[PROVIDERS[id].keyEnv] || db.ai.providers[id].key || '';
-const provAccount = id => PROVIDERS[id].accountEnv ? (process.env[PROVIDERS[id].accountEnv] || db.ai.providers[id].accountId || '') : '';
-// Cloudflare: o endereço é montado com o ID da conta (a menos que um endereço seja informado).
+const provAccount = () => '';
 const provUrl = id => {
   let u = process.env[PROVIDERS[id].urlEnv] || db.ai.providers[id].baseUrl || PROVIDERS[id].defaultUrl;
-  if (!u && PROVIDERS[id].accountEnv && provAccount(id)) u = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(provAccount(id))}/ai/v1`;
   return u.replace(/\/chat\/completions\/?$/, '').replace(/\/+$/, '');
 };
 const provReady = id => !!provKey(id) && !!provUrl(id);
@@ -222,7 +218,7 @@ async function api(req, res, p) {
       const b = await body(req, aiOp === 'generate' || aiOp === 'ideas' ? 2e4 : 5e5);
       const opt = { seconds: +b.seconds, look: SCHEMA.SET.look.has(b.look) ? b.look : '', format: str(b.format, 20), tone: str(b.tone, 20), lang: str(b.lang, 8), music: str(b.music, 20), cast: +b.cast };
       const storyOk = v => v && typeof v === 'object' && Array.isArray(v.scenes) && v.scenes.length > 0 && v.scenes.length <= 40;
-      const common = (llm) => ({ llm, maxTokens: db.ai.maxTokens, extra: db.ai.extra || '', tpm: llm.tpm || 8000 });
+      const common = (llm) => ({ llm, maxTokens: Math.min(db.ai.maxTokens, PROVIDERS[llm.id].maxOut || 1e9), extra: db.ai.extra || '', tpm: llm.tpm || 8000 });
       let job; // job(llm): recebe o provedor da vez (principal primeiro, depois o fallback)
       if (aiOp === 'generate') {
         const idea = str(b.idea, 6000);
@@ -291,7 +287,6 @@ async function api(req, res, p) {
         if (typeof pb.baseUrl === 'string') { const u = cleanUrl(pb.baseUrl); if (u === null) return send(res, 400, { error: `Endereço inválido para ${PROVIDERS[pid].label}. Use http:// ou https://.` }); c.baseUrl = u; }
         if (typeof pb.key === 'string' && pb.key.trim()) c.key = pb.key.trim().slice(0, 300);
         if (pb.clearKey) c.key = '';
-        if (PROVIDERS[pid].accountEnv && typeof pb.accountId === 'string') c.accountId = pb.accountId.trim().replace(/[^\w-]/g, '').slice(0, 64);
       }
       save(); return send(res, 200, aiInfo());
     }
@@ -302,7 +297,6 @@ async function api(req, res, p) {
       const llm = llmOf(pid);
       if (typeof b.baseUrl === 'string' && b.baseUrl.trim() && !process.env[PROVIDERS[pid].urlEnv]) { const u = cleanUrl(b.baseUrl); if (!u) return send(res, 400, { error: 'Endereço inválido. Use http:// ou https://.' }); llm.baseUrl = u; }
       if (typeof b.key === 'string' && b.key.trim() && !process.env[PROVIDERS[pid].keyEnv]) llm.key = b.key.trim();
-      if (PROVIDERS[pid].accountEnv && typeof b.accountId === 'string' && b.accountId.trim() && !process.env[PROVIDERS[pid].accountEnv] && !(typeof b.baseUrl === 'string' && b.baseUrl.trim())) llm.baseUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(b.accountId.trim().replace(/[^\w-]/g, ''))}/ai/v1`;
       if (!llm.baseUrl) return send(res, 400, { error: `Informe o ID da conta de ${llm.label}.` });
       if (typeof b.model === 'string' && /^[\w.\/:@+-]{1,100}$/.test(b.model.trim())) llm.model = b.model.trim();
       if (!llm.key) return send(res, 400, { error: `Informe a chave de ${llm.label} primeiro.` });
@@ -354,7 +348,7 @@ http.createServer((req, res) => {
   console.log('  Ajuda:   http://localhost:' + PORT + '/ajuda');
   console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
   const ap = activeProviders();
-  console.log('  IA: ' + (db.ai.enabled && ap.length ? ap.map(l => `${l.label} (${l.model})`).join(' → ') : 'desativada ou sem chave (configure no Admin > IA ou GROQ_API_KEY / CEREBRAS_API_KEY / CLOUDFLARE_API_TOKEN)'));
+  console.log('  IA: ' + (db.ai.enabled && ap.length ? ap.map(l => `${l.label} (${l.model})`).join(' → ') : 'desativada ou sem chave (configure no Admin > IA ou GROQ_API_KEY / ITERACOMPUTE_API_KEY)'));
   if (firstRunPassword) console.log('\n  >>> Senha inicial do admin: ' + firstRunPassword + '\n  >>> (aparece só desta vez; troque em Admin > Segurança)\n');
   else if (process.env.ADMIN_PASSWORD) console.log('  Senha do admin vem de ADMIN_PASSWORD.');
 });

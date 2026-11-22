@@ -60,7 +60,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 
 <!-- APP -->
 <div id="app" class="hidden">
-  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IA (Groq, Cerebras e Cloudflare), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
+  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IA (Groq e IteraCompute), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" data-t="painel" aria-selected="true">Painel</button>
     <button role="tab" data-t="ia" aria-selected="false">IA</button>
@@ -109,10 +109,9 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
       <h3 style="margin-top:0">Como funciona</h3>
       <ul style="padding-left:18px;margin:0">
         <li><b>Groq</b>: chave em <code>console.groq.com</code>. Modelo padrão: <code>openai/gpt-oss-120b</code>.</li>
-        <li><b>Cerebras</b>: chave em <code>cloud.cerebras.ai</code>. Modelo padrão: <code>gpt-oss-120b</code>.</li>
-        <li><b>Cloudflare Workers AI</b>: informe o ID da conta e um token de API com permissão Workers AI (<code>dash.cloudflare.com</code>). Modelo padrão: <code>@cf/meta/llama-3.3-70b-instruct-fp8-fast</code>. Se "Buscar modelos" não funcionar, digite o nome do modelo.</li>
+        <li><b>IteraCompute</b>: chave em <code>platform.iteracompute.com</code>. Plano grátis usa o modelo <code>Auto</code>; a saída é limitada a 8192 tokens (o servidor já respeita) e só roda 1 requisição por vez.</li>
         <li>Cada provedor pode ser ligado ou desligado e ter seu próprio modelo. Com o fallback ligado, se o principal falhar (limite, fora do ar, modelo ruim) o próximo ativo assume na mesma requisição.</li>
-        <li>Alternativa às chaves salvas: variáveis <code>GROQ_API_KEY</code>, <code>CEREBRAS_API_KEY</code>, <code>CLOUDFLARE_API_TOKEN</code> e <code>CLOUDFLARE_ACCOUNT_ID</code> ao iniciar o servidor; elas têm prioridade.</li>
+        <li>Alternativa às chaves salvas: variáveis <code>GROQ_API_KEY</code> e <code>ITERACOMPUTE_API_KEY</code> ao iniciar o servidor; elas têm prioridade.</li>
         <li>Use <b>Buscar modelos</b> para listar o que o provedor oferece e <b>Testar</b> para validar chave, endereço e modelo antes de salvar.</li>
         <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
       </ul>
@@ -258,8 +257,7 @@ $('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['da
 /* ---- IA ---- */
 const PV={
   groq:{models:['openai/gpt-oss-120b','openai/gpt-oss-20b','llama-3.3-70b-versatile','llama-3.1-8b-instant'],keyPh:'gsk_…',desc:'Nuvem, cota gratuita com limite de tokens por minuto.'},
-  cerebras:{models:['gpt-oss-120b','llama-3.3-70b','qwen-3-32b','llama3.1-8b'],keyPh:'csk-…',desc:'Nuvem, inferência muito rápida, cota gratuita.'},
-  cloudflare:{models:['@cf/meta/llama-3.3-70b-instruct-fp8-fast','@cf/openai/gpt-oss-120b','@cf/openai/gpt-oss-20b','@cf/meta/llama-3.1-8b-instruct'],keyPh:'Token da API (permissão Workers AI)',desc:'Workers AI, compatível com OpenAI. Precisa do ID da conta.',acct:1}
+  iteracompute:{models:['Auto'],keyPh:'Chave da IteraCompute',desc:'Plano gratuito: modelo Auto (o provedor escolhe), 30M de tokens por mês, 1 requisição por vez.',nolist:1}
 };
 let AI={};
 const pid=()=>Object.keys(PV);
@@ -267,11 +265,10 @@ function provCard(id,c){
   return `<div class="card pcard ${c.enabled?'':'off'}" data-p="${id}">
     <div class="row sb"><h3 style="margin:0">${esc(c.label)} <span class="badge" data-st></span></h3><label class="sw"><input type="checkbox" data-f="enabled" aria-label="Ativar ${esc(c.label)}"><span data-sw></span></label></div>
     <p class="muted" style="margin:4px 0 14px">${esc(PV[id].desc)}</p>
-    ${PV[id].acct?`<label class="f">ID da conta Cloudflare<input data-f="accountId" autocomplete="off" spellcheck="false" placeholder="32 caracteres, no painel da Cloudflare"></label>`:''}
     <label class="f">${PV[id].acct?'Token da API':'Chave da API'}<input type="password" data-f="key" autocomplete="off" placeholder="${esc(PV[id].keyPh)} (deixe vazio para manter a atual)"></label>
     <div class="muted" data-hint style="margin:-6px 0 12px"></div>
     <label class="f">Modelo
-      <span class="mrow"><input data-f="model" list="dl-${id}" autocomplete="off" spellcheck="false"><button type="button" class="sec sm" data-act="models">Buscar modelos</button></span>
+      <span class="mrow"><input data-f="model" list="dl-${id}" autocomplete="off" spellcheck="false">${PV[id].nolist?'':'<button type="button" class="sec sm" data-act="models">Buscar modelos</button>'}</span>
       <datalist id="dl-${id}">${PV[id].models.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>
     </label>
     <div class="grid g2">
