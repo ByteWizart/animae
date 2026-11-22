@@ -1,8 +1,7 @@
-// Integração com a Groq (API compatível com OpenAI): ideia -> roteiro + direção + JSON de história.
+// Integração com IAs gratuitas (Groq, Z.ai, Gemini, Cerebras, OpenRouter...; todas compatíveis com a API da OpenAI): ideia -> roteiro + direção + JSON de história.
 // Roda só no servidor, para a chave nunca chegar ao navegador. Requer Node 18+ (fetch embutido). build 9
+// Recebe `llm = { chain: [provedores] }`: tenta o primeiro e, se ele falhar (limite, chave, queda), passa para o próximo.
 const SCHEMA = require('./schema.js');
-
-const GROQ_URL = process.env.GROQ_URL || 'https://api.groq.com/openai/v1/chat/completions';
 
 /* ------------------------------------------------------------------ opções de criação ------------------------------------------------------------------ */
 const FORMATS = {
@@ -39,7 +38,7 @@ const LOOK_MUSIC = { noir: 'mystery', neon: 'retro', retro: 'retro', pixel: 'ret
 // Estimativa grosseira de tokens (português + JSON ~ 3 caracteres por token).
 const estTok = t => Math.ceil(String(t).length / 3);
 const msgTok = m => m.reduce((n, x) => n + estTok(x.content) + 8, 0);
-// Escolhe o nível de compactação do prompt e o teto de saída para caber no limite de tokens por minuto (TPM) da Groq.
+// Escolhe o nível de compactação do prompt e o teto de saída para caber no limite de tokens por minuto (TPM) do provedor.
 function budget({ build, user, maxTokens, tpm, minOut }) {
   tpm = tpm || 8000; minOut = minOut || 3800;
   let res = null;
@@ -241,43 +240,88 @@ function autoDirect(st) {
   return st;
 }
 
-/* ------------------------------------------------------------------ chamadas à Groq ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ chamadas ao provedor de IA ------------------------------------------------------------------ */
 const httpErr = (code, msg) => ({ code, msg });
-async function callGroq({ key, model, messages, maxTokens, temperature, json }) {
-  const body = { model, messages, temperature: temperature == null ? 0.7 : temperature, max_tokens: maxTokens };
+const failErr = (code, msg, cool) => ({ code, msg, failover: true, cool: cool || 60e3 }); // erro que justifica tentar outro provedor
+const cooldown = new Map(); // id do provedor -> até quando evitá-lo depois de uma falha
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+// Uma chamada a UM provedor (com as repetições que fazem sentido dentro dele).
+async function callOne(p, { messages, maxTokens, temperature, json, canFailover }) {
+  const body = { model: p.model, messages, temperature: temperature == null ? 0.7 : temperature, max_tokens: maxTokens };
   if (json !== false) body.response_format = { type: 'json_object' };
-  // Modelos de raciocínio (gpt-oss) gastam tokens pensando: pedimos pouco raciocínio e escondemos o texto dele.
-  if (/gpt-oss/i.test(model)) { body.reasoning_effort = 'low'; body.include_reasoning = false; }
+  if (typeof p.tune === 'function') p.tune(body, p.model); // ajustes do provedor (ex.: pouco raciocínio, "thinking" desligado)
+  const extras = Object.keys(body).filter(k => !['model', 'messages', 'temperature', 'max_tokens', 'response_format'].includes(k));
+  const headers = { 'Content-Type': 'application/json', ...(p.headers || {}) };
+  if (p.key) headers.Authorization = 'Bearer ' + p.key;
   for (let attempt = 0; attempt < 5; attempt++) {
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 120e3);
     let r, j = {};
     try {
-      r = await fetch(GROQ_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
+      r = await fetch(p.url, { method: 'POST', headers, body: JSON.stringify(body), signal: ctl.signal });
       try { j = await r.json(); } catch {}
     } catch (e) {
-      throw httpErr(504, e.name === 'AbortError' ? 'A Groq demorou demais para responder. Tente de novo.' : 'Não consegui falar com a Groq (sem internet?).');
+      throw failErr(504, e.name === 'AbortError' ? p.label + ' demorou demais para responder.' : 'Não consegui falar com ' + p.label + ' (sem internet?).', 30e3);
     } finally { clearTimeout(timer); }
-    if (r.ok) return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
-    const msg = (j.error && j.error.message) || '';
+    if (r.ok) {
+      const txt = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+      return String(txt).replace(/<think>[\s\S]*?<\/think>/gi, ''); // alguns modelos devolvem o raciocínio dentro do texto
+    }
+    const msg = (j.error && (j.error.message || (typeof j.error === 'string' ? j.error : ''))) || j.message || '';
     if (r.status === 400 && /response_format|json/i.test(msg) && body.response_format) { delete body.response_format; continue; } // modelo sem modo JSON
-    if (r.status === 400 && /reasoning|include_reasoning/i.test(msg) && body.reasoning_effort) { delete body.reasoning_effort; delete body.include_reasoning; continue; }
-    if (r.status === 401) throw httpErr(502, 'A chave da Groq foi recusada. Peça ao administrador para conferir a chave.');
-    if (r.status === 404 || (r.status === 400 && /model/i.test(msg))) throw httpErr(502, 'Modelo da Groq indisponível: ' + msg);
+    if (r.status === 400 && extras.some(k => k in body) && /reasoning|thinking|unknown|unrecognized|unsupported|extra|not permitted/i.test(msg)) { extras.forEach(k => delete body[k]); continue; }
+    if (r.status === 401 || r.status === 403) throw failErr(502, 'A chave de ' + p.label + ' foi recusada. Peça ao administrador para conferir a chave.', 600e3);
+    if (r.status === 402) throw failErr(502, p.label + ' pede crédito ou pagamento para este modelo.', 600e3);
+    if (r.status === 404 || (r.status === 400 && /model/i.test(msg))) throw failErr(502, 'Modelo de ' + p.label + ' indisponível: ' + msg, 600e3);
+    // limite de tokens por minuto no formato da Groq ("Limit N, Requested M")
     const lim = /Limit (\d+)/i.exec(msg), req = /Requested (\d+)/i.exec(msg), wait = /try again in ([\d.]+)\s*(ms|s|m)/i.exec(msg);
     if ((r.status === 429 || r.status === 413) && /tokens/i.test(msg) && lim && req) {
       const L = +lim[1], R = +req[1];
       if (R > L) { // este pedido sozinho passa do limite por minuto: reduz a saída e tenta de novo
         const nm = body.max_tokens - (R - L) - 150;
         if (nm >= 2500) { body.max_tokens = nm; continue; }
-        throw httpErr(502, `O pedido é grande demais para o limite do seu plano da Groq (${L} tokens por minuto). Reduza a duração ou o tamanho da ideia, ou use um modelo/plano com limite maior.`);
+        if (canFailover) throw failErr(502, `Pedido grande demais para o limite de ${L} tokens por minuto de ${p.label}.`, 300e3);
+        throw httpErr(502, `O pedido é grande demais para o limite do seu plano de ${p.label} (${L} tokens por minuto). Reduza a duração ou o tamanho da ideia, ou use um modelo/provedor com limite maior.`);
       }
-      if (wait && attempt < 4) { const ms = Math.min(45000, Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400); await new Promise(res => setTimeout(res, ms)); continue; } // limite do minuto: espera e repete
+      if (wait && attempt < 4 && !canFailover) { const ms = Math.min(45000, Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400); await sleep(ms); continue; } // limite do minuto: espera e repete
     }
-    if (r.status === 413) throw httpErr(502, 'O pedido ficou grande demais para a Groq. Reduza a duração ou o tamanho da ideia.');
-    if (r.status === 429) throw httpErr(429, 'A Groq atingiu o limite de uso. Tente novamente em instantes.');
-    throw httpErr(502, 'Erro da Groq (' + r.status + '): ' + (msg || 'sem detalhes'));
+    if (r.status === 429) {
+      if (canFailover) throw failErr(429, p.label + ' atingiu o limite de uso.', 60e3);
+      if (wait && attempt < 4) { const ms = Math.min(45000, Math.ceil(parseFloat(wait[1]) * (wait[2] === 'ms' ? 1 : wait[2] === 'm' ? 60000 : 1000)) + 400); await sleep(ms); continue; }
+      throw httpErr(429, p.label + ' atingiu o limite de uso. Tente novamente em instantes ou configure outro provedor de reserva no painel.');
+    }
+    if (r.status === 413) { if (canFailover) throw failErr(502, 'Pedido grande demais para ' + p.label + '.', 300e3); throw httpErr(502, 'O pedido ficou grande demais para ' + p.label + '. Reduza a duração ou o tamanho da ideia.'); }
+    if (r.status === 408 || r.status >= 500) { if (canFailover || attempt >= 1) throw failErr(502, 'Erro de ' + p.label + ' (' + r.status + '): ' + (msg || 'instabilidade'), 60e3); await sleep(1500); continue; }
+    throw httpErr(502, 'Erro de ' + p.label + ' (' + r.status + '): ' + (msg || 'sem detalhes'));
   }
-  throw httpErr(502, 'A Groq não respondeu corretamente.');
+  throw failErr(502, p.label + ' não respondeu corretamente.', 60e3);
+}
+
+// Tenta os provedores da cadeia, em ordem; passa ao próximo quando um deles falha por limite, chave, modelo ou queda.
+async function callLLM({ llm, messages, maxTokens, temperature, json }) {
+  const chain = (llm && llm.chain) || [];
+  if (!chain.length) throw httpErr(503, 'Nenhum provedor de IA está configurado.');
+  const need = msgTok(messages) + (maxTokens || 0), now = Date.now();
+  let cands = chain.filter(p => (cooldown.get(p.id) || 0) <= now);
+  if (!cands.length) cands = chain.slice(); // todos em pausa: tenta mesmo assim
+  const fit = cands.filter(p => need <= (p.tpm || 8000)); // não manda pedido grande para quem tem cota pequena
+  if (fit.length) cands = fit;
+  let last = null;
+  for (let i = 0; i < cands.length; i++) {
+    const p = cands[i];
+    try {
+      const txt = await callOne(p, { messages, maxTokens, temperature, json, canFailover: i < cands.length - 1 });
+      if (llm) llm.lastUsed = p.label;
+      cooldown.delete(p.id);
+      return txt;
+    } catch (e) {
+      last = e;
+      if (!e || !e.failover) throw e;
+      cooldown.set(p.id, Date.now() + (e.cool || 60e3));
+      console.warn('IA: ' + p.label + ' falhou (' + e.msg + ')' + (i < cands.length - 1 ? '; tentando o próximo provedor.' : '.'));
+    }
+  }
+  throw httpErr(last.code || 502, last.msg);
 }
 
 function parseModelJson(txt) {
@@ -313,11 +357,11 @@ function checkResult(obj, look, ctx) {
   return { issues, errs: issues.filter(i => i.level === 'erro') };
 }
 
-async function runStory({ key, model, maxTokens, messages, look, ctx, tpm }) {
+async function runStory({ llm, maxTokens, messages, look, ctx, tpm }) {
   let out = null, issues = [], raw = '';
   for (let round = 0; round < 2; round++) {
     if (round > 0 && msgTok(messages) + maxTokens > (tpm || 8000)) break; // a conversa de correção não cabe na cota por minuto
-    raw = await callGroq({ key, model, messages, maxTokens });
+    raw = await callLLM({ llm, messages, maxTokens });
     const obj = parseModelJson(raw);
     if (!obj || !obj.story) {
       messages.push({ role: 'assistant', content: raw.slice(0, 4000) }, { role: 'user', content: 'Sua resposta não foi um JSON válido com as chaves pedidas (incluindo "story"). Responda de novo, só com o JSON.' });
@@ -344,7 +388,7 @@ const optClean = o => ({
 });
 
 /* ------------------------------------------------------------------ operações ------------------------------------------------------------------ */
-async function generate({ key, model, maxTokens, tpm, idea, extra, ...raw }) {
+async function generate({ llm, maxTokens, tpm, idea, extra, ...raw }) {
   tpm = tpm || 8000;
   const o = optClean({ ...raw, extra }), maxIdea = tpm <= 10000 ? 2800 : 6000;
   const user = 'Ideia do vídeo:\n' + String(idea).slice(0, maxIdea), need = sec => 1500 + sec * 100;
@@ -352,34 +396,34 @@ async function generate({ key, model, maxTokens, tpm, idea, extra, ...raw }) {
   if (b.out < need(o.seconds)) { // reduz a duração até caber na cota de tokens por minuto
     const orig = o.seconds;
     for (const sec of [45, 30, 20]) if (sec < orig) { o.seconds = sec; b = budget({ build: l => systemPrompt({ ...o, level: l }), user, maxTokens, tpm, minOut: need(sec) }); if (b.out >= need(sec)) break; }
-    if (o.seconds !== orig) notice = `Duração ajustada de ${orig} s para ${o.seconds} s: o limite de ${tpm} tokens por minuto do seu plano da Groq não comporta vídeos maiores de uma vez.`;
+    if (o.seconds !== orig) notice = `Duração ajustada de ${orig} s para ${o.seconds} s: o limite de ${tpm} tokens por minuto do provedor de IA não comporta vídeos maiores de uma vez.`;
   }
-  if (b.out < 2800) throw httpErr(413, 'A ideia é longa demais para o limite de tokens por minuto da Groq. Resuma a ideia.');
+  if (b.out < 2800) throw httpErr(413, 'A ideia é longa demais para o limite de tokens por minuto do provedor de IA. Resuma a ideia.');
   const messages = [{ role: 'system', content: b.sys }, { role: 'user', content: user }];
   const ctx = { music: o.music, toneMusic: (TONES[o.tone] || {}).music || '' };
-  const { out, issues, script } = await runStory({ key, model, maxTokens: b.out, messages, look: o.look, ctx, tpm });
+  const { out, issues, script } = await runStory({ llm, maxTokens: b.out, messages, look: o.look, ctx, tpm });
   return { title: cleanStr(out.titulo || 'Sem título', 80), script, story: out.story, issues, plan: cleanPlan(out.plano), publish: cleanPublish(out.publicacao), notice };
 }
 
 // Edita uma história existente seguindo uma instrução ("deixe mais dinâmico", "troque para noite"...).
-async function refine({ key, model, maxTokens, tpm, story, script, instruction, extra, ...raw }) {
+async function refine({ llm, maxTokens, tpm, story, script, instruction, extra, ...raw }) {
   tpm = tpm || 8000;
   const o = optClean({ ...raw, extra }), sj = JSON.stringify(story);
   const user = `INSTRUÇÃO DE EDIÇÃO:\n${instruction}\n\nROTEIRO ATUAL:\n${script || '(use as captions das cenas)'}\n\nSTORY ATUAL (JSON):\n${sj}`;
   const b = budget({ build: l => systemPrompt({ ...o, mode: 'edit', level: Math.max(1, l) }), user, maxTokens, tpm, minOut: Math.min(5200, Math.ceil(estTok(sj) * 1.15) + 500) });
-  if (b.out < Math.ceil(estTok(sj) * 1.05) + 300) throw httpErr(413, `A história é grande demais para a IA editar dentro do limite de ${tpm} tokens por minuto da Groq. Edite pelo JSON ou use um plano/modelo com limite maior.`);
+  if (b.out < Math.ceil(estTok(sj) * 1.05) + 300) throw httpErr(413, `A história é grande demais para a IA editar dentro do limite de ${tpm} tokens por minuto do provedor de IA. Edite pelo JSON ou use um provedor/modelo com limite maior.`);
   const messages = [{ role: 'system', content: b.sys }, { role: 'user', content: user }];
-  const { out, issues, script: sc } = await runStory({ key, model, maxTokens: b.out, messages, look: o.look || '', ctx: { music: '', toneMusic: '' }, tpm });
+  const { out, issues, script: sc } = await runStory({ llm, maxTokens: b.out, messages, look: o.look || '', ctx: { music: '', toneMusic: '' }, tpm });
   return { title: cleanStr(out.titulo || '', 80), script: sc, story: out.story, issues, summary: cleanStr(out.resumo_mudancas, 400) };
 }
 
-async function ideas({ key, model, topic, count, format, tone, seconds }) {
+async function ideas({ llm, topic, count, format, tone, seconds }) {
   count = Math.min(10, Math.max(3, +count || 6));
   const sys = `Você é estrategista de conteúdo para shorts animados verticais (YouTube Shorts, Reels, TikTok). Gere ${count} ideias de vídeo diferentes entre si, cada uma com gancho forte nos 3 primeiros segundos e viável com personagens-palito 2D e objetos desenhados (sem fotos, sem pessoas reais, sem marcas). Varie os formatos. Não invente fatos duvidosos.
 Formatos possíveis: ${Object.keys(FORMATS).filter(k => k !== 'auto').join(', ')}. Estilos visuais possíveis: ${idsOf(SCHEMA.LOOKS)}.
 Responda SOMENTE JSON: {"ideias":[{"titulo":"até 60 caracteres","gancho":"a frase que abre o vídeo","ideia":"1 a 3 frases prontas para colar no campo Ideia (tema, tom, público)","formato":"um dos formatos","estilo":"um dos estilos","duracao":30}]}`;
   const user = `Assunto ou nicho: ${topic || 'curiosidades do dia a dia'}${format && FORMATS[format] && format !== 'auto' ? `\nFormato preferido: ${format}` : ''}${tone && TONES[tone] && tone !== 'auto' ? `\nTom: ${tone}` : ''}${seconds ? `\nDuração desejada: ${seconds} s` : ''}`;
-  const raw = await callGroq({ key, model, maxTokens: 3500, temperature: 0.95, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] });
+  const raw = await callLLM({ llm, maxTokens: 3500, temperature: 0.95, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] });
   const obj = parseModelJson(raw);
   const list = obj && Array.isArray(obj.ideias) ? obj.ideias : [];
   const out = list.filter(isObj).map(i => ({ title: cleanStr(i.titulo, 80), hook: cleanStr(i.gancho, 200), idea: cleanStr(i.ideia, 600), format: FORMATS[i.formato] ? i.formato : 'auto', look: SCHEMA.SET.look.has(i.estilo) ? i.estilo : '', seconds: [20, 30, 45, 60].includes(+i.duracao) ? +i.duracao : 30 })).filter(i => i.idea.length > 8).slice(0, count);
@@ -394,13 +438,13 @@ function outline(st) {
     return `${i + 1}) ${s.t0}-${s.t1}s [${s.scenery || '?'}${s.tr ? ' tr=' + s.tr : ''}] cam=${s.cam ? (s.cam.keys ? 'keys' : `${s.cam.z0 || 1}->${s.cam.z1 || 1}`) : 'nenhuma'} fx=${asArr(s.fx).join(',') || '-'} props=${asArr(s.props).map(p => p.type).join(',') || '-'} atores=${acts.join(' | ') || '-'} extras=${['title', 'lower', 'spot', 'punch', 'flashes', 'shakes', 'scroll'].filter(k => s[k]).join(',') || '-'}\n   fala: ${s.caption || ''}`;
   }).join('\n');
 }
-async function review({ key, model, story, script, tpm }) {
+async function review({ llm, story, script, tpm }) {
   const sys = `Você é um diretor de shorts animados exigente e construtivo. Avalie o roteiro e a direção (resumo por cena) quanto a: gancho nos 3 primeiros segundos, ritmo (algo muda a cada 2–3 s), clareza, variedade de câmera/cenário/transição, uso de som e de recursos visuais (gráficos, títulos, efeitos), continuidade de elenco e fecho. Seja específico (cite o número da cena).
 Os recursos existentes são: cenários ${idsOf(SCHEMA.SCENERY)}; fx ${idsOf(SCHEMA.FX)}; transições ${idsOf(SCHEMA.TRANSITIONS)}; trilhas ${idsOf(SCHEMA.MUSIC)}; e os recursos de cena title, lower, spot, bars, punch, flashes, shakes, scroll, cam.hand, além de objetos de dados (chart, counter, checklist, chat, callout, stamp, headline...).
 Responda SOMENTE JSON: {"nota":0 a 10,"resumo":"2 frases","pontos_fortes":["..."],"problemas":[{"cena":número ou 0 para geral,"problema":"...","correcao":"o que fazer, usando recursos existentes"}],"instrucao_refino":"UMA instrução objetiva (até 700 caracteres) que aplique as correções mais importantes quando enviada a um editor automático"}`;
   const stl = (story && story.style) || {};
   const user = `ROTEIRO:\n${script || ''}\n\nDIREÇÃO POR CENA (total ${story && story.total}s, estilo ${stl.look || 'cartoon'}, trilha ${(isObj(stl.music) ? stl.music.type : stl.music) || 'nenhuma'}, sfx ${asArr(story && story.sfx).length}):\n${outline(story)}`;
-  const raw = await callGroq({ key, model, maxTokens: Math.max(1500, Math.min(3000, (tpm || 8000) - estTok(sys + user) - 400)), temperature: 0.4, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] });
+  const raw = await callLLM({ llm, maxTokens: Math.max(1500, Math.min(3000, (tpm || 8000) - estTok(sys + user) - 400)), temperature: 0.4, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] });
   const o = parseModelJson(raw);
   if (!o) throw httpErr(502, 'A IA não devolveu uma avaliação utilizável. Tente de novo.');
   return { score: Math.max(0, Math.min(10, +o.nota || 0)), summary: cleanStr(o.resumo, 500), strengths: asArr(o.pontos_fortes).map(x => cleanStr(x, 200)).slice(0, 6),
@@ -424,19 +468,26 @@ function collectTexts(st) {
   }
   return refs;
 }
-async function translate({ key, model, maxTokens, tpm, story, script, lang }) {
+async function translate({ llm, maxTokens, tpm, story, script, lang }) {
   tpm = tpm || 8000;
   if (!LANGS[lang]) throw httpErr(400, 'Idioma não suportado.');
   const st = JSON.parse(JSON.stringify(story)), refs = collectTexts(st);
   const items = [String(script || ''), ...refs.map(r => String(r.o[r.k]))];
   const total = items.reduce((n, t) => n + t.length, 0);
-  if (estTok(JSON.stringify(items)) * 2 + 500 > tpm) throw httpErr(413, 'Há texto demais para traduzir de uma vez dentro do limite de tokens por minuto da Groq.');
+  if (estTok(JSON.stringify(items)) * 2 + 500 > tpm) throw httpErr(413, 'Há texto demais para traduzir de uma vez dentro do limite de tokens por minuto do provedor de IA.');
   const sys = `Você é tradutor de legendas e roteiros de vídeos curtos. Traduza cada item da lista para ${LANGS[lang]}, mantendo tom, sentido e brevidade (os textos precisam caber na tela e na fala no mesmo tempo; textos de 1 a 3 palavras continuam curtos). Preserve números, símbolos de moeda, hashtags e nomes próprios. O item 0 é o roteiro completo; os demais são textos da tela, na mesma ordem. Responda SOMENTE JSON: {"itens":["...","..."]} com exatamente ${items.length} itens, na mesma ordem.`;
-  const raw = await callGroq({ key, model, maxTokens: Math.max(1500, Math.min(maxTokens || 8000, tpm - estTok(JSON.stringify(items)) - 700)), temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify({ itens: items }) }] });
+  const raw = await callLLM({ llm, maxTokens: Math.max(1500, Math.min(maxTokens || 8000, tpm - estTok(JSON.stringify(items)) - 700)), temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify({ itens: items }) }] });
   const o = parseModelJson(raw);
   if (!o || !Array.isArray(o.itens) || o.itens.length !== items.length) throw httpErr(502, 'A tradução voltou incompleta. Tente de novo.');
   refs.forEach((r, i) => { const v = cleanStr(o.itens[i + 1], 400); if (v) r.o[r.k] = v; });
   return { script: String(o.itens[0] || '').trim(), story: st };
 }
 
-module.exports = { generate, refine, ideas, review, translate, fixStory, autoDirect, systemPrompt, FORMATS, TONES, LANGS };
+// Pedido mínimo para testar uma chave/modelo no painel.
+async function ping({ llm }) {
+  const raw = await callLLM({ llm, maxTokens: 300, temperature: 0, messages: [{ role: 'user', content: 'Responda somente com este JSON: {"ok":true}' }] });
+  if (!parseModelJson(raw)) throw httpErr(502, 'O provedor respondeu, mas não devolveu JSON. Tente outro modelo.');
+  return raw.trim();
+}
+
+module.exports = { ping, generate, refine, ideas, review, translate, fixStory, autoDirect, systemPrompt, FORMATS, TONES, LANGS };

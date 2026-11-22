@@ -982,7 +982,7 @@ $('libimp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
     if(libSet(a)){libRender();log(inc.length+' item(ns) lido(s) do backup.')}}catch{log('Arquivo de backup inválido.')}};
 libRender();
 
-/* ---- criar com IA (Groq, via servidor) ---- */
+/* ---- criar com IA (provedores grátis, via servidor) ---- */
 const LOOKL={cartoon:'Cartoon',sketch:'Lápis',comic:'Quadrinhos',noir:'Preto e branco',neon:'Neon',retro:'Retrô VHS',pixel:'Pixel art',blueprint:'Planta azul',pastel:'Pastel',vintage:'Filme antigo'};
 $('ailook').insertAdjacentHTML('beforeend',Object.entries(LOOKL).map(([k,v])=>`<option value="${k}">${v}</option>`).join(''));
 $('cpscript').onclick=async()=>{try{await navigator.clipboard.writeText($('script').value);log('Roteiro copiado.')}catch{$('script').select();log('Selecione e copie (Ctrl+C).')}};

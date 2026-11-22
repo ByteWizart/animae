@@ -51,10 +51,10 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 
 <!-- APP -->
 <div id="app" class="hidden">
-  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IA (Groq), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
+  <div class="row sb" style="margin-bottom:14px"><div><h1>Painel</h1><div class="muted">Configurações do site, IA (Groq, Z.ai, Gemini e outras), histórico e segurança.</div></div><button class="sec" id="logout">Sair</button></div>
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" data-t="painel" aria-selected="true">Painel</button>
-    <button role="tab" data-t="ia" aria-selected="false">IA (Groq)</button>
+    <button role="tab" data-t="ia" aria-selected="false">IA</button>
     <button role="tab" data-t="padroes" aria-selected="false">Padrões</button>
     <button role="tab" data-t="historico" aria-selected="false">Histórico</button>
     <button role="tab" data-t="seguranca" aria-selected="false">Segurança</button>
@@ -73,35 +73,32 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 
   <!-- IA -->
   <section id="t-ia" class="hidden">
-    <div class="grid g2">
-      <div class="card">
-        <h3 style="margin-top:0">Integração com a Groq</h3>
-        <p class="muted">Os visitantes descrevem uma ideia no gerador e a Groq escreve o roteiro e o JSON. A chave fica só neste servidor, nunca vai para o navegador.</p>
-        <div id="ainote" class="notice hidden"></div>
-        <form id="aif">
+    <div class="card" style="margin-bottom:14px">
+      <h3 style="margin-top:0">Provedores de IA</h3>
+      <p class="muted">Os visitantes descrevem uma ideia no gerador e a IA escreve o roteiro e o JSON. Escolha um provedor <b>principal</b> e, se quiser, provedores de <b>reserva</b>: quando o principal estourar o limite grátis, recusar a chave ou cair, o site passa sozinho para a reserva. As chaves ficam só neste servidor, nunca vão para o navegador.</p>
+      <div id="ainote" class="notice hidden"></div>
+      <form id="aif">
+        <div class="grid g2">
           <label class="f" style="display:flex;gap:8px;align-items:center"><input id="ai-on" type="checkbox"> Criação com IA ativada</label>
-          <label class="f">Chave da API da Groq<input id="ai-key" type="password" autocomplete="off" placeholder="gsk_… (deixe vazio para manter a atual)"></label>
-          <div id="ai-hint" class="muted" style="margin:-6px 0 12px"></div>
-          <div class="grid g2">
-            <label class="f">Modelo<input id="ai-model" list="ai-models" autocomplete="off"><datalist id="ai-models"><option value="openai/gpt-oss-120b"><option value="llama-3.3-70b-versatile"><option value="openai/gpt-oss-20b"><option value="llama-3.1-8b-instant"></datalist></label>
-            <label class="f">Limite por IP / hora<input id="ai-ph" type="number" min="1" max="1000"></label>
-            <label class="f">Tokens por minuto do modelo (TPM)<input id="ai-tpm" type="number" min="3000" max="200000"></label>
-          </div>
-          <label class="f">Instruções extras para a IA (estilo da casa, opcional)<textarea id="ai-extra" maxlength="2000" rows="4" placeholder="Ex.: Sempre use personagens com chapéu. Termine os vídeos pedindo para seguir o canal. Evite cenários escuros."></textarea></label>
-          <div class="muted" style="margin:-6px 0 12px">Entram no fim do prompt de todas as gerações e têm prioridade sobre o estilo padrão.</div>
-          <div class="row"><button type="submit">Salvar</button><button type="button" class="danger" id="ai-clear">Remover chave</button></div>
-        </form>
-      </div>
-      <div class="card">
-        <h3 style="margin-top:0">Como funciona</h3>
-        <ul style="padding-left:18px;margin:0">
-          <li>Crie a chave em <code>console.groq.com</code> (API Keys).</li>
-          <li>Alternativa: defina a variável <code>GROQ_API_KEY</code> ao iniciar o servidor; ela tem prioridade.</li>
-          <li>O limite por hora protege sua cota gratuita contra abuso.</li>
-          <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
-          <li>Modelo padrão: <code>openai/gpt-oss-120b</code>.</li>
-        </ul>
-      </div>
+          <label class="f">Limite por IP / hora<input id="ai-ph" type="number" min="1" max="1000"></label>
+        </div>
+        <div id="ai-provs" style="display:grid;gap:10px;margin-bottom:14px"></div>
+        <label class="f">Instruções extras para a IA (estilo da casa, opcional)<textarea id="ai-extra" maxlength="2000" rows="4" placeholder="Ex.: Sempre use personagens com chapéu. Termine os vídeos pedindo para seguir o canal. Evite cenários escuros."></textarea></label>
+        <div class="muted" style="margin:-6px 0 12px">Entram no fim do prompt de todas as gerações e têm prioridade sobre o estilo padrão.</div>
+        <div class="row"><button type="submit">Salvar</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Como funciona</h3>
+      <ul style="padding-left:18px;margin:0">
+        <li>Crie uma chave grátis no provedor (o link está em cada cartão) e cole no campo. Ou defina a variável de ambiente indicada (ex.: <code>ZAI_API_KEY</code>) ao iniciar o servidor: ela tem prioridade sobre a chave salva aqui.</li>
+        <li><b>Salvar e testar</b> grava o cartão e faz um pedido minúsculo para confirmar que chave e modelo funcionam.</li>
+        <li>Todos usam o mesmo formato (API de chat da OpenAI). O campo <b>Modelo</b> aceita qualquer nome: planos grátis mudam, e quando um modelo sumir basta trocar o nome.</li>
+        <li><b>TPM</b> é o limite de tokens por minuto do seu plano. O site compacta o prompt e reduz a duração do vídeo para caber nele.</li>
+        <li>Provedores com limite pequeno (Groq, GitHub Models) são pulados automaticamente em pedidos grandes, se houver reserva maior.</li>
+        <li>Em <b>Outro (compatível com OpenAI)</b> cabem LM Studio, vLLM, Together, Cloudflare Workers AI e qualquer serviço parecido. O <b>Ollama</b> roda no seu PC, sem chave e sem internet.</li>
+        <li>O servidor valida o JSON gerado e pede correção à IA uma vez, se vier com erro.</li>
+      </ul>
     </div>
   </section>
 
@@ -242,15 +239,49 @@ $('hcsv').onclick=()=>{const q=v=>'"'+String(v).replace(/"/g,'""')+'"',head=['da
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));a.download='historico-shorts.csv';a.click()};
 
 /* ---- IA ---- */
-async function loadAi(){const a=await api('/api/admin/ai');
-  $('ai-on').checked=a.enabled;$('ai-model').value=a.model;$('ai-ph').value=a.perHour;$('ai-tpm').value=a.tpm||8000;$('ai-extra').value=a.extra||'';$('ai-key').value='';
-  $('ai-hint').textContent=a.hasKey?`Chave configurada (${a.keyHint})${a.keyFromEnv?' via GROQ_API_KEY':''}.`:'Nenhuma chave configurada.';
-  const n=$('ainote');n.classList.remove('hidden','ok','warn','bad');n.classList.add(a.enabled&&a.hasKey?'ok':'warn');
-  n.textContent=a.enabled&&a.hasKey?'A criação com IA está ativa para os visitantes.':(a.hasKey?'A criação com IA está desativada.':'Falta a chave da Groq: a criação com IA fica indisponível.');
-  $('ai-clear').classList.toggle('hidden',!a.hasKey||a.keyFromEnv)}
-$('aif').onsubmit=e=>{e.preventDefault();run(async()=>{const d={enabled:$('ai-on').checked,model:$('ai-model').value,perHour:+$('ai-ph').value,tpm:+$('ai-tpm').value,extra:$('ai-extra').value};if($('ai-key').value.trim())d.key=$('ai-key').value;
-  await api('/api/admin/ai','PUT',d);toast('IA atualizada.');await Promise.all([loadAi(),loadStatus()])})};
-$('ai-clear').onclick=()=>{if(confirm('Remover a chave da Groq deste servidor?'))run(async()=>{await api('/api/admin/ai','PUT',{clearKey:true});toast('Chave removida.');await loadAi()})};
+let AIS=null,AIMAIN='groq',AIFB=[];
+function aiMarks(){AIS.providers.forEach(p=>{const main=AIMAIN===p.id,fi=AIFB.indexOf(p.id),el=$('bd-'+p.id);if(!el)return;
+  el.innerHTML=(main?'<span class="badge ok">Principal</span> ':'')+(fi>=0?`<span class="badge info">Reserva ${fi+1}</span> `:'')+(p.ready?'<span class="badge">pronto</span>':'<span class="badge warn">sem chave</span>');
+  const cb=$('fb-'+p.id);if(cb){cb.checked=fi>=0;cb.disabled=main}})}
+function renderProvs(){
+  $('ai-provs').innerHTML=AIS.providers.map(p=>{
+    const need=!p.keyless&&!p.keyOptional,keyHint=p.hasKey?`Chave configurada (${esc(p.keyHint)})${p.keyFromEnv?' via variável de ambiente':''}.`:(need?'Nenhuma chave configurada.':'Chave opcional.');
+    return `<details class="card" style="padding:12px 14px"${p.ready||p.id===AIMAIN?' open':''}>
+      <summary style="cursor:pointer;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${esc(p.label)}</b><span id="bd-${p.id}"></span></summary>
+      <p class="muted" style="margin:10px 0">${esc(p.free)}${p.signup?` <a href="${esc(p.signup)}" target="_blank" rel="noopener noreferrer">${p.keyless?'Baixar':'Criar chave'}</a>`:''}</p>
+      <div class="row" style="gap:18px;margin-bottom:10px;flex-wrap:wrap">
+        <label style="display:flex;gap:6px;align-items:center"><input type="radio" name="ai-main" value="${p.id}"${AIMAIN===p.id?' checked':''}> Principal</label>
+        <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="fb-${p.id}" data-fb="${p.id}"> Usar como reserva</label>
+      </div>
+      <div class="grid g2">
+        ${p.keyless?'':`<label class="f">Chave da API<input id="k-${p.id}" type="password" autocomplete="off" placeholder="${p.hasKey?'deixe vazio para manter a atual':'cole a chave aqui'}"></label>`}
+        <label class="f">Modelo<input id="m-${p.id}" list="dl-${p.id}" autocomplete="off" placeholder="${esc(p.defaultModel)}" value="${esc(p.model)}"><datalist id="dl-${p.id}">${p.models.map(m=>`<option value="${esc(m)}">`).join('')}</datalist></label>
+        <label class="f">Tokens por minuto (TPM)<input id="t-${p.id}" type="number" min="3000" max="2000000" placeholder="${p.defaultTpm}" value="${p.tpm||''}"></label>
+        ${p.editableUrl?`<label class="f">Endereço (termina em /chat/completions)<input id="u-${p.id}" type="url" autocomplete="off" placeholder="${esc(p.defaultUrl||'https://…/v1/chat/completions')}" value="${esc(p.url)}"></label>`:''}
+      </div>
+      <div class="muted" style="margin:-4px 0 10px">${p.keyless?'':keyHint+' '}${p.env.length?'Variável: <code>'+p.env.join('</code> ou <code>')+'</code>.':''}</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="sec sm" data-test="${p.id}">Salvar e testar</button>${p.hasKey&&!p.keyFromEnv?`<button type="button" class="danger sm" data-clear="${p.id}">Remover chave</button>`:''}<span class="muted" id="r-${p.id}"></span></div>
+    </details>`}).join('');
+  aiMarks();
+  $('ai-provs').querySelectorAll('input[name=ai-main]').forEach(r=>r.onchange=()=>{AIMAIN=r.value;AIFB=AIFB.filter(x=>x!==AIMAIN);aiMarks()});
+  $('ai-provs').querySelectorAll('[data-fb]').forEach(c=>c.onchange=()=>{const id=c.dataset.fb;AIFB=AIFB.filter(x=>x!==id);if(c.checked)AIFB.push(id);aiMarks()});
+  $('ai-provs').querySelectorAll('[data-test]').forEach(b=>b.onclick=()=>testProv(b.dataset.test,b));
+  $('ai-provs').querySelectorAll('[data-clear]').forEach(b=>b.onclick=()=>{const p=AIS.providers.find(x=>x.id===b.dataset.clear);if(confirm('Remover a chave de '+p.label+' deste servidor?'))run(async()=>{await api('/api/admin/ai','PUT',{providers:{[p.id]:{clearKey:true}}});toast('Chave removida.');await loadAi()})})}
+async function loadAi(){AIS=await api('/api/admin/ai');
+  AIMAIN=AIS.provider;AIFB=AIS.fallback.slice();
+  $('ai-on').checked=AIS.enabled;$('ai-ph').value=AIS.perHour;$('ai-extra').value=AIS.extra||'';
+  renderProvs();
+  const n=$('ainote');n.classList.remove('hidden','ok','warn','bad');n.classList.add(AIS.enabled&&AIS.hasKey?'ok':'warn');
+  n.textContent=AIS.enabled&&AIS.hasKey?'A criação com IA está ativa para os visitantes. Ordem de uso: '+AIS.active.join(' → ')+'.':(AIS.hasKey?'A criação com IA está desativada.':'Nenhum provedor está pronto: informe a chave do provedor principal para liberar a criação com IA.')}
+function aiForm(){const d={enabled:$('ai-on').checked,perHour:+$('ai-ph').value,extra:$('ai-extra').value,provider:AIMAIN,fallback:AIFB,providers:{}};
+  AIS.providers.forEach(p=>{const o={},k=$('k-'+p.id),m=$('m-'+p.id).value.trim(),t=$('t-'+p.id).value.trim(),u=$('u-'+p.id);
+    if(k&&k.value.trim())o.key=k.value;o.model=m===p.defaultModel?'':m;o.tpm=(!t||+t===p.defaultTpm)?0:+t;if(u)o.url=u.value;d.providers[p.id]=o});return d}
+$('aif').onsubmit=e=>{e.preventDefault();run(async()=>{await api('/api/admin/ai','PUT',aiForm());toast('IA atualizada.');await Promise.all([loadAi(),loadStatus()])})};
+async function testProv(id,btn){const label=AIS.providers.find(p=>p.id===id).label;btn.disabled=true;
+  try{await api('/api/admin/ai','PUT',aiForm());await Promise.all([loadAi(),loadStatus()]);const r=await api('/api/admin/ai/test','POST',{provider:id});
+    const el=$('r-'+id);if(el)el.textContent='Funcionou em '+(r.ms/1000).toFixed(1)+' s com '+r.model+'.';toast(label+': funcionou ('+(r.ms/1000).toFixed(1)+' s).')}
+  catch(e){const el=$('r-'+id);if(el)el.textContent=e.message;if(e.message!=='Sessão expirada.')toast(label+': '+e.message,true)}
+  finally{btn.disabled=false}}
 
 /* ---- padrões ---- */
 function fillLooks(){$('s-look').innerHTML=S.LOOKS.map(l=>`<option value="${l.id}">${esc(l.label)}</option>`).join('')}fillLooks();

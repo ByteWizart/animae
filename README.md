@@ -7,7 +7,8 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | index.html | O gerador de vídeo |
 | ajuda.html | Central de ajuda (guia, referência do JSON, solução de problemas) |
 | admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
-| ai.js | Integração com a Groq (roteiro + JSON a partir da ideia do usuário) |
+| ai.js | Integração com a IA (roteiro + JSON a partir da ideia do usuário), com troca automática de provedor |
+| providers.js | Catálogo dos provedores de IA grátis (Groq, Z.ai, Gemini, Cerebras, OpenRouter...) |
 | server.js | Servidor local + API do Admin |
 | schema.js | Catálogo do formato de história e validador (usado por Ajuda, Admin e servidor) |
 | tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
@@ -16,30 +17,50 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | PROMPT-MOVIMENTOS.md | Bloco para colar no seu prompt de IA |
 | historia-teste.json | História de exemplo simples |
 | historia-demo-v9.json | História de 30 s que mostra os recursos novos (rua em movimento, gráfico, chat, glitch, holofote, palco...). Carregue em Avançado > Carregar história |
-| dados.json | Criado automaticamente: configurações, chave da Groq, histórico, senha (com hash) e endereço do painel. Não compartilhe |
+| dados.json | Criado automaticamente: configurações, chaves de IA, histórico, senha (com hash) e endereço do painel. Não compartilhe |
 
 ## Como usar
 
 1. Instale o Node.js **18 ou mais novo**.
 2. Na pasta, rode `npm install` (só na primeira vez) e depois `node server.js` (o terminal mostra os endereços, a senha inicial do painel e o endereço secreto).
 3. Abra http://localhost:3000 no Chrome ou Edge (PC) e aperte Ctrl+F5. O rodapé deve mostrar "build 9".
-4. **Criar com IA**: descreva a ideia; a Groq escreve o roteiro e o JSON. Grave a voz, carregue o áudio, "Ajustar ao áudio", "Prévia" e "Gerar vídeo" (aba aberta e visível: a gravação é em tempo real).
+4. **Criar com IA**: descreva a ideia; a IA escreve o roteiro e o JSON. Grave a voz, carregue o áudio, "Ajustar ao áudio", "Prévia" e "Gerar vídeo" (aba aberta e visível: a gravação é em tempo real).
 5. O arquivo é baixado sozinho (short.mp4 ou short.webm).
 
-## Ativar a IA (Groq)
+## Ativar a IA (vários provedores grátis)
 
-- Crie uma chave em https://console.groq.com e informe de um destes jeitos:
-  - variável de ambiente: `GROQ_API_KEY=gsk_... node server.js` (prioridade), ou
-  - no painel, aba **IA (Groq)**.
-- A chave fica só no servidor. O modelo padrão é `openai/gpt-oss-120b` (pode trocar no painel).
-- Há limite de gerações por hora por IP (padrão 20 em instalações novas, ajustável) para proteger sua cota.
+O site fala com qualquer provedor que aceite o formato de chat da OpenAI. Já vêm configurados:
+
+| Provedor | Variável de ambiente | Onde criar a chave | Modelo padrão |
+|---|---|---|---|
+| Groq | `GROQ_API_KEY` | console.groq.com | `openai/gpt-oss-120b` |
+| **Z.ai (GLM)** | `ZAI_API_KEY` | z.ai (API keys) | `glm-4.7-flash` |
+| Google Gemini | `GEMINI_API_KEY` | aistudio.google.com/apikey | `gemini-2.5-flash` |
+| Cerebras | `CEREBRAS_API_KEY` | cloud.cerebras.ai | `gpt-oss-120b` |
+| OpenRouter | `OPENROUTER_API_KEY` | openrouter.ai/keys | `z-ai/glm-4.7-flash:free` |
+| Mistral | `MISTRAL_API_KEY` | console.mistral.ai | `mistral-small-latest` |
+| NVIDIA NIM | `NVIDIA_API_KEY` | build.nvidia.com | `openai/gpt-oss-120b` |
+| GitHub Models | `GITHUB_MODELS_TOKEN` | token do GitHub com permissão "models" | `openai/gpt-4.1-mini` |
+| SambaNova | `SAMBANOVA_API_KEY` | cloud.sambanova.ai | `Meta-Llama-3.3-70B-Instruct` |
+| Hugging Face | `HF_TOKEN` | huggingface.co/settings/tokens | `openai/gpt-oss-120b` |
+| Ollama (no seu PC) | sem chave | ollama.com | `llama3.1` |
+| Outro (compatível com OpenAI) | `CUSTOM_API_KEY` | LM Studio, vLLM, Together, Cloudflare Workers AI... | o que você informar |
+
+- Informe a chave por variável de ambiente (prioridade) ou em **Admin > IA**. As chaves ficam só no servidor.
+- Em **Admin > IA** escolha o provedor **principal** e os de **reserva**. Se o principal estourar o limite grátis, recusar a chave, cair ou demorar demais, o site passa sozinho para a reserva. Pedidos grandes são enviados só a provedores com cota suficiente.
+- Se o principal não tiver chave mas outro provedor tiver, o site usa o que estiver pronto (ex.: só `ZAI_API_KEY` definida já basta).
+- **Salvar e testar** confirma que chave e modelo funcionam. O campo **Modelo** aceita qualquer nome: os planos grátis mudam sem aviso, então se um modelo sumir é só trocar.
+- **TPM** (tokens por minuto) é o limite do seu plano; o prompt é compactado e a duração do vídeo reduzida para caber. Cada provedor traz um valor padrão que você pode ajustar.
+- A **Z.ai** libera os modelos Flash de graça, mas só com 1 pedido por vez: com vários visitantes ao mesmo tempo, deixe um provedor de reserva.
+- Há limite de gerações por hora por IP (padrão 20) para proteger a cota.
 - O servidor valida o JSON da IA e pede uma correção automática se vier com erro.
+- Quem usava só a Groq não precisa fazer nada: a chave e o modelo antigos são migrados sozinhos para o provedor Groq.
 
 ## Páginas
 
 - **/** Gerador, com "Criar com IA" e "Minha biblioteca".
 - **/ajuda** Central de ajuda (referência gerada do `schema.js`).
-- **Painel administrativo**: **não tem link em nenhuma página** e `/admin` não existe. O endereço aleatório (ex.: `/painel-1a2b3c4d5e`) aparece no terminal a cada início. Troque em Segurança ou defina `ADMIN_PATH=meu-caminho`. Abas: Painel, IA (Groq), Padrões, Histórico, Segurança.
+- **Painel administrativo**: **não tem link em nenhuma página** e `/admin` não existe. O endereço aleatório (ex.: `/painel-1a2b3c4d5e`) aparece no terminal a cada início. Troque em Segurança ou defina `ADMIN_PATH=meu-caminho`. Abas: Painel, IA, Padrões, Histórico, Segurança.
 
 ## Biblioteca do usuário
 
@@ -49,7 +70,7 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 
 - Na primeira execução, uma senha aleatória aparece **uma vez** no terminal. Troque em Segurança.
 - Alternativa: `ADMIN_PASSWORD=minhasenha node server.js` (prioridade).
-- Esqueceu? Apague `dados.json` (apaga chave da Groq, histórico e senha) e reinicie.
+- Esqueceu? Apague `dados.json` (apaga as chaves de IA, histórico e senha) e reinicie.
 - Sessão de 8 h; trava de 1 min após 5 erros.
 
 ## Outras observações
@@ -80,7 +101,7 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 
 **Limite de tokens por minuto (Groq)**
 - O plano gratuito do `openai/gpt-oss-120b` aceita ~8.000 tokens por minuto (pedido + resposta). O site calcula o tamanho do prompt, compacta o catálogo quando preciso, ajusta o teto de resposta e, se necessário, reduz a duração (avisando na tela). Se a Groq ainda recusar, o servidor reduz a resposta e repete, ou espera o tempo indicado.
-- Com um plano com mais cota, ajuste **Tokens por minuto (TPM)** no painel (aba IA): o prompt completo, com exemplos, e vídeos de 45 a 60 s passam a ser usados.
+- Com um plano com mais cota (ou outro provedor), ajuste **Tokens por minuto (TPM)** no painel (aba IA): o prompt completo, com exemplos, e vídeos de 45 a 60 s passam a ser usados.
 
 
 ## Novidades do build 10: voz com IA
