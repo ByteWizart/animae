@@ -1,121 +1,143 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Animaê</title>
+<title>Gerador · Animaê</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#7c5cff">
 <script src="theme.js"></script>
 <link rel="stylesheet" href="ui.css">
 <style>
-.app{display:grid;grid-template-columns:320px minmax(0,1fr);gap:56px;max-width:1120px;margin:0 auto;align-items:start}
+.app{display:grid;grid-template-columns:300px minmax(0,1fr);gap:52px;max-width:1120px;margin:0 auto;align-items:start}
 /* palco: o canvas dentro de uma moldura de celular */
-.stage{position:sticky;top:84px}
-.phone{position:relative;padding:11px;border-radius:38px;background:linear-gradient(160deg,#2a2640,#0e0c18);box-shadow:0 0 0 1px #ffffff14 inset,0 30px 70px -24px rgba(124,92,255,.55),0 12px 30px -12px #0008}
+.stage{position:sticky;top:84px;scroll-margin-top:90px}
+.phone{position:relative;padding:11px;border-radius:38px;background:linear-gradient(160deg,#2a2640,#0e0c18);box-shadow:0 0 0 1px #ffffff14 inset,0 24px 56px -26px rgba(124,92,255,.45),0 10px 26px -14px #0008}
 .phone::before{content:"";position:absolute;top:19px;left:50%;width:74px;height:20px;border-radius:99px;background:#05040a;transform:translateX(-50%);z-index:2;opacity:.9}
-.phone::after{content:"";position:absolute;inset:-26px;border-radius:60px;background:var(--grad);filter:blur(46px);opacity:.28;z-index:-1}
 canvas{display:block;width:100%;aspect-ratio:9/16;height:auto;border-radius:28px;background:#000}
-.stage .muted{text-align:center;margin-top:16px}
-.col{display:flex;flex-direction:column;gap:18px;min-width:0}
-.hero{margin-bottom:6px}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);padding:4px 12px;border-radius:99px;margin-bottom:14px}
-.eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
-.lead{margin:0;color:var(--muted);font-size:16.5px;max-width:52ch}
-.step{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px 22px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
-.step::before{content:"";position:absolute;left:0;top:22px;bottom:22px;width:3px;border-radius:0 3px 3px 0;background:var(--grad);opacity:.85}
-.sh{display:flex;align-items:center;gap:12px}
-.sh h2{font-size:18px;margin:0}
-.n{width:28px;height:28px;border-radius:10px;background:var(--grad);color:#fff;font-weight:800;font-size:13px;display:grid;place-items:center;flex:none;box-shadow:var(--glow)}
+.stage .muted{text-align:center;margin-top:14px}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.top{margin:0 0 4px}
+.top h1{font-size:clamp(26px,3.4vw,34px);margin:0 0 6px}
+.lead{margin:0;color:var(--muted);font-size:15.5px;max-width:52ch}
+.muted{font-size:13px}
+
+/* passos: cartões planos, uma ação principal por passo */
+.step{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:14px;scroll-margin-top:90px}
+.sh{display:flex;align-items:center;gap:11px}
+.sh h2{font-size:18px;margin:0;letter-spacing:-.02em}
+.n{width:26px;height:26px;border-radius:50%;background:var(--text);color:var(--bg);font-weight:800;font-size:12.5px;display:grid;place-items:center;flex:none}
 .page select{width:auto;min-width:0}
-.page textarea{resize:vertical;min-height:92px}
+.page textarea{resize:vertical;min-height:84px}
+.page textarea#idea{min-height:96px}
 .page textarea#story{min-height:240px;color:var(--code-fg);font:12px var(--mono)}
-.fld{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600}
+.fld{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--muted);font-weight:600}
+.fld.grow{flex:1 1 200px}.fld.grow select{width:100%}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
-.row.end{justify-content:flex-end}
+.row.start{align-items:center}
+.row .push{margin-left:auto}
 .page input[type=file]{width:auto;max-width:100%;font-size:13px;color:var(--muted);border:0;background:none;padding:0;box-shadow:none}
 .page input[type=file]::file-selector-button{background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:8px 13px;margin-right:10px;font:600 13px var(--font);cursor:pointer}
 .page input[type=file]::file-selector-button:hover{background:var(--panel2)}
-progress{width:100%;height:8px;border:0;border-radius:99px;overflow:hidden;background:var(--panel2);accent-color:var(--accent);-webkit-appearance:none;appearance:none}
+.page button.go{padding:11px 22px}
+progress{width:100%;height:6px;border:0;border-radius:99px;overflow:hidden;background:var(--panel2);accent-color:var(--accent);-webkit-appearance:none;appearance:none}
 progress::-webkit-progress-bar{background:var(--panel2);border-radius:99px}
 progress::-webkit-progress-value{background:var(--grad);border-radius:99px;transition:width .2s}
 progress::-moz-progress-bar{background:var(--grad);border-radius:99px}
 .page pre{white-space:pre-wrap;margin:0;font-size:12.5px;padding:12px}
 .page pre#log{color:var(--muted);font-family:var(--font);font-size:13px;background:var(--panel2);border-color:transparent}
-.muted{font-size:13px}
-details.adv{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:0;box-shadow:var(--shadow)}
-.step details.adv{background:var(--panel2);border-color:transparent;box-shadow:none;border-radius:14px}
-.step details.adv>summary{padding:13px 16px;font-size:14px}.step details.adv>.in{padding:0 16px 16px}
-details.adv>summary{cursor:pointer;padding:16px 22px;font-weight:700;font-size:15px;list-style:none;display:flex;justify-content:space-between;align-items:center;border-radius:inherit}
-details.adv>summary::-webkit-details-marker{display:none}
-details.adv>summary::after{content:"+";color:var(--accent);font-size:20px;font-weight:600;line-height:1}
-details.adv[open]>summary::after{content:"–"}
-details.adv>.in{padding:0 22px 22px;display:flex;flex-direction:column;gap:12px}
+.page .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:-4px}
+
+/* detalhes: discretos, só aparecem quando você abre */
+details.more>summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:13.5px;font-weight:600;padding:2px 0;border-radius:6px}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;margin-right:2px}
+details.more[open]>summary::before{transform:rotate(45deg)}
+details.more>summary:hover{color:var(--text)}
+details.more>.in{display:flex;flex-direction:column;gap:12px;margin-top:12px;padding-left:14px;border-left:2px solid var(--line)}
+/* seções recolhidas em caixa (biblioteca e avançado) */
+details.box{background:var(--panel);border:1px solid var(--line);border-radius:18px;scroll-margin-top:90px}
+details.box>summary{cursor:pointer;padding:16px 22px;font-weight:700;font-size:15px;list-style:none;display:flex;justify-content:space-between;align-items:center;border-radius:inherit}
+details.box>summary::-webkit-details-marker{display:none}
+details.box>summary::after{content:"+";color:var(--accent);font-size:20px;font-weight:500;line-height:1}
+details.box[open]>summary::after{content:"–"}
+details.box>.in{padding:0 22px 22px;display:flex;flex-direction:column;gap:14px}
+.advblock{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.advblock:first-child{border-top:0;padding-top:0}
+.advblock h3{margin:0;font-size:15px}
+.advblock p{margin:0}
+
 .lib-item{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-top:1px solid var(--line);padding:10px 0;font-size:14px}
 .lib-item small{color:var(--muted);display:block}
 .lib-item button{padding:5px 11px;font-size:12.5px}
-footer{max-width:1120px;margin:44px auto 0;color:var(--muted);font-size:12.5px;text-align:center}
-.pubbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:10px;font-size:13.5px;line-height:1.55}.pubbox h3{margin:12px 0 4px;font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}.pubbox h3:first-child{margin-top:0}.pubbox .tg{display:inline-block;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px 11px;margin:2px 4px 2px 0;font-size:12.5px;cursor:pointer}.pubbox .tg:hover{border-color:var(--accent);color:var(--accent)}.pubbox button{padding:4px 11px;font-size:12px;margin:2px 4px 2px 0}.warnb{border-left:3px solid var(--hl);padding-left:10px;color:var(--muted)}#ideas .lib-item b{font-size:14px}.score{font-size:32px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-@media(max-width:900px){.app{grid-template-columns:1fr;gap:28px}.stage{position:static;max-width:280px;margin:0 auto}}
-@media(max-width:560px){body.page{padding:0 14px 40px}.step{padding:18px}}
+footer{max-width:1120px;margin:40px auto 0;color:var(--muted);font-size:12.5px;text-align:center}
+.pubbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.55}.pubbox h3{margin:12px 0 4px;font-size:12px;color:var(--muted);font-weight:700}.pubbox h3:first-child{margin-top:0}.pubbox .tg{display:inline-block;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px 11px;margin:2px 4px 2px 0;font-size:12.5px;cursor:pointer}.pubbox .tg:hover{border-color:var(--accent);color:var(--accent)}.pubbox button{padding:4px 11px;font-size:12px;margin:2px 4px 2px 0}.warnb{border-left:3px solid var(--hl);padding-left:10px;color:var(--muted)}#ideas .lib-item b{font-size:14px}.score{font-size:32px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+@media(max-width:900px){.app{grid-template-columns:1fr;gap:26px}.stage{position:static;max-width:260px;margin:0 auto}}
+@media(max-width:560px){body.page{padding:0 14px 120px}.step{padding:18px}details.box>summary{padding:14px 18px}details.box>.in{padding:0 18px 18px}}
 </style></head><body class="page">
-<nav class="topnav"><a class="brand" href="/"><i></i>Animaê</a><a class="nl" href="/" aria-current="page">Gerador</a><a class="nl" href="/docs">Docs</a></nav>
+<nav class="topnav"><a class="brand" href="/"><i></i>Animaê</a><a class="nl" href="/">Início</a><a class="nl" href="/gerar" aria-current="page">Gerador</a><a class="nl" href="/docs">Docs</a><a class="nl" href="#tutorial" id="tourlink">Tutorial</a></nav>
 <main class="app">
-<div class="stage"><div class="phone"><canvas id="cv"></canvas></div><div class="muted">Prévia 9:16</div></div>
+<aside class="stage" id="stage" aria-label="Prévia do vídeo"><div class="phone"><canvas id="cv"></canvas></div><div class="muted">Prévia 9:16</div></aside>
 <div class="col">
-<header class="hero"><span class="eyebrow">IA grátis · sem recarga · roda no navegador</span><h1>Crie seu short <span class="gt">animado</span> em minutos</h1><p class="lead">Descreva a ideia, deixe a IA escrever o roteiro, gere a voz e baixe o vídeo pronto.</p></header>
+<header class="top"><h1>Criar um short</h1><p class="lead">Conte a ideia, confira o roteiro, escolha a voz e grave o vídeo.</p></header>
 
-<section class="step" id="aip"><div class="sh"><span class="n">1</span><h2>Ideia</h2></div>
+<section class="step" id="s1"><div class="sh"><span class="n">1</span><h2>Ideia</h2></div>
+<textarea id="idea" maxlength="6000" placeholder="Ex.: por que esquecemos o que íamos fazer quando passamos por uma porta, em tom bem-humorado."></textarea>
 <div class="muted" id="aist">Descreva o tema, o tom e o público.</div>
-<textarea id="idea" maxlength="6000" placeholder="Ex.: curiosidade sobre por que esquecemos o que íamos fazer quando passamos por uma porta, tom bem-humorado."></textarea>
 <div class="row"><label class="fld">Duração<select id="aisec"><option value="20">~20 s</option><option value="30" selected>~30 s</option><option value="45">~45 s</option><option value="60">~60 s</option></select></label>
 <label class="fld">Estilo<select id="ailook"><option value="">A IA escolhe</option></select></label>
-<button id="aigo">Gerar roteiro e história</button></div>
-<details class="adv" id="aiopt"><summary>Opções da IA: formato, tom, idioma, trilha</summary><div class="in">
+<button class="go push" id="aigo">Gerar roteiro</button></div>
+<details class="more" id="aiopt"><summary>Mais opções</summary><div class="in">
 <div class="row"><label class="fld">Formato<select id="aifmt"></select></label><label class="fld">Tom<select id="aitone"></select></label><label class="fld">Idioma<select id="ailang"></select></label></div>
 <div class="row"><label class="fld">Trilha<select id="aimusic"><option value="">A IA escolhe</option></select></label><label class="fld">Personagens<select id="aicast"><option value="0">A IA escolhe</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></div>
-<div class="row"><button class="sec" id="aiideas">Sugerir ideias</button><button class="sec" id="aiprompt">Copiar prompt para outra IA</button></div>
-<div class="muted">Cole também um texto longo (notícia, artigo) no campo da ideia: a IA resume e transforma em short.</div></div></details>
+<div class="row"><button class="sec sm" id="aiideas">Sugerir ideias</button><button class="sec sm" id="aiprompt">Copiar prompt para outra IA</button></div>
+<div class="muted">Dica: cole um texto longo (notícia, artigo) no campo da ideia e a IA resume e transforma em short.</div></div></details>
 <div id="ideas"></div></section>
 
-<section class="step"><div class="sh"><span class="n">2</span><h2>Roteiro e voz</h2></div>
-<textarea id="script" placeholder="O roteiro aparece aqui. Grave a narração lendo este texto. Você também pode escrever ou editar."></textarea>
-<div class="row"><button class="sec" id="cpscript">Copiar roteiro</button></div>
+<section class="step" id="s2"><div class="sh"><span class="n">2</span><h2>Roteiro e voz</h2></div>
+<textarea id="script" placeholder="O roteiro aparece aqui. É o texto que a voz vai ler. Você também pode escrever ou editar."></textarea>
+<div class="tools"><button class="sec sm" id="cpscript">Copiar roteiro</button></div>
 <div id="pub" class="pubbox" hidden></div>
-<details class="adv" id="aiedit"><summary>Melhorar com a IA: editar, avaliar, traduzir</summary><div class="in">
+<div id="voz" style="display:flex;flex-direction:column;gap:12px">
+<div class="row"><label class="fld grow">Voz<select id="ttsvoice"><option value="">Carregando vozes...</option></select></label>
+<button class="go" id="ttsgo">Gerar voz</button><button class="sec" id="ttsplay" disabled>Ouvir</button><a id="ttsdl" class="btn sec" download="narracao.mp3" hidden>Baixar MP3</a></div>
+<div class="muted" id="ttsst">A voz é feita a partir do roteiro e já fica carregada como narração.</div>
+<details class="more" id="ttsbox"><summary>Velocidade e tom da voz</summary><div class="in">
+<div class="row"><label class="fld">Velocidade <span id="ttsratev">0%</span><input type="range" id="ttsrate" min="-30" max="40" value="0"></label>
+<label class="fld">Tom <span id="ttspitchv">0 Hz</span><input type="range" id="ttspitch" min="-20" max="20" value="0"></label></div></div></details></div>
+<details class="more" id="aiedit"><summary>Melhorar com a IA: editar, avaliar, traduzir</summary><div class="in">
 <label class="fld">Atalho<select id="aipre"><option value="">Escolha um atalho ou escreva abaixo</option></select></label>
 <textarea id="aiins" maxlength="1200" placeholder="Ex.: deixe a cena 2 mais engraçada e troque o cenário para noite."></textarea>
 <div class="row"><button id="airefine">Aplicar mudança</button><button class="sec" id="aireview">Avaliar a direção</button></div>
 <div id="aireviewout"></div>
 <div class="row"><label class="fld">Traduzir tudo para<select id="aitr"></select></label><button class="sec" id="aitrgo">Traduzir</button></div>
 <div class="muted">Cada uso conta no limite por hora da IA. A história atual (JSON) é enviada para a IA e a resposta substitui a atual: salve na biblioteca antes se quiser guardar a versão anterior.</div></div></details>
-<details class="adv" id="ttsbox" open><summary>Voz com IA: gerar a narração a partir do roteiro</summary><div class="in">
-<div class="row"><label class="fld">Voz<select id="ttsvoice"><option value="">Carregando vozes...</option></select></label>
-<label class="fld">Velocidade <span id="ttsratev">0%</span><input type="range" id="ttsrate" min="-30" max="40" value="0"></label>
-<label class="fld">Tom <span id="ttspitchv">0 Hz</span><input type="range" id="ttspitch" min="-20" max="20" value="0"></label></div>
-<div class="row"><button id="ttsgo">Gerar voz com IA</button><button class="sec" id="ttsplay" disabled>Ouvir</button><a id="ttsdl" class="sec" download="narracao.mp3" hidden style="align-self:center">Baixar MP3</a></div>
-<div class="muted" id="ttsst">A voz é gerada a partir do texto do roteiro e já fica carregada como áudio da narração.</div></div></details>
-<label class="fld">Ou envie sua própria gravação (mp3, wav ou m4a)<input type="file" id="audio" accept="audio/*"></label></section>
+</section>
 
-<section class="step"><div class="sh"><span class="n">3</span><h2>Vídeo</h2></div>
-<div class="row"><label class="fld">Estilo visual<select id="look"><option value="cartoon">Cartoon</option><option value="sketch">Desenho a lápis</option><option value="comic">Quadrinhos</option><option value="noir">Preto e branco</option><option value="neon">Neon</option><option value="retro">Retrô VHS</option><option value="pixel">Pixel art</option><option value="blueprint">Planta azul</option><option value="pastel">Pastel</option><option value="vintage">Filme antigo</option></select></label>
-<label class="fld">Resolução<select id="res"><option value="720">720p (rápido)</option><option value="1080">1080p Full HD</option></select></label>
-<label class="fld">Quadros/s<select id="fps"><option>30</option><option>60</option></select></label></div>
-<div class="row"><label class="fld">Trilha<select id="music"></select></label><label class="fld" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="autotalk" checked>Boca do 1º personagem acompanha a fala</label></div>
-<div class="row"><button class="sec" id="fit">Ajustar ao áudio</button><button class="sec" id="prev">Prévia</button><button id="gen">Gerar vídeo</button></div>
-<progress id="bar" value="0" max="100"></progress><pre id="log">Escolha o áudio e clique em Gerar vídeo. Deixe a aba aberta e visível (Chrome ou Edge).</pre></section>
+<section class="step" id="s3"><div class="sh"><span class="n">3</span><h2>Vídeo</h2></div>
+<div class="row"><label class="fld">Estilo visual<select id="look"><option value="cartoon">Cartoon</option><option value="sketch">Desenho a lápis</option><option value="comic">Quadrinhos</option><option value="noir">Preto e branco</option><option value="neon">Neon</option><option value="retro">Retrô VHS</option><option value="pixel">Pixel art</option><option value="blueprint">Planta azul</option><option value="pastel">Pastel</option><option value="vintage">Filme antigo</option></select></label></div>
+<div class="row start"><button class="sec" id="fit">Ajustar ao áudio</button><button class="sec" id="prev">Prévia</button><button class="go push" id="gen">Gerar vídeo</button></div>
+<progress id="bar" value="0" max="100"></progress><pre id="log">Gere a voz (passo 2) e clique em Gerar vídeo. Deixe a aba aberta e visível (Chrome ou Edge).</pre>
+<details class="more"><summary>Ajustes do vídeo</summary><div class="in">
+<div class="row"><label class="fld">Resolução<select id="res"><option value="720">720p (rápido)</option><option value="1080">1080p Full HD</option></select></label>
+<label class="fld">Quadros/s<select id="fps"><option>30</option><option>60</option></select></label>
+<label class="fld">Trilha<select id="music"></select></label></div>
+<label class="fld" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="autotalk" checked>Boca do 1º personagem acompanha a fala</label></div></details></section>
 
-<details class="adv" id="libp"><summary>Minha biblioteca <span class="muted" id="libn"></span></summary><div class="in">
+<details class="box" id="libp"><summary>Minha biblioteca <span class="muted" id="libn"></span></summary><div class="in">
 <div class="muted" id="libnote">Fica só neste navegador. Entre na sua conta para guardá-la na nuvem, ou exporte um backup.</div>
 <div class="row"><button class="sec" id="lib">Salvar história atual</button></div>
 <div id="libl"></div>
 <div class="row"><button class="sec" id="libexp">Exportar backup</button><label class="fld">Importar backup<input type="file" id="libimp" accept=".json,application/json"></label></div></div></details>
 
-<details class="adv"><summary>Avançado: editar o JSON</summary><div class="in">
+<details class="box" id="advanced"><summary>Avançado</summary><div class="in">
+<div class="advblock"><h3>Sua própria gravação</h3><p class="muted">Em vez da voz com IA, envie um arquivo (mp3, wav ou m4a) lendo o roteiro.</p>
+<label class="fld"><span class="sr" style="position:absolute;left:-9999px">Arquivo de áudio</span><input type="file" id="audio" accept="audio/*"></label></div>
+<div class="advblock"><h3>História em JSON</h3><p class="muted">Carregue um arquivo, cole o resultado de outra IA ou edite à mão. O vídeo usa o que estiver aqui.</p>
 <label class="fld">Carregar história (.json)<input type="file" id="jf" accept=".json,application/json"></label>
 <textarea id="story" spellcheck="false" aria-label="JSON da história"></textarea>
-<div class="row"><button class="sec" id="pauses">Detectar pausas da voz</button></div>
-<details><summary class="muted" style="cursor:pointer">Referência rápida dos campos (veja os <a href="/docs#json">Docs</a> completos)</summary><pre>
+<div class="row"><button class="sec sm" id="pauses">Detectar pausas da voz</button></div>
+<details class="more"><summary>Referência rápida dos campos</summary><div class="in"><div class="muted">Lista completa e exemplos nos <a href="/docs#json">Docs</a>.</div><pre>
 total: duração (s) | style:{look,music:calm|happy|tense|epic|mystery|sad|chill|retro|none} | sfx: [{t,type,f,len,amp}] (33 sons: veja os Docs)
-  NOVO (build 9): cena title|lower|spot|bars|punch|flashes|shakes|scroll, cam.hand, tr: slide|zoom|glitch|push...; 98 objetos (chart, counter, chat, checklist...),
-  20 cenários, 34 animações, 14 humores, 15 chapéus, 11 cabelos, 17 roupas, 21 itens de mão. Lista completa e exemplos nos Docs.
+  cena title|lower|spot|bars|punch|flashes|shakes|scroll, cam.hand, tr: slide|zoom|glitch|push...; 98 objetos (chart, counter, chat, checklist...),
+  20 cenários, 34 animações, 14 humores, 15 chapéus, 11 cabelos, 17 roupas, 21 itens de mão.
 scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor,
   tr:fade|flash, shake:seg, fx:[confetti,lines], cam:{z0,z1,x0,x1,y0,y1}
   text:{t,at,y,size,color} | caption:"fala da cena" (1-2 palavras por vez, 69% da altura)
@@ -131,9 +153,9 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
     anim:idle|walk|run|wave|jump|shock|point, to:{x,y},move,dur, at, talk:[ini,fim], flip
   props[]: type:desk|monitor|plant|lamp|door|box|window|frame|shelf|sign|icon|emoji|circle|rect|star, t:"😀", x,y,s,color, at,
     anim:pop|float|spin|shake|pulse|fall|none, to:{x,y}, dur, front:true
-</pre></details></div></details>
+</pre></div></details></div></div></details>
 </div></main>
-<footer>Animaê · build 10</footer>
+<footer>Animaê · build 11</footer>
 <script src="audio.js"></script>
 <script src="schema.js"></script>
 <script src="auth.js"></script>
@@ -147,7 +169,7 @@ const arr=v=>Array.isArray(v)?v:[];
 const ENGERR=new Set();
 function safe(fn){const d=c.getTransform();try{fn()}catch(e){ENGERR.add(e.message);console.error(e);c.setTransform(d);c.globalAlpha=1;c.globalCompositeOperation='source-over'}}
 let DEFCAP={},DEFLOOK='cartoon'; // padrões vindos do Admin (se houver servidor)
-const cv=$('cv');cv.width=720;cv.height=1280;let S=720/W;const c=cv.getContext('2d');
+const cv=$('cv');cv.width=720;cv.height=1280;let S=720/W;let c=cv.getContext('2d'); /* let: o boneco-guia (guia.js) desenha com este mesmo motor num canvas próprio */
 /* ---- ícones online: biblioteca grande (Iconify) buscada pelo servidor, com cache. Precisa ser carregada antes de gravar. ---- */
 const ICONS=new Map(),iconKey=p=>p.id?'id='+encodeURIComponent(p.id):'q='+encodeURIComponent(String(p.q||p.t||'').trim().toLowerCase());
 function getIcon(p){const k=iconKey(p);let e=ICONS.get(k);if(!e){e={img:new Image(),ok:false,fail:false};e.img.onload=()=>{e.ok=true};e.img.onerror=()=>{e.fail=true};e.img.src='/api/icon?'+k;ICONS.set(k,e)}return e}
@@ -900,15 +922,16 @@ $('jf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('story').val
 async function setVoice(ab,label){ac=new(window.AudioContext||window.webkitAudioContext)({sampleRate:SR});
   try{voiceBuf=await ac.decodeAudioData(ab);log((label||'Áudio')+`: ${voiceBuf.duration.toFixed(1)} s`);return true}catch(x){log('Áudio inválido: '+x.message);return false}}
 $('audio').onchange=async e=>{const f=e.target.files[0];if(!f)return;await setVoice(await f.arrayBuffer())};
+const openAdv=()=>{const d=$('advanced');d.open=true;d.scrollIntoView({behavior:'smooth',block:'center'})};
 /* ---- voz com IA (TTS no servidor): texto do roteiro -> MP3 -> mesmo caminho do áudio enviado ---- */
 let ttsUrl=null,ttsOk=false;
 (async()=>{const st=$('ttsst');
   try{const s=await (await fetch('/api/tts/status')).json();
-    if(!s.available){st.textContent=s.installed?'A voz com IA está desativada neste site. Envie sua gravação abaixo.':'A voz com IA não está instalada no servidor (rode \"npm install\" e reinicie). Envie sua gravação abaixo.';$('ttsgo').disabled=true;return}
+    if(!s.available){st.textContent=s.installed?'A voz com IA está desativada neste site. Envie sua gravação em Avançado.':'A voz com IA não está instalada no servidor (rode \"npm install\" e reinicie). Envie sua gravação em Avançado.';$('ttsgo').disabled=true;return}
     ttsOk=true;const v=await (await fetch('/api/tts/voices')).json();
     $('ttsvoice').innerHTML=v.voices.map(x=>`<option value=\"${x.id}\">${x.lang} · ${x.label}</option>`).join('');
     if(v.voices.some(x=>x.id===v.default))$('ttsvoice').value=v.default}
-  catch{st.textContent='Voz com IA indisponível (abra pelo servidor: node server.js). Envie sua gravação abaixo.';$('ttsgo').disabled=true}})();
+  catch{st.textContent='Voz com IA indisponível (abra pelo servidor: node server.js). Envie sua gravação em Avançado.';$('ttsgo').disabled=true}})();
 $('ttsrate').oninput=()=>{$('ttsratev').textContent=($('ttsrate').value>0?'+':'')+$('ttsrate').value+'%'};
 $('ttspitch').oninput=()=>{$('ttspitchv').textContent=($('ttspitch').value>0?'+':'')+$('ttspitch').value+' Hz'};
 $('ttsgo').onclick=async()=>{if(busy||!ttsOk)return;const text=$('script').value.trim();if(text.length<2)return log('Escreva ou gere o roteiro primeiro: a voz é feita a partir dele.');
@@ -920,14 +943,14 @@ $('ttsgo').onclick=async()=>{if(busy||!ttsOk)return;const text=$('script').value
   catch(e){st.textContent=e.message;log(e.message)}finally{b.disabled=false}};
 $('ttsplay').onclick=()=>{if(!ttsUrl)return;if(window._ttsA){window._ttsA.pause();window._ttsA=null;$('ttsplay').textContent='Ouvir';return}
   const a=new Audio(ttsUrl);window._ttsA=a;$('ttsplay').textContent='Parar';a.onended=()=>{window._ttsA=null;$('ttsplay').textContent='Ouvir'};a.play()};
-$('fit').onclick=()=>{if(!voiceBuf)return log('Escolha o áudio.');if(!readStory())return;if(story.scenes.some(s=>s&&s.caption)){const m=smartFit(story,voiceBuf,$('autotalk')?$('autotalk').checked:true);show();return log(m)}const f=voiceBuf.duration/story.total,r=v=>+(v*f).toFixed(2);
+$('fit').onclick=()=>{if(!voiceBuf)return log('Falta a voz: gere a voz no passo 2 ou envie sua gravação em Avançado.');if(!readStory())return;if(story.scenes.some(s=>s&&s.caption)){const m=smartFit(story,voiceBuf,$('autotalk')?$('autotalk').checked:true);show();return log(m)}const f=voiceBuf.duration/story.total,r=v=>+(v*f).toFixed(2);
   story.scenes.forEach(s=>{s.t0=r(s.t0);s.t1=r(s.t1)});(story.sfx||[]).forEach(x=>x.t=r(x.t));story.total=+voiceBuf.duration.toFixed(2);show();log('Tempos ajustados (fator '+f.toFixed(2)+'). Marque as falas dos personagens (talk) à mão se precisar.')};
-$('pauses').onclick=()=>{if(!voiceBuf)return log('Escolha o áudio.');log('Pausas (s):\n'+detectPauses(voiceBuf).map(p=>p.join(' – ')).join('\n'))};
+$('pauses').onclick=()=>{if(!voiceBuf)return log('Falta a voz: gere a voz no passo 2 ou envie sua gravação em Avançado.');log('Pausas (s):\n'+detectPauses(voiceBuf).map(p=>p.join(' – ')).join('\n'))};
 const pickMime=()=>['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));
 async function run(rec_){try{await run0(rec_)}catch(e){console.error(e);busy=false;$('gen').disabled=$('prev').disabled=false;log('Erro ao gerar: '+e.message)}}
 async function run0(rec_){ENGERR.clear();
   if(rec_&&window.Auth&&Auth.required&&!Auth.user){Auth.open('login','Entre na sua conta para gerar e baixar o vídeo.');return log('Entre na sua conta para gerar vídeos.')}
-  if(busy||!readStory())return;if(!voiceBuf)return log('Escolha o arquivo de voz primeiro.');
+  if(busy||!readStory())return;if(!voiceBuf)return log('Falta a voz: clique em Gerar voz (passo 2) ou envie sua gravação em Avançado.');
   if(!(Math.min(story.total,voiceBuf.duration+.5)>.5))return log('Duração inválida (história: '+story.total+' s, voz: '+voiceBuf.duration.toFixed(1)+' s). Gere a voz ou carregue um áudio com som e confira o "total" da história.');
   busy=true;$('gen').disabled=$('prev').disabled=true;{const R=+$('res').value||720;cv.width=R;cv.height=Math.round(R*16/9);S=R/W}await ac.resume();await preloadIcons(story);
   const total=Math.min(story.total,voiceBuf.duration+.5),bd=synthBed({...story,total}),bed=ac.createBuffer(1,bd.length,SR);bed.copyToChannel(bd,0);
@@ -1061,11 +1084,11 @@ async function aiCall(btn,label,path,data){if(busy)return null;btn.disabled=true
 $('aigo').onclick=async()=>{const idea=$('idea').value.trim();if(idea.length<8)return log('Descreva melhor a ideia do vídeo.');
   const j=await aiCall($('aigo'),'Gerando roteiro e história com a IA','/api/ai/generate',{idea,...aiOpts()});if(!j)return;
   applyAI(j);showPub(j);
-  log(`Pronto: "${j.title}" (${Math.round(j.story.total)} s, ${j.story.scenes.length} cenas).\nAgora grave o roteiro (veja "Como narrar" abaixo do roteiro), carregue o áudio, clique em "Ajustar ao áudio" e depois em "Prévia".`+(j.issues&&j.issues.length?`\n(${j.issues.length} aviso(s) leve(s) no JSON)`:'')+(j.notice?'\n'+j.notice:''))};
+  log(`Pronto: "${j.title}" (${Math.round(j.story.total)} s, ${j.story.scenes.length} cenas).\nAgora gere a voz no passo 2 (ou envie a sua em Avançado), clique em "Ajustar ao áudio" e depois em "Prévia".`+(j.issues&&j.issues.length?`\n(${j.issues.length} aviso(s) leve(s) no JSON)`:'')+(j.notice?'\n'+j.notice:''))};
 $('aiideas').onclick=async()=>{const topic=$('idea').value.trim().slice(0,300)||'curiosidades do dia a dia';
   const j=await aiCall($('aiideas'),'Pensando em ideias','/api/ai/ideas',{topic,count:6,...aiOpts()});if(!j)return;
   $('ideas').innerHTML='<div class="muted" style="margin-top:8px">Clique em "Usar" para preencher a ideia e as opções.</div>'+j.ideas.map((i,n)=>`<div class="lib-item"><div><b>${esc2(i.title)}</b><small>${esc2(i.hook)}</small><small>${esc2(FMTL[i.format]||'')} · ${i.seconds} s</small></div><button class="sec" data-n="${n}">Usar</button></div>`).join('');
-  $('ideas').querySelectorAll('button[data-n]').forEach(bt=>bt.onclick=()=>{const i=j.ideas[+bt.dataset.n];$('idea').value=i.idea;$('aisec').value=String(i.seconds);if(i.look)$('ailook').value=i.look;$('aifmt').value=i.format;$('idea').scrollIntoView({behavior:'smooth',block:'center'});log('Ideia aplicada. Clique em "Gerar roteiro e história".')});
+  $('ideas').querySelectorAll('button[data-n]').forEach(bt=>bt.onclick=()=>{const i=j.ideas[+bt.dataset.n];$('idea').value=i.idea;$('aisec').value=String(i.seconds);if(i.look)$('ailook').value=i.look;$('aifmt').value=i.format;$('idea').scrollIntoView({behavior:'smooth',block:'center'});log('Ideia aplicada. Clique em "Gerar roteiro".')});
   log(j.ideas.length+' ideias prontas.')};
 $('aiprompt').onclick=async()=>{try{const q=new URLSearchParams({seconds:$('aisec').value,look:$('ailook').value,format:$('aifmt').value,tone:$('aitone').value,lang:$('ailang').value,music:$('aimusic').value,cast:$('aicast').value}),r=await fetch('/api/ai/prompt?'+q),j=await r.json();
   if(!r.ok)throw new Error(j.error||'erro');await copyTxt(j.prompt+'\n\nIdeia do vídeo:\n'+($('idea').value.trim()||'(escreva sua ideia aqui)'));log('Prompt completo copiado. Cole em outra IA (ChatGPT, Claude...) e depois cole o JSON da resposta em "Avançado".')}catch(e){log('Prompt: '+e.message)}};
@@ -1078,4 +1101,6 @@ $('aireview').onclick=async()=>{if(!readStory())return;const j=await aiCall($('a
 $('aitrgo').onclick=async()=>{if(!readStory())return;const lang=$('aitr').value;const j=await aiCall($('aitrgo'),'Traduzindo','/api/ai/translate',{story,script:$('script').value,lang});if(!j)return;
   applyAI({script:j.script,story:j.story,title:storyName},{keepOpen:true});log('Tradução pronta ('+LANGL[lang]+'). Grave a narração no novo idioma e use "Ajustar ao áudio".')};
 applyDefaults();
-</script></body></html>
+</script>
+<script src="guia.js"></script>
+</body></html>

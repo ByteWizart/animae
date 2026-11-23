@@ -38,7 +38,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 @media(max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}.side{position:static;max-height:none}.side .links{display:flex;flex-wrap:wrap;gap:4px}.side .grp{display:none}}
 </style></head>
 <body class="page"><div class="shell">
-<nav class="topnav"><a class="brand" href="/"><i></i>Animaê</a><a class="nl" href="/">Gerador</a><a class="nl" href="/docs" aria-current="page">Docs</a></nav>
+<nav class="topnav"><a class="brand" href="/"><i></i>Animaê</a><a class="nl" href="/">Início</a><a class="nl" href="/gerar">Gerador</a><a class="nl" href="/docs" aria-current="page">Docs</a></nav>
 
 <div class="hero">
   <h1>Documentação</h1>
@@ -57,7 +57,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 
 <section class="doc" id="inicio" data-g="Começar"><h2>Início rápido</h2>
 <ol class="steps">
-  <li><div><b>Abra o gerador</b>Rode <code>node server.js</code> nesta pasta e acesse <code>http://localhost:3000</code> no <b>Chrome ou Edge</b> (PC). Aperte <span class="kbd code">Ctrl+F5</span>; o rodapé deve mostrar <code>build 9</code>.</div></li>
+  <li><div><b>Abra o gerador</b>Rode <code>node server.js</code> nesta pasta e acesse <code>http://localhost:3000</code> no <b>Chrome ou Edge</b> (PC). Aperte <span class="kbd code">Ctrl+F5</span>; o rodapé deve mostrar <code>build 11</code>.</div></li>
   <li><div><b>Grave e carregue a voz</b>Leia o roteiro e carregue o áudio (mp3, wav ou m4a). Ele define a duração do vídeo.</div></li>
   <li><div><b>Crie ou carregue a história</b>Descreva a ideia em <b>Criar com IA</b> (a IA escreve o roteiro e o JSON), ou envie/cole um <code>.json</code> seu. Depois de gravar a voz, use <b>Ajustar ao áudio</b> para encaixar as cenas na duração dela.</div></li>
   <li><div><b>Escolha estilo, resolução e gere</b>Clique em <b>Prévia</b> para ver com som, depois em <b>Gerar vídeo</b>. Deixe a aba aberta e visível: a gravação acontece em tempo real. O arquivo <code>short.mp4</code> (ou <code>.webm</code>) baixa sozinho.</div></li>
@@ -80,13 +80,13 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 <ol>
 <li>Escreva a ideia com tema, tom e público (ex.: <i>"curiosidade sobre por que esquecemos o que íamos fazer ao passar por uma porta, tom bem-humorado"</i>).</li>
 <li>Escolha a duração aproximada e, se quiser, um estilo visual. Deixe em "a IA escolhe" para ela decidir pelo tema.</li>
-<li>Clique em <b>Gerar roteiro e JSON</b>. O roteiro aparece na caixa de roteiro e o JSON na caixa de história.</li>
+<li>Clique em <b>Gerar roteiro</b>. O roteiro aparece na caixa de roteiro e o JSON na caixa de história.</li>
 <li>Grave a narração, carregue o áudio e use <b>Ajustar ao áudio</b> e <b>Prévia</b>.</li>
 </ol>
 <h3>Opções da IA</h3>
 <ul>
 <li><b>Formato</b>: curiosidade, história, tutorial, notícia, lista, mito ou verdade, quiz, humor, motivacional, terror, como funciona, diálogo e comparação. Cada um usa uma estrutura de roteiro e recursos visuais próprios.</li>
-<li><b>Tom, idioma, trilha e número de personagens</b>: ficam em <i>Opções da IA</i>. A trilha escolhida vale para o vídeo inteiro.</li>
+<li><b>Tom, idioma, trilha e número de personagens</b>: ficam em <i>Mais opções</i>. A trilha escolhida vale para o vídeo inteiro.</li>
 <li><b>Sugerir ideias</b>: a IA propõe 6 ideias prontas para o seu assunto; clique em <i>Usar</i> para preenchê-las.</li>
 <li><b>Texto longo</b>: cole uma notícia ou artigo no campo da ideia e a IA resume em um short.</li>
 <li><b>Copiar prompt para outra IA</b>: copia as mesmas regras e o catálogo completo para você usar no ChatGPT, Claude etc. Cole o JSON da resposta em <i>Avançado</i>.</li>
@@ -229,7 +229,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 
 <section class="doc" id="faq" data-g="Suporte"><h2>Solução de problemas</h2>
 <details class="faq"><summary>"JSON inválido" ao carregar a história</summary><div class="a">Há um erro de sintaxe (vírgula sobrando, aspas faltando). A mensagem indica a posição. Se o JSON veio da IA e deu erro depois de editar, gere de novo ou volte à versão salva na biblioteca.</div></details>
-<details class="faq"><summary>Um objeto não aparece</summary><div class="a">O tipo pode estar escrito errado ou o <code>index.html</code> estar desatualizado. O gerador mostra um aviso com os tipos desconhecidos. Aperte Ctrl+F5 e confira se o rodapé diz <code>build 9</code>.</div></details>
+<details class="faq"><summary>Um objeto não aparece</summary><div class="a">O tipo pode estar escrito errado ou o <code>index.html</code> estar desatualizado. O gerador mostra um aviso com os tipos desconhecidos. Aperte Ctrl+F5 e confira se o rodapé diz <code>build 11</code>.</div></details>
 <details class="faq"><summary>O vídeo sai travando ou pulando</summary><div class="a">Mantenha a aba visível durante a gravação, feche abas pesadas e use 720p/30 fps. Em computadores fracos, evite 1080p/60.</div></details>
 <details class="faq"><summary>O arquivo baixa como .webm em vez de .mp4</summary><div class="a">Depende do navegador. Chrome e Edge recentes gravam MP4; versões antigas caem para WebM, que a maioria das redes aceita, ou converta com qualquer conversor.</div></details>
 <details class="faq"><summary>"Navegador sem gravação"</summary><div class="a">Use Chrome ou Edge no computador. Celulares e alguns navegadores não oferecem a gravação necessária.</div></details>
@@ -249,7 +249,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 </section>
 </main></div>
 
-<footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Animaê · build 9 · <a href="/">voltar ao gerador</a></footer>
+<footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Animaê · build 11 · <a href="/gerar">voltar ao gerador</a></footer>
 </div>
 <script src="schema.js"></script>
 <script>

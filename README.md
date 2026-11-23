@@ -4,7 +4,9 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 
 | Arquivo | Para que serve |
 |---|---|
-| index.html | O gerador de vídeo |
+| home.html | Página inicial (`/`): explica o site, os passos, recursos, estilos e perguntas frequentes |
+| index.html | O gerador de vídeo, em `/gerar` |
+| guia.js | Graveto, o boneco-guia do tutorial (desenhado pelo motor dos vídeos; abre na primeira visita ao gerador) |
 | docs.html | Documentação (guia, referência do JSON, solução de problemas), em `/docs` |
 | admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
 | ai.js | Integração com a IA (roteiro + JSON a partir da ideia do usuário), com troca automática de provedor |
@@ -27,7 +29,7 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 
 1. Instale o Node.js **18 ou mais novo**.
 2. Na pasta, rode `npm install` (só na primeira vez) e depois `node server.js` (o terminal mostra os endereços, a senha inicial do painel e o endereço secreto).
-3. Abra http://localhost:3000 no Chrome ou Edge (PC) e aperte Ctrl+F5. O rodapé deve mostrar "build 9".
+3. Abra http://localhost:3000/gerar no Chrome ou Edge (PC) e aperte Ctrl+F5. O rodapé deve mostrar "build 11".
 4. **Criar com IA**: descreva a ideia; a IA escreve o roteiro e o JSON. Grave a voz, carregue o áudio, "Ajustar ao áudio", "Prévia" e "Gerar vídeo" (aba aberta e visível: a gravação é em tempo real).
 5. O arquivo é baixado sozinho (short.mp4 ou short.webm).
 
@@ -85,7 +87,8 @@ Com o Supabase configurado, **só quem entrou na conta consegue usar a IA, a voz
 
 ## Páginas
 
-- **/** Gerador, com "Criar com IA" e "Minha biblioteca".
+- **/** Início: explica tudo sobre o site.
+- **/gerar** Gerador (ideia, roteiro e voz, vídeo), com "Minha biblioteca" e **Avançado** (enviar sua gravação e editar o JSON). O Graveto ensina o uso na primeira visita; o link "Tutorial" da barra abre de novo.
 - **/docs** Documentação (referência gerada do `schema.js`). O endereço antigo `/ajuda` redireciona para ela.
 - **Painel administrativo**: **não tem link em nenhuma página** e `/admin` não existe. O endereço aleatório (ex.: `/painel-1a2b3c4d5e`) aparece no terminal a cada início. Troque em Segurança ou defina `ADMIN_PATH=meu-caminho`. Abas: Painel, IA, Padrões, Histórico, Segurança.
 

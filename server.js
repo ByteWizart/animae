@@ -10,7 +10,7 @@ const TTS = require('./tts.js');
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
 const DATA_FILE = path.join(dir, 'dados.json');
-const BUILD = 10;
+const BUILD = 11;
 const STARTED = Date.now();
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.sql': 'text/plain; charset=utf-8' };
@@ -540,7 +540,8 @@ http.createServer((req, res) => {
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end(); }
   if (p.startsWith('/api/')) return api(req, res, p);
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
-  if (p === '/') p = '/index.html';
+  if (p === '/') p = '/home.html';           // página inicial (explica o site)
+  if (p === '/gerar') p = '/index.html';     // o gerador
   if (p === '/ajuda' || p === '/ajuda.html') { res.writeHead(301, { Location: '/docs' }); return res.end(); } // endereço antigo
   if (p === '/docs') p = '/docs.html';
   if (p === '/' + adminPath()) { res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' }); return res.end(fs.readFileSync(path.join(dir, 'admin.html'))); }
@@ -554,7 +555,8 @@ http.createServer((req, res) => {
 }).listen(PORT, () => {
   console.log('Animaê · build ' + BUILD);
   { const c = sbCfg(); console.log('  Login: ' + (c.enabled ? 'Supabase ' + c.url + (c.required ? ' (obrigatório para gerar vídeos)' : ' (opcional)') : 'desligado (configure o Supabase em Admin > Conta e banco ou com SUPABASE_URL e SUPABASE_ANON_KEY)')); }
-  console.log('  Gerador: http://localhost:' + PORT);
+  console.log('  Início:  http://localhost:' + PORT);
+  console.log('  Gerador: http://localhost:' + PORT + '/gerar');
   console.log('  Docs:    http://localhost:' + PORT + '/docs');
   console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
   { const c = aiChain(); console.log('  IA: ' + (c.length ? c.map(p => p.label + ' (' + p.model + ')').join(' → ') : 'nenhum provedor configurado (use uma variável como GEMINI_API_KEY / GROQ_API_KEY ou o Admin > IA)')); }

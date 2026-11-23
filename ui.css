@@ -150,3 +150,12 @@ body.page{font-family:var(--font);background:var(--bg) var(--mesh) fixed no-repe
 .gate b{font-size:16px}.gate span{font-size:13.5px;color:var(--muted)}
 @keyframes fin{from{opacity:0}to{opacity:1}}
 @media(max-width:560px){.acct{margin-left:4px}.abox{padding:26px 20px 20px}}
+
+/* barra no celular: só o ícone da marca e links mais compactos, para tudo caber */
+@media(max-width:560px){
+  .topnav{gap:0}
+  .topnav .brand{font-size:0;gap:0;margin-right:auto}
+  .topnav a.nl{padding:6px 8px;font-size:13px}
+  .topnav a.btn{display:none}
+  .page button.themebtn{margin-left:0}
+}
