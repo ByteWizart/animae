@@ -71,6 +71,13 @@ async function health(c) {
       const r = await call(c, 'GET', `/rest/v1/${t}?select=id&limit=1`, { token: c.serviceKey || c.anonKey });
       out.tables[t] = r.ok ? true : (r.status === 401 || r.status === 403) ? 'rls' : false; // 'rls' = existe, mas as regras escondem as linhas (normal com a chave anon)
     }
+    // Teste de verdade da chave secreta: lê a tabela ai_config, que SÓ a service_role / secret enxerga.
+    // (Sem isso, "tabela encontrada" também aparece quando a chave foi recusada.)
+    if (c.serviceKey) {
+      const k = c.serviceKey, fmt = isJwt(k) ? 'antiga (eyJ...)' : /^sb_secret_/.test(k) ? 'nova (sb_secret_...)' : /^sb_publishable_/.test(k) ? 'PUBLISHABLE (errada: precisa ser a secret)' : /^eyJ/.test(c.anonKey) || !k ? 'desconhecida' : 'formato desconhecido';
+      const r = await call(c, 'GET', '/rest/v1/ai_config?select=id&limit=1');
+      out.serviceTest = { ok: r.ok, status: r.status, format: fmt, msg: (r.json && (r.json.message || r.json.hint || r.json.msg || r.json.error_description)) || '' };
+    }
     out.ok = true;
   } catch (e) { out.error = e.name === 'TimeoutError' ? 'O Supabase demorou para responder.' : 'Não consegui falar com o Supabase (' + (e.cause && e.cause.code || e.message) + ').'; }
   return out;

@@ -539,7 +539,7 @@ async function api(req, res, p) {
         env: { url: !!e.SUPABASE_URL, anon: !!(e.SUPABASE_ANON_KEY || e.SUPABASE_KEY), service: !!(e.SUPABASE_SERVICE_KEY || e.SUPABASE_SERVICE_ROLE_KEY), required: e.REQUIRE_LOGIN !== undefined } }; };
       if (id === 'test' && m === 'POST') {
         if (!eff.enabled) return send(res, 400, { error: 'Informe o endereço (https://…supabase.co) e a chave anon.' });
-        const h = await SB.health(eff); let users = null; if (h.ok && eff.serviceKey) { try { users = (await SB.listUsers(eff, 1, 1)).total; } catch (x) { h.serviceError = x.message; } }
+        const h = await SB.health(eff); let users = null; const st = h.serviceTest; if (st && !st.ok) h.serviceError = 'HTTP ' + st.status + ', chave ' + st.format + (st.msg ? ', Supabase diz: ' + st.msg : ''); if (h.ok && eff.serviceKey && !h.serviceError) { try { users = (await SB.listUsers(eff, 1, 1)).total; } catch (x) { h.serviceError = x.message; } }
         return send(res, 200, { ...h, users });
       }
       if (id === 'users' && m === 'GET') { if (!eff.enabled) return send(res, 200, { users: [], total: 0 }); try { return send(res, 200, await SB.listUsers(eff, 1, 100)); } catch (x) { return send(res, 502, { error: 'Não consegui listar os usuários: ' + x.message }); } }
