@@ -64,3 +64,11 @@ create table if not exists public.ai_config (
 alter table public.ai_config enable row level security;
 revoke all on public.ai_config from anon, authenticated;
 -- A linha id = 1 é criada pelo próprio servidor na primeira vez que ele conectar (com a configuração que já estiver valendo).
+
+-- Permissões das tabelas (necessárias em projetos que não concedem acesso automático ao schema public).
+-- service_role (chave secret): o servidor grava ai_config, vídeos e histórias.
+-- authenticated (usuário logado): só videos e stories, e o RLS acima limita a cada pessoa as próprias linhas.
+grant usage on schema public to service_role, authenticated;
+grant all on public.ai_config, public.videos, public.stories to service_role;
+grant select, insert, update, delete on public.videos, public.stories to authenticated;
+grant usage, select on all sequences in schema public to service_role, authenticated;
