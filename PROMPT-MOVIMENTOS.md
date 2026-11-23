@@ -53,3 +53,14 @@ Dica: o botão "Copiar prompt para outra IA" no gerador já entrega o prompt com
 - Objetos com dados: chart {"kind":"bar|line|pie|donut","data":[..],"labels":[..],"t":"título","vals":true}, counter {"from":0,"to":1000,"pre":"R$ "}, checklist {"items":[..]}, chat {"msgs":[{"w":0,"t":".."}]}, gauge/thermo/donut {"v":0.7}, stamp, headline, callout {"t","tx","ty"}, notification, clock, calendar.
 - Cena: "title":{"t":"TEXTO","anim":"slam"} | "lower":{"t":"Nome","sub":"cargo"} | "spot":{"x","y","r"} | "bars":0.08 | "punch":[{"t":2,"z":0.12}] | "flashes":[{"t":2}] | "shakes":[{"t":2,"dur":0.4}] | cam:{"hand":1}.
 - Trilha: "style":{"music":"happy"} (calm, happy, tense, epic, mystery, sad, chill, retro, none). Sons novos: pop, click, tick, coin, ding, bell, success, tada, fail, error, alarm, cash, boing, sparkle, laser, riser, boom, explosion, splash, shatter, heartbeat, typing, camera, horn, drumroll, scratch, wind, steps.
+
+
+=== MOTOR EXTRA (build 12) ===
+O botão "Copiar prompt para outra IA" já entrega tudo atualizado; abaixo o resumo do que entrou.
+- Novas animações de personagem (29): yawn, stretch, robot, jumpingjack, zombie, drunk, headbang, fistpump, shiver, crossarms, hips, scratch, knock, boxing, stumble, slip, pray, toast, meditate, eureka, surrender, sneeze, disco, twist e andares que funcionam com "to": march, limp, tiptoe, skip, strut (zombie também anda sozinho).
+- Novas animações de objeto, no campo "anim" do prop: bounce (quica), swing (pêndulo), wobble (treme girando), grow, shrink, drift (sobe e some), blink (pisca), jelly (gelatina), orbit (gira em volta), slidein (entra pela esquerda), riseup (sobe de baixo), flipx (vira como moeda), beat (pulsa como coração), zoomin (entra de perto).
+- 80 objetos novos. Tecnologia: headphones, camera, microphone, speaker, server, database, codewin, browser, qr, shield, robot, drone, satellite. Ciência: flask, dna, atom, magnet, globe, hourglass, scale. Dinheiro e compras: piggy, creditcard, bag, cart, medal, crown, diamond, pricetag. Interface: thumbsup, play, subscribe, loading, searchbar, toggle, ecg, podium, thought, rating, speech. Viagem: map, compass, treasure, trafficlight, stopsign. Sons e esporte: bell, megaphone, skateboard, soccer, basketball, dumbbell. Animais: rabbit, duck, penguin, owl, pig, frog, shark, turtle, butterfly, snail. Comida: doughnut, icecream, banana, soda, fries, egg, cookie, watermelon. Veículos: truck, train, helicopter. Natureza e construções (y = base): pine, rainbow, volcano, windmill, castle, lighthouse, campfire, streetlamp, fence.
+- Novos efeitos fx: fireworks, balloons, speed, alert, bokeh, notes.
+- Novas transições tr: checker, diagonal, curtain, clock.
+- Novos cenários: sky (acima das nuvens), mars, jungle, farm, rooftop, studio.
+

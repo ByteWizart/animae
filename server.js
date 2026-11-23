@@ -10,7 +10,7 @@ const TTS = require('./tts.js');
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
 const DATA_FILE = path.join(dir, 'dados.json');
-const BUILD = 11;
+const BUILD = 12;
 const STARTED = Date.now();
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.sql': 'text/plain; charset=utf-8' };

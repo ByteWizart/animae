@@ -306,9 +306,10 @@ function track(a,t){
     const m=eio((t-st)/dur);x=lerp(px,tx,m);y=lerp(py,ty,m);dist+=Math.hypot(tx-px,ty-py)*m;if(Math.abs(tx-px)>1)dir=tx<px?-1:1;
     if(t<st+dur){mv=true;break}px=tx;py=ty;t0=st+dur}
   return{x,y,dist,mv,dir}}
+const LOCO=new Set(['walk','run','sneak']); // poses de caminhada: parado, viram idle
 function pose2(an,t,u,mv,dist,talk,lt=0){
   const run=an==='run',ph=(an==='walk'||run)?dist/(u*10*(run?.1:.13)):t*2.2,s=Math.sin(ph),q=Math.sin(t*6);
-  const o={bob:Math.sin(t*2.2)*u*.06,L:.1,R:-.1,AL:.3,AR:.3,lean:0,sq:1,sx:0,hun:0,mood:null,rot:0,lift:0,kb:0,fxs:1,lkk:0,cl:0,tear:0,zz:0},A=v=>Object.assign(o,v);
+  const o={bob:Math.sin(t*2.2)*u*.06,L:.1,R:-.1,AL:.3,AR:.3,lean:0,sq:1,sx:0,hun:0,mood:null,rot:0,lift:0,kb:0,fxs:1,lkk:0,cl:0,tear:0,zz:0,eL:.35,eR:.35,kL:0,kR:0,tilt:0},A=v=>Object.assign(o,v);
   if(an==='walk'||run){const f=run?1:.65;A({bob:Math.abs(s)*u*(run?.5:.28),L:s*f,R:-s*f,AL:-s*f,AR:s*f,lean:run?.15:.07})}
   else if(an==='wave')o.AR=2.7+Math.sin(t*11)*.45;
   else if(an==='point')o.AR=1.6;
@@ -334,19 +335,19 @@ function figure(a,t){
   const h=(a.h||460)*(a.floor===false?1:dS(y)),u=h/10;
   const ks=[{t:0,anim:a.anim||'idle',mood:a.mood,look:a.look},...arr(a.seq).filter(q=>q&&typeof q==='object')].sort((p,q)=>(+p.t||0)-(+q.t||0));
   let k=0,mood0=null,lkv=a.look||0;ks.forEach((q,n)=>{if(t>=q.t){k=n;if(q.mood)mood0=q.mood;if(q.look!==undefined)lkv=q.look}});
-  const cu=ks[k],pv=ks[k-1],w=pv?eio((t-cu.t)/.3):1,fix=n=>(n==='walk'||n==='run'||n==='sneak')&&!mv?'idle':(n==='idle'&&mv&&!a.still?'walk':n);
+  const cu=ks[k],pv=ks[k-1],w=pv?eio((t-cu.t)/.3):1,fix=n=>LOCO.has(n)&&!mv?'idle':(n==='idle'&&mv&&!a.still?'walk':n);
   const an=fix(cu.anim||'idle'),talk=a.talk&&t>=a.talk[0]&&t<=a.talk[1],o1=pose2(an,t,u,mv,pp.dist,talk,t-cu.t);let o=o1;
   if(pv&&w<1){const o0=pose2(fix(pv.anim||'idle'),t,u,mv,pp.dist,talk,t-pv.t),mix={};for(const n in o1)mix[n]=typeof o1[n]==='number'?lerp(o0[n],o1[n],w):o1[n];o=mix}
   let{bob,L,R,AL,AR,lean,sq,sx,hun}=o,mood=mood0||o.mood||'smile';if(mood==='happy')mood='smile';if(mood==='sad')mood='worry';
-  const{rot,lift,kb,fxs,lkk,cl,tear,zz}=o;
+  const{rot,lift,kb,fxs,lkk,cl,tear,zz,eL,eR,kL,kR,tilt}=o;
   const pop=back((t-at)/.45);
   c.save();c.fillStyle='rgba(0,0,0,.28)';c.beginPath();c.ellipse(x,y+4,u*2*pop,u*.45,0,0,7);c.fill();
   c.translate(x+sx,y-lift*u);c.scale(d*pop*fxs/sq,pop*sq);c.rotate(rot);
   const hy=-3.1*u-bob,tx=Math.sin(lean)*1.5*u,hd=[tx+hun*u*3,hy-5*u+hun*u*2],ik=Math.max(2,u*.3);
   const shC=a.color||OUT[a.outfit]||'#f2f2f2';
-  const arm=(sd,a2)=>{const sx0=tx*.8+sd*1.4*u,sy=hy-2.4*u,e=[sx0+sd*Math.sin(a2)*1.7*u,sy+Math.cos(a2)*1.7*u];return[[sx0,sy],e,[e[0]+sd*Math.sin(a2+.35)*1.7*u,e[1]+Math.cos(a2+.35)*1.7*u]]};
-  const leg=(hx,a2)=>{const k0=[hx+Math.sin(a2)*1.55*u,hy+Math.cos(a2)*1.55*u];return[[hx,hy],k0,[k0[0]+Math.sin(a2-kb)*1.55*u,k0[1]+Math.cos(a2-kb)*1.55*u]]};
-  const A1=arm(-1,AL),A2=arm(1,AR),L1=leg(-.7*u,L),L2=leg(.7*u,R);
+  const arm=(sd,a2,eb=.35)=>{const sx0=tx*.8+sd*1.4*u,sy=hy-2.4*u,e=[sx0+sd*Math.sin(a2)*1.7*u,sy+Math.cos(a2)*1.7*u];return[[sx0,sy],e,[e[0]+sd*Math.sin(a2+eb)*1.7*u,e[1]+Math.cos(a2+eb)*1.7*u]]};
+  const leg=(hx,a2,kk=kb)=>{const k0=[hx+Math.sin(a2)*1.55*u,hy+Math.cos(a2)*1.55*u];return[[hx,hy],k0,[k0[0]+Math.sin(a2-kk)*1.55*u,k0[1]+Math.cos(a2-kk)*1.55*u]]};
+  const A1=arm(-1,AL,eL),A2=arm(1,AR,eR),L1=leg(-.7*u,L,kb+kL),L2=leg(.7*u,R,kb+kR);
   if(a.cape||a.outfit==='cape')capeDraw(a,tx,hy,u,t,mv);
   c.strokeStyle=K;c.lineWidth=ik;c.lineCap=c.lineJoin='round';
   for(const sg of[A1,L1,L2]){c.beginPath();c.moveTo(...sg[0]);for(let i=1;i<sg.length;i++)c.lineTo(...sg[i]);c.stroke()}
@@ -357,6 +358,7 @@ function figure(a,t){
   if(OUTX[a.outfit])OUTX[a.outfit](a,tx*.5,hy,u,shC);
   c.lineWidth=ik;c.strokeStyle=K;c.beginPath();c.moveTo(...A2[0]);for(let i=1;i<A2.length;i++)c.lineTo(...A2[i]);c.stroke();
   c.fillStyle=K;for(const sg of[A1,A2]){const hnd=sg[2];c.beginPath();c.arc(hnd[0],hnd[1],.48*u,0,7);c.fill()}if(a.hold)holdItem(a.hold,A2[2],u,a.holdT);if(a.holdL)holdItem(a.holdL,A1[2],u,a.holdLT);
+  if(tilt){c.save();c.translate(hd[0],hd[1]+2*u);c.rotate(tilt);c.translate(-hd[0],-(hd[1]+2*u))}
   c.beginPath();c.ellipse(hd[0],hd[1],2.2*u,2.1*u,0,0,7);c.fillStyle=a.skin||'#f7e2d0';c.fill();c.lineWidth=u*.22;c.strokeStyle=K;c.stroke();
   const hc=a.hairc||(a.hair==='grey'?'#b9b9c4':'#2a2230');
   if(a.hair&&a.hair!=='none'){c.fillStyle=hc;c.beginPath();c.ellipse(hd[0],hd[1]-1.25*u,2.2*u,1.2*u,0,Math.PI,2*Math.PI);c.fill();c.stroke();
@@ -384,6 +386,7 @@ function figure(a,t){
   if(hat==='top'){c.fillStyle='#222';c.fillRect(hx-1.3*u,ht-1.7*u,2.6*u,2.1*u);c.fillRect(hx-2.1*u,ht+.35*u,4.2*u,.4*u)}
   if(hat==='crown'){c.fillStyle='#ffd23b';c.beginPath();c.moveTo(hx-1.4*u,ht+.5*u);c.lineTo(hx-1.4*u,ht-1*u);c.lineTo(hx-.7*u,ht-.2*u);c.lineTo(hx,ht-1.3*u);c.lineTo(hx+.7*u,ht-.2*u);c.lineTo(hx+1.4*u,ht-1*u);c.lineTo(hx+1.4*u,ht+.5*u);c.closePath();c.fill();c.stroke()}
   if(HATX[hat])HATX[hat](hx,ht,u,hd,t,a);
+  if(tilt)c.restore();
   c.restore();bubbles(a,x,y,u,t);if(zz)zzz(x+d*5*u,y-3*u,u,t);if(a.tag)nameTag(a,x,y,u);
 }
 function prop(p,t){
@@ -393,7 +396,22 @@ function prop(p,t){
   if(an==='float')y+=Math.sin(k*2.5)*28;
   if(an==='spin')r+=k*2;if(an==='shake')x+=Math.sin(k*45)*12;if(an==='pulse')sc*=1+Math.sin(k*6)*.08;
   if(an==='fall'){const q=clamp(k/.7);y=lerp(-300,p.y,q*q);if(q>=1){const b=Math.abs(Math.sin((k-.7)*7))*Math.exp(-(k-.7)*3)*120;y-=b}sc=1}
-  if(FLOOR.has(p.type))sc*=dS(y);c.save();c.globalAlpha=(p.alpha??1)*(p.end?clamp((p.end-t)/.2):1);c.translate(x,y);c.rotate(r);c.scale(sc,sc);c.fillStyle=p.color||'#ffd23b';c.strokeStyle=K;c.lineWidth=10;
+  let pa=1,sx2=1,sy2=1;
+  if(an==='bounce')y-=Math.abs(Math.sin(k*4.5))*s*.3;
+  else if(an==='swing'){r+=Math.sin(k*3)*.32;x+=Math.sin(k*3)*s*.12}
+  else if(an==='wobble')r+=Math.sin(k*10)*.1;
+  else if(an==='grow')sc*=1+.5*eio(k/4);
+  else if(an==='shrink')sc*=1-.4*eio(k/4);
+  else if(an==='drift'){y-=k*70;pa=clamp(1-(k-1.5)/1.5)}
+  else if(an==='blink')pa=Math.sin(k*9)>-.2?1:.15;
+  else if(an==='jelly'){sx2=1+Math.sin(k*9)*.09;sy2=1-Math.sin(k*9)*.09}
+  else if(an==='orbit'){x+=Math.cos(k*2.2)*s*.45;y+=Math.sin(k*2.2)*s*.2}
+  else if(an==='slidein'){x=lerp(-s,x,eio(k/.7));sc=1}
+  else if(an==='riseup'){y=lerp(H+s,y,eio(k/.7));sc=1}
+  else if(an==='flipx'){sx2=Math.cos(k*5)}
+  else if(an==='beat')sc*=1+Math.pow(Math.max(0,Math.sin(k*7)),4)*.18;
+  else if(an==='zoomin')sc*=lerp(2.5,1,eio(k/.5));
+  if(FLOOR.has(p.type))sc*=dS(y);c.save();c.globalAlpha=(p.alpha??1)*pa*(p.end?clamp((p.end-t)/.2):1);c.translate(x,y);c.rotate(r);c.scale(sc,sc);if(sx2!==1||sy2!==1)c.scale(sx2,sy2);c.fillStyle=p.color||'#ffd23b';c.strokeStyle=K;c.lineWidth=10;
   if(PR[p.type])PR[p.type](p,s,k);else if(PX[p.type])PX[p.type](p,s,k);else if(PN[p.type])PN[p.type](p,s,k);else if(p.type==='icon'){const e=getIcon(p);if(e.ok)c.drawImage(e.img,-s/2,-s/2,s,s)}else if(p.type==='emoji'){c.font=`${s}px ${EMO}`;c.textAlign='center';c.textBaseline='middle';c.fillText(p.t||'⭐',0,0)}
   else if(p.type==='circle'){c.beginPath();c.arc(0,0,s/2,0,7);c.fill();c.stroke()}
   else if(p.type==='rect'){c.beginPath();c.roundRect(-s/2,-s/2,s,s,s*.12);c.fill();c.stroke()}
@@ -1102,5 +1120,6 @@ $('aitrgo').onclick=async()=>{if(!readStory())return;const lang=$('aitr').value;
   applyAI({script:j.script,story:j.story,title:storyName},{keepOpen:true});log('Tradução pronta ('+LANGL[lang]+'). Grave a narração no novo idioma e use "Ajustar ao áudio".')};
 applyDefaults();
 </script>
+<script src="motor-extra.js"></script>
 <script src="guia.js"></script>
 </body></html>

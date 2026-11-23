@@ -6,6 +6,7 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 |---|---|
 | home.html | Página inicial (`/`): explica o site, os passos, recursos, estilos e perguntas frequentes |
 | index.html | O gerador de vídeo, em `/gerar` |
+| motor-extra.js | Motor extra (build 12): 29 animações de personagem, 80 objetos, 6 efeitos, 4 transições e 6 cenários. Carregado depois do script do index.html; para acrescentar algo, edite aqui e descreva no schema.js |
 | guia.js | Graveto, o boneco-guia do tutorial (desenhado pelo motor dos vídeos; abre na primeira visita ao gerador) |
 | docs.html | Documentação (guia, referência do JSON, solução de problemas), em `/docs` |
 | admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
