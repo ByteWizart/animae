@@ -26,7 +26,7 @@
   ];
   function nice(j, st) { var raw = (j && (j.error_description || j.msg || j.message || j.error || j.error_code)) || ('Erro ' + st); for (var i = 0; i < MSG.length; i++) if (MSG[i][0].test(raw + ' ' + (j && j.error_code || ''))) return MSG[i][1]; return String(raw); }
   function api(method, path, body, token) {
-    return origFetch(CFG.url + path, { method: method, headers: { apikey: CFG.anonKey, 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || CFG.anonKey) }, body: body ? JSON.stringify(body) : undefined })
+    return origFetch(CFG.url + path, { method: method, headers: Object.assign({ apikey: CFG.anonKey, 'Content-Type': 'application/json' }, (token || /^eyJ/.test(CFG.anonKey)) ? { Authorization: 'Bearer ' + (token || CFG.anonKey) } : {}), body: body ? JSON.stringify(body) : undefined })
       .then(function (r) { return r.text().then(function (t) { var j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {} if (!r.ok) { var e = new Error(nice(j, r.status)); e.status = r.status; throw e; } return j || {}; }); });
   }
   function fromToken(j) { return { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at ? j.expires_at * 1000 : Date.now() + (j.expires_in || 3600) * 1000, user: j.user }; }

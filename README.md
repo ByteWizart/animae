@@ -160,3 +160,4 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 - **Motor extra 2 ligado ao gerador:** o `motor-extra2.js` agora é carregado pelo `index.html` (antes ficava de fora) e aparece no schema, nos Docs e no prompt da IA.
 - **Objetos novos:** `bigtext` (título grande com contorno e legenda), `highlight` (marca-texto animado) e `steps` (etapas que acendem).
 - **Pós-efeitos de cinema:** `vignette`, `grain`, `scanlines`, `grade`, `fadeIn`, `fadeOut` e `progress`, na cena ou em `style`. Histórias sem esses campos saem exatamente como antes.
+- **Chaves novas do Supabase:** o site aceita `sb_publishable_...` (no lugar da anon) e `sb_secret_...` (no lugar da service_role), além das antigas `eyJ...`. As novas vão só no cabeçalho `apikey`, porque o Supabase não as aceita como `Authorization: Bearer`.

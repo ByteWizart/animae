@@ -7,12 +7,16 @@
 const cache = new Map(); // token -> { user, exp }  (evita perguntar ao Supabase a cada pedido)
 const TTL = 60e3;
 
-const hdr = (c, token, extra) => ({
-  apikey: c.anonKey,
-  Authorization: 'Bearer ' + (token || c.serviceKey || c.anonKey),
-  'Content-Type': 'application/json',
-  ...(extra || {}),
-});
+// Aceita os dois formatos de chave do Supabase:
+//  - antigas (anon / service_role): são JWT ("eyJ...") e vão em apikey + Authorization: Bearer;
+//  - novas (sb_publishable_... / sb_secret_...): NÃO são JWT, vão só no cabeçalho apikey (o Supabase recusa como Bearer).
+// Um token de usuário (login) é sempre JWT e continua indo em Authorization.
+const isJwt = k => /^eyJ/.test(k || '');
+const hdr = (c, token, extra) => {
+  const k = token || c.serviceKey || c.anonKey, h = { 'Content-Type': 'application/json', ...(extra || {}) };
+  if (isJwt(k)) { h.apikey = c.anonKey; h.Authorization = 'Bearer ' + k; } else h.apikey = k;
+  return h;
+};
 
 async function call(c, method, path, { token, body, extra, timeout = 10e3 } = {}) {
   const r = await fetch(c.url.replace(/\/+$/, '') + path, {
