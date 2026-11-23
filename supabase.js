@@ -54,7 +54,7 @@ async function listUsers(c, page = 1, perPage = 50) {
   return { users: list.map(u => ({ id: u.id, email: u.email || '', provider: (u.app_metadata && u.app_metadata.provider) || '', createdAt: u.created_at, lastSignIn: u.last_sign_in_at, confirmed: !!(u.email_confirmed_at || u.confirmed_at) })), total };
 }
 
-// Testa a conexão: Auth no ar, provedores de login e se as tabelas do supabase-schema.sql existem.
+// Testa a conexão: Auth no ar, provedores de login e se as tabelas do supabase-schema.sql (videos, stories, ai_config) existem.
 async function health(c) {
   const out = { ok: false, auth: false, google: false, signup: true, autoconfirm: false, tables: {}, error: '' };
   try {
@@ -63,7 +63,7 @@ async function health(c) {
     out.auth = true;
     const j = s.json || {};
     out.google = !!(j.external && j.external.google); out.signup = !j.disable_signup; out.autoconfirm = !!j.mailer_autoconfirm;
-    for (const t of ['videos', 'stories']) {
+    for (const t of ['videos', 'stories', 'ai_config']) {
       const r = await call(c, 'GET', `/rest/v1/${t}?select=id&limit=1`, { token: c.serviceKey || c.anonKey });
       out.tables[t] = r.ok ? true : (r.status === 401 || r.status === 403) ? 'rls' : false; // 'rls' = existe, mas as regras escondem as linhas (normal com a chave anon)
     }

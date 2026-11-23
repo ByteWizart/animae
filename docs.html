@@ -100,7 +100,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 <li><b>Ajuste automático</b>: o site corrige sozinho coordenadas, textos longos na faixa da legenda, câmera ausente, transições repetidas e falta de sons nas trocas de cena.</li>
 </ul>
 <div class="notice"><b>Se algo não ficou bom:</b> edite o roteiro ou o JSON à mão, ou gere de novo com uma ideia mais específica. Quanto mais detalhe você der (personagens, cenário, humor), melhor o resultado.</div>
-<p class="muted">A geração leva de 10 a 40 segundos. Há um limite de gerações por hora por pessoa. Sua ideia é enviada ao provedor de IA do site (Gemini, Groq, OpenRouter, Cloudflare, NVIDIA, Mistral, Cohere, Z.ai etc.) para gerar o texto; o áudio e o vídeo nunca saem do seu computador.</p>
+<p class="muted">A geração leva de 10 a 40 segundos. Há um limite de gerações por hora por pessoa. Sua ideia é enviada ao provedor de IA do site (Gemini, Groq, LLM7 ou outro serviço compatível com a OpenAI) para gerar o texto; o áudio e o vídeo nunca saem do seu computador.</p>
 </section>
 
 <section class="doc" id="biblioteca" data-g="Usar o gerador"><h2>Minha biblioteca</h2>
@@ -234,7 +234,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 <details class="faq"><summary>O arquivo baixa como .webm em vez de .mp4</summary><div class="a">Depende do navegador. Chrome e Edge recentes gravam MP4; versões antigas caem para WebM, que a maioria das redes aceita, ou converta com qualquer conversor.</div></details>
 <details class="faq"><summary>"Navegador sem gravação"</summary><div class="a">Use Chrome ou Edge no computador. Celulares e alguns navegadores não oferecem a gravação necessária.</div></details>
 <details class="faq"><summary>A fala não bate com a boca/legenda</summary><div class="a">Use <b>Ajustar ao áudio</b>, depois <b>Detectar pausas</b> e acerte <code>t0</code>/<code>t1</code> das cenas e o <code>talk</code> dos personagens com esses tempos.</div></details>
-<details class="faq"><summary>"A criação com IA não está configurada"</summary><div class="a">O site precisa de uma chave de algum provedor de IA (Gemini, Groq, OpenRouter, Cloudflare, NVIDIA, Mistral, Cohere, Z.ai...) no servidor. Quem administra o site deve configurá-la. Enquanto isso, você pode colar um JSON seu.</div></details>
+<details class="faq"><summary>"A criação com IA não está configurada"</summary><div class="a">O site precisa de uma chave de algum provedor de IA (Gemini, Groq, LLM7 ou outro serviço compatível com a OpenAI) no servidor. Quem administra o site deve configurá-la. Enquanto isso, você pode colar um JSON seu.</div></details>
 <details class="faq"><summary>"Limite de gerações por hora atingido"</summary><div class="a">Existe um limite por pessoa para proteger a cota. Aguarde um pouco e tente de novo.</div></details>
 <details class="faq"><summary>A IA demorou ou deu erro</summary><div class="a">Pode ser instabilidade ou limite do provedor de IA (se o administrador configurou uma reserva, o site troca sozinho). Tente novamente; ideias muito longas ou vagas também atrapalham. Se persistir, simplifique a ideia.</div></details>
 <details class="faq"><summary>Minha biblioteca sumiu</summary><div class="a">Ela fica no navegador. Foi limpa se você apagou dados do site, usou outro navegador ou janela anônima. Importe seu backup em "Minha biblioteca".</div></details>

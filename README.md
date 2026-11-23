@@ -10,14 +10,14 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | docs.html | Documentação (guia, referência do JSON, solução de problemas), em `/docs` |
 | admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
 | ai.js | Integração com a IA (roteiro + JSON a partir da ideia do usuário), com troca automática de provedor |
-| providers.js | Catálogo dos provedores de IA grátis e sem recarga (Gemini, Groq, OpenRouter, Cloudflare, NVIDIA, Mistral, Cohere, Z.ai...) |
+| providers.js | Catálogo dos provedores de IA grátis e sem recarga (Gemini, Groq, LLM7 e Outro) |
 | server.js | Servidor local + API do Admin |
 | schema.js | Catálogo do formato de história e validador (usado por Docs, Admin e servidor) |
 | tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
 | audio.js | Trilha e efeitos sonoros gerados por código |
 | auth.js | Login no navegador (Supabase): janela de entrar/criar conta, sessão e biblioteca na nuvem |
 | supabase.js | Ponte do servidor com o Supabase (confere o login, grava vídeos, lista usuários) |
-| supabase-schema.sql | Tabelas `videos` e `stories` com regras de privacidade (RLS). Rode uma vez no SQL Editor do Supabase |
+| supabase-schema.sql | **Único SQL do projeto**: tabelas `videos`, `stories` (RLS por usuário) e `ai_config` (provedor padrão e modelos, só o servidor acessa). Rode uma vez no SQL Editor do Supabase |
 | theme.js | Botão de tema claro/escuro (lua/sol na barra); a escolha fica salva no navegador |
 | ui.css | Estilos compartilhados (visual novo: degradê violeta/rosa/âmbar, claro e escuro automático) |
 | PROMPT-MOVIMENTOS.md | Bloco para colar no seu prompt de IA |
@@ -33,43 +33,38 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 4. **Criar com IA**: descreva a ideia; a IA escreve o roteiro e o JSON. Grave a voz, carregue o áudio, "Ajustar ao áudio", "Prévia" e "Gerar vídeo" (aba aberta e visível: a gravação é em tempo real).
 5. O arquivo é baixado sozinho (short.mp4 ou short.webm).
 
-## Ativar a IA (só provedores grátis, sem cartão e sem recarga)
+## Ativar a IA (Gemini, Groq, LLM7 e "Outro")
 
-O site fala com qualquer provedor que aceite o formato de chat da OpenAI. Só ficaram no catálogo serviços com plano grátis **permanente** (conferidos em novembro de 2026):
+O site fala com qualquer provedor que aceite o formato de chat da OpenAI. O catálogo tem só três provedores prontos, mais o cartão **Outro** para plugar qualquer outra API:
 
 | Provedor | Famílias de IA | Variável de ambiente | Onde criar a chave | Modelo padrão |
 |---|---|---|---|---|
 | **Google Gemini** | Gemini, Gemma | `GEMINI_API_KEY` | aistudio.google.com/apikey | `gemini-2.5-flash` |
-| Groq | GPT-OSS, Qwen, Llama | `GROQ_API_KEY` | console.groq.com/keys | `openai/gpt-oss-120b` |
-| **OpenRouter** | Llama, DeepSeek, Qwen, Gemma, Nemotron... | `OPENROUTER_API_KEY` | openrouter.ai/keys | `openrouter/free` (escolhe um modelo grátis) |
-| **Cloudflare Workers AI** | Llama, GPT-OSS, Qwen, Gemma | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` | dash.cloudflare.com | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
-| **NVIDIA NIM** | Llama, DeepSeek, Qwen, Kimi, Nemotron | `NVIDIA_API_KEY` | build.nvidia.com | `meta/llama-3.3-70b-instruct` |
-| Mistral | Mistral, Codestral | `MISTRAL_API_KEY` | console.mistral.ai | `mistral-small-latest` |
-| Cohere | Command | `COHERE_API_KEY` | dashboard.cohere.com | `command-a-03-2025` |
-| Z.ai (GLM) | GLM | `ZAI_API_KEY` | z.ai | `glm-4.7-flash` |
-| LLM7.io | vários (comunitário) | `LLM7_API_KEY` (opcional) | token.llm7.io | `default` |
-| Ollama (no seu PC) | Llama, Qwen, Gemma... | sem chave | ollama.com | `llama3.1` |
-| Outro (compatível com OpenAI) | qualquer | `CUSTOM_API_KEY` | LM Studio, vLLM, Kilo, Together... | o que você informar |
+| **Groq** | GPT-OSS, Qwen, Llama | `GROQ_API_KEY` | console.groq.com/keys | `openai/gpt-oss-120b` |
+| **LLM7.io** | vários (comunitário) | `LLM7_API_KEY` (opcional) | token.llm7.io | `default` |
+| **Outro (compatível com OpenAI)** | qualquer | `CUSTOM_API_KEY` | OpenRouter, Together, Kilo, LM Studio, Ollama, vLLM... | o que você informar (endereço terminando em `/chat/completions`) |
 
-**Removidos** por não serem mais grátis sem recarga: Cerebras (virou crédito de teste com cartão), SambaNova (exige compra de crédito), Hugging Face (só US$ 0,10 de crédito por mês) e GitHub Models. Os limites mudam sem aviso: confira no site de cada provedor.
+Os limites grátis mudam sem aviso: confira no site de cada provedor.
+
+**Onde fica salvo:** o provedor **padrão**, as **reservas** e, por provedor, o **modelo**, os modelos de reserva, o TPM e o endereço do "Outro" ficam na tabela `ai_config` do Supabase (criada pelo mesmo `supabase-schema.sql`). Para isso o servidor precisa da chave `service_role` (Admin > Conta e banco, ou `SUPABASE_SERVICE_KEY`). Na primeira conexão o servidor cria a linha com a configuração que já estava valendo, e depois o banco manda: reiniciar ou trocar de servidor não perde nada, e mudanças feitas direto no banco valem em até 30 s. **As chaves de API não vão para o banco** (variável de ambiente ou `dados.json`). Sem Supabase, tudo continua só no `dados.json`, como antes.
 
 - Informe a chave por variável de ambiente (prioridade) ou em **Admin > IA**. As chaves ficam só no servidor.
-- **Aceita qualquer modelo.** O campo **Modelo** aceita qualquer nome. O botão **Carregar modelos** pergunta ao provedor o que ele oferece agora (no OpenRouter, só os gratuitos), com busca; **Usar** troca o modelo e **+ Reserva** adiciona aos modelos de reserva.
+- **Aceita qualquer modelo.** O campo **Modelo** aceita qualquer nome. O botão **Carregar modelos** pergunta ao provedor o que ele oferece agora, com busca; **Usar** troca o modelo e **+ Reserva** adiciona aos modelos de reserva.
 - **Modelos de reserva por provedor:** se um modelo sumir ou estourar o limite, o próximo do mesmo provedor é tentado antes de passar a outro provedor. Muitos limites são por modelo, então isso soma cotas.
 - Em **Admin > IA** escolha o provedor **principal** e os de **reserva**. Se o principal estourar o limite grátis, recusar a chave, cair ou demorar demais, o site passa sozinho para a reserva. Pedidos grandes são enviados só a provedores com cota suficiente.
 - Se o principal não tiver chave mas outro provedor tiver, o site usa o que estiver pronto (ex.: só `GEMINI_API_KEY` definida já basta).
 - **Salvar e testar** confirma que chave e modelo funcionam.
 - **TPM** (tokens por minuto) é o limite do seu plano; o prompt é compactado e a duração do vídeo reduzida para caber. Cada provedor traz um valor padrão que você pode ajustar.
-- A **Groq** só libera ~8.000 tokens por minuto e a **Z.ai** só 1 pedido por vez: com vários visitantes, use também o Gemini, o OpenRouter ou o NVIDIA como reserva.
+- A **Groq** só libera ~8.000 tokens por minuto: com vários visitantes, use também o Gemini como reserva.
 - Há limite de gerações por hora por IP (padrão 20) para proteger a cota.
 - O servidor valida o JSON da IA e pede uma correção automática se vier com erro.
-- Configurações antigas continuam valendo (a chave da Groq é migrada sozinha). Provedores removidos são apagados do `dados.json` ao iniciar.
+- Configurações antigas continuam valendo (a chave da Groq é migrada sozinha). Provedores que saíram do catálogo (OpenRouter, Cloudflare, NVIDIA, Mistral, Cohere, Z.ai, Ollama...) são apagados do `dados.json` ao iniciar; para usá-los, cadastre-os no cartão **Outro**.
 
 ## Login e banco de dados (Supabase)
 
 Com o Supabase configurado, **só quem entrou na conta consegue usar a IA, a voz e gerar vídeos**. O servidor confere o login em cada pedido (IA, voz e histórico respondem 401 sem login) e o botão "Gerar vídeo" abre a janela de entrar. A "Prévia" continua livre.
 
-1. Crie um projeto grátis em supabase.com e, no **SQL Editor**, rode o conteúdo de `supabase-schema.sql` (cria `videos` e `stories`, com RLS: cada pessoa só vê o que é dela).
+1. Crie um projeto grátis em supabase.com e, no **SQL Editor**, rode o conteúdo de `supabase-schema.sql` (cria `videos`, `stories` e `ai_config`; nas duas primeiras cada pessoa só vê o que é dela).
 2. Informe o **Project URL** e a chave **anon** em **Admin > Conta e banco** (ou `SUPABASE_URL` e `SUPABASE_ANON_KEY`). A chave **service_role** é opcional (`SUPABASE_SERVICE_KEY`): permite listar os usuários no painel. Ela fica só no servidor.
 3. Em **Authentication** do Supabase, deixe *Email* ligado e coloque o endereço do seu site em *Site URL* e *Redirect URLs* (necessário para recuperar senha e para o Google). Para o botão do Google, ative o provedor lá e marque a opção no painel.
 4. Clique em **Salvar e testar conexão**.

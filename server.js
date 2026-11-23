@@ -172,6 +172,7 @@ const aiInfo = () => {
   const chain = aiChain(), top = chain[0];
   return {
     enabled: !!db.ai.enabled, perHour: db.ai.perHour, extra: db.ai.extra || '', provider: db.ai.provider, fallback: db.ai.fallback,
+    store: { enabled: aiDbReady(), ok: aiDb.ok, error: aiDb.error },
     hasKey: chain.length > 0, active: [...new Set(chain.map(p => p.label))], model: top ? top.model : '', tpm: top ? top.tpm : 0,
     providers: PROV.IDS.map(id => {
       const P = PROV.PROVIDERS[id], k = provKey(id);
@@ -190,7 +191,7 @@ async function listModels(id, onlyFree) {
   if (!url || !/^https?:/.test(url)) return fallback('static', 'Configure o endereço' + (P.account ? ' e o ID da conta' : '') + ' para carregar a lista do provedor.');
   const headers = { Accept: 'application/json', ...(P.headers || {}) }, k = provKey(id);
   if (k) headers.Authorization = 'Bearer ' + k;
-  if (!k && !P.keyless && !P.keyOptional && id !== 'openrouter') return fallback('static', 'Cole a chave para carregar a lista completa de modelos do provedor.');
+  if (!k && !P.keyless && !P.keyOptional) return fallback('static', 'Cole a chave para carregar a lista completa de modelos do provedor.');
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 15e3);
   try {
     const r = await fetch(url, { headers, signal: ctl.signal });
@@ -241,6 +242,70 @@ function applyAi(b) {
     }
   }
   return '';
+}
+
+/* ---------- configuração da IA no Supabase (tabela ai_config, veja supabase-schema.sql) ---------- */
+// O banco guarda o provedor padrão, as reservas e, por provedor, o modelo, os modelos de reserva, o TPM e o endereço do "Outro".
+// As chaves de API NÃO vão para o banco. Precisa da chave service_role; sem ela (ou sem Supabase) tudo fica só em dados.json, como antes.
+const AI_ROW = '/rest/v1/ai_config';
+const aiDb = { ok: null, error: '', at: 0, loading: null }; // ok: null = não usa o banco, true = sincronizado, false = deu erro
+const aiDbReady = () => { const c = sbCfg(); return c.enabled && !!c.serviceKey; };
+const aiDbErr = r => (r.status === 404 || (r.json && /PGRST205|42P01/.test(String(r.json.code || '')))) ? 'A tabela ai_config não existe: rode o supabase-schema.sql no SQL Editor do Supabase.'
+  : r.status === 401 || r.status === 403 ? 'O Supabase recusou a chave service_role.' : (r.json && (r.json.message || r.json.hint)) || 'Erro ' + r.status + ' no Supabase.';
+const aiDbCatch = e => e.name === 'TimeoutError' ? 'O Supabase demorou para responder.' : 'Não consegui falar com o Supabase (' + ((e.cause && e.cause.code) || e.message) + ').';
+// O que vai para o banco: só o que não é segredo.
+function aiPublic() {
+  const out = {};
+  for (const id of PROV.IDS) {
+    const c = aiCfg(id), o = {};
+    if (c.model) o.model = c.model;
+    if (Array.isArray(c.extraModels) && c.extraModels.length) o.extraModels = c.extraModels;
+    if (c.tpm) o.tpm = c.tpm;
+    if (PROV.PROVIDERS[id].editableUrl && c.url) o.url = c.url;
+    out[id] = o;
+  }
+  return out;
+}
+async function aiDbSave() {
+  if (!aiDbReady()) { aiDb.ok = null; aiDb.error = ''; return false; }
+  try {
+    const r = await SB.call(sbCfg(), 'POST', AI_ROW + '?on_conflict=id', {
+      body: { id: 1, provider: db.ai.provider, fallback: db.ai.fallback, providers: aiPublic(), updated_at: new Date().toISOString() },
+      extra: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    });
+    aiDb.ok = r.ok; aiDb.error = r.ok ? '' : aiDbErr(r); if (r.ok) aiDb.at = Date.now();
+    return r.ok;
+  } catch (e) { aiDb.ok = false; aiDb.error = aiDbCatch(e); return false; }
+}
+// Lê a configuração do banco e aplica por cima da local. Sem linha ainda (primeira vez), envia a configuração atual para o banco.
+// Com force = false só consulta de novo depois de 30 s (vários servidores ou reinícios enxergam a mesma configuração).
+function aiDbLoad(force) {
+  if (!aiDbReady()) { aiDb.ok = null; aiDb.error = ''; return Promise.resolve(false); }
+  if (!force && Date.now() - aiDb.at < 30e3) return Promise.resolve(aiDb.ok === true);
+  if (aiDb.loading) return aiDb.loading;
+  aiDb.loading = (async () => {
+    try {
+      const r = await SB.call(sbCfg(), 'GET', AI_ROW + '?id=eq.1&select=provider,fallback,providers');
+      if (!r.ok) { aiDb.ok = false; aiDb.error = aiDbErr(r); return false; }
+      const row = Array.isArray(r.json) ? r.json[0] : null;
+      if (!row) return await aiDbSave();
+      const a = db.ai, pv = row.providers && typeof row.providers === 'object' ? row.providers : {};
+      if (PROV.isId(row.provider)) a.provider = row.provider;
+      a.fallback = (Array.isArray(row.fallback) ? row.fallback : []).filter((id, i, arr) => PROV.isId(id) && id !== a.provider && arr.indexOf(id) === i);
+      for (const id of PROV.IDS) {
+        const v = pv[id] && typeof pv[id] === 'object' ? pv[id] : {}, P = PROV.PROVIDERS[id], c = a.providers[id] = a.providers[id] || {};
+        if (typeof v.model === 'string' && PROV.validModel(v.model.trim())) c.model = v.model.trim(); else delete c.model;
+        const xs = (Array.isArray(v.extraModels) ? v.extraModels : []).map(x => String(x).trim()).filter((x, i, arr) => x && PROV.validModel(x) && arr.indexOf(x) === i).slice(0, 6);
+        if (xs.length) c.extraModels = xs; else delete c.extraModels;
+        if (+v.tpm) c.tpm = Math.round(clampN(+v.tpm, 3000, 2000000, P.tpm)); else delete c.tpm;
+        if (P.editableUrl) { const u = PROV.validUrl(v.url || ''); if (u) c.url = u; else delete c.url; }
+      }
+      save(); aiDb.ok = true; aiDb.error = ''; aiDb.at = Date.now();
+      return true;
+    } catch (e) { aiDb.ok = false; aiDb.error = aiDbCatch(e); return false; }
+    finally { aiDb.loading = null; }
+  })();
+  return aiDb.loading;
 }
 
 // Registro de atividade da IA (últimos 200 usos) e totais, mostrados no painel.
@@ -399,6 +464,7 @@ async function api(req, res, p) {
     const aiOp = p.startsWith('/api/ai/') ? p.slice(8) : '';
     if (m === 'POST' && { generate: 1, refine: 1, ideas: 1, review: 1, translate: 1 }[aiOp]) {
       const lg = await needLogin(req, res); if (!lg) return;
+      await aiDbLoad();
       const i = aiInfo();
       if (!i.enabled || !i.hasKey) return send(res, 503, { error: 'A criação com IA não está configurada neste site.' });
       const ip = lg.user ? 'u:' + lg.user.id : ipOf(req), now = Date.now(), hits = (aiHits.get(ip) || []).filter(t => now - t < 3600e3);
@@ -454,7 +520,7 @@ async function api(req, res, p) {
       if (!PROV.isId(pid)) return send(res, 400, { error: 'Provedor desconhecido.' });
       return send(res, 200, await listModels(pid, qs.get('free') !== '0'));
     }
-    if (r[0] === 'ai' && m === 'GET') return send(res, 200, aiInfo());
+    if (r[0] === 'ai' && m === 'GET') { await aiDbLoad(true); return send(res, 200, aiInfo()); }
     if (r[0] === 'ai' && r[1] === 'test' && m === 'POST') { // testa um provedor com um pedido minúsculo
       const b = await body(req, 1e3), id = str(b.provider, 30);
       if (!PROV.isId(id) || !provReady(id)) return send(res, 400, { error: 'Esse provedor ainda não está configurado (falta a chave, o modelo ou o endereço).' });
@@ -465,7 +531,7 @@ async function api(req, res, p) {
     if (r[0] === 'ai' && m === 'PUT') {
       const err = applyAi(await body(req, 3e4));
       if (err) return send(res, 400, { error: err });
-      save(); return send(res, 200, aiInfo());
+      save(); await aiDbSave(); return send(res, 200, aiInfo());
     }
     if (r[0] === 'supabase') {
       const e = process.env, c = db.supabase, eff = sbCfg();
@@ -486,7 +552,7 @@ async function api(req, res, p) {
         if (b.clearAnon) c.anonKey = ''; if (b.clearService) c.serviceKey = '';
         if (b.required !== undefined) c.required = !!b.required;
         if (b.google !== undefined) c.google = !!b.google;
-        save(); return send(res, 200, info());
+        save(); await aiDbLoad(true); return send(res, 200, info());
       }
     }
     if (r[0] === 'ailog' && m === 'GET') return send(res, 200, db.aiLog);
@@ -501,7 +567,7 @@ async function api(req, res, p) {
       if (!b || b.app !== 'shorts-animados') return send(res, 400, { error: 'Esse arquivo não é um backup do painel.' });
       if (b.settings) db.settings = cleanSettings(b.settings, db.settings);
       if (b.ai && typeof b.ai === 'object') { const err = applyAi(b.ai); if (err) return send(res, 400, { error: err }); }
-      save(); return send(res, 200, { ok: true });
+      save(); await aiDbSave(); return send(res, 200, { ok: true });
     }
 
     if (r[0] === 'tts' && m === 'GET') return send(res, 200, ttsInfo());
@@ -552,8 +618,9 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': types[path.extname(f)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' });
     res.end(req.method === 'HEAD' ? undefined : d);
   });
-}).listen(PORT, () => {
+}).listen(PORT, async () => {
   console.log('Animaê · build ' + BUILD);
+  if (aiDbReady()) { await aiDbLoad(true); console.log('  Config da IA: ' + (aiDb.ok ? 'sincronizada com o Supabase (tabela ai_config)' : 'Supabase com erro: ' + aiDb.error)); }
   { const c = sbCfg(); console.log('  Login: ' + (c.enabled ? 'Supabase ' + c.url + (c.required ? ' (obrigatório para gerar vídeos)' : ' (opcional)') : 'desligado (configure o Supabase em Admin > Conta e banco ou com SUPABASE_URL e SUPABASE_ANON_KEY)')); }
   console.log('  Início:  http://localhost:' + PORT);
   console.log('  Gerador: http://localhost:' + PORT + '/gerar');
