@@ -320,7 +320,7 @@ let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
 const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
 
 function status() {
-  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'theme.js', 'favicon.svg', 'supabase.js', 'supabase-schema.sql', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json'];
+  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'theme.js', 'favicon.svg', 'supabase.js', 'supabase-schema.sql', 'server.js', 'package.json', 'README.md', 'PROMPT-MOVIMENTOS.md', 'historia-teste.json', 'historia-demo-v9.json', 'motor-extra.js', 'motor-extra2.js'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;

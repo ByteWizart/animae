@@ -286,6 +286,9 @@
     L('cake', 'Bolo', 'Vela acesa.'),
     L('apple', 'Maçã', '"color".'),
     L('coffee', 'Café', 'Fumaça subindo.'),
+    L('bigtext', 'Texto grande', 'Título com contorno (build 13). "t" = texto, "s" = altura da letra (padrão 160), "color", "sc" (contorno), "sub" = legenda menor abaixo, "subColor", "w" = largura máx. Encolhe sozinho. Ótimo para números e palavras de impacto.'),
+    L('highlight', 'Marca-texto', 'Faixa que desenha da esquerda para a direita (build 13). "w", "s" (altura), "color", "dur". Coloque atrás de um texto.'),
+    L('steps', 'Etapas', 'Linha de bolinhas que acendem (build 13). "steps":["Ideia","Roteiro","Voz","Vídeo"], "dur" (s), "w", "color"; "v" de 0 a 1 fixa o progresso.'),
     L('headphones', 'Fone de ouvido', 'Fone vermelho ("color"). Música, podcast.'),
     L('camera', 'Câmera fotográfica', 'Dá um flash a cada 3 s. Foto, memória.'),
     L('microphone', 'Microfone', 'Entrevista, podcast, show.'),
@@ -393,6 +396,7 @@
     L('holdL', 'Item na mão esquerda', 'No personagem: "holdL":"book" (mesmos itens de hold).'),
     L('cape', 'Capa', 'No personagem: "cape":true ou cor "#hex" (qualquer roupa), ou "outfit":"cape".'),
     L('skin', 'Tom de pele e cabelo', 'No personagem: "skin":"#8d5524" (ex.: #f7e2d0, #e8c39e, #c68b59, #8d5524, #5c3a21), "hairc":"#hex", "hatc":"#hex" (cor do chapéu), "color":"#hex" (cor da roupa), "stripec" (listras), "num" (camisa jersey).'),
+    L('post', 'Pós-efeitos de cinema', 'Build 13. Na cena ou em "style": "vignette":0.5 (cantos escuros), "grain":0.3 (grão de filme), "scanlines":0.25 (linhas de monitor), "grade":{"sat":1.2,"contrast":1.1,"bright":1,"hue":0} (cor; Chrome/Edge). Só em "style": "fadeIn":0.6, "fadeOut":0.8 (abre/fecha do preto) e "progress":{"color":"#ff5fa2","h":10,"y":0} (barra de progresso).'),
     L('music', 'Trilha', 'No topo do JSON: "style":{"music":"happy"} ou {"type":"tense","vol":0.8,"bpm":100}. Veja as trilhas disponíveis.'),
   ];
   const PROP_ANIMS = ['pop', 'float', 'spin', 'shake', 'pulse', 'fall', 'none', 'bounce', 'swing', 'wobble', 'grow', 'shrink', 'drift', 'blink', 'jelly', 'orbit', 'slidein', 'riseup', 'flipx', 'beat', 'zoomin'];

@@ -7,6 +7,7 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | home.html | Página inicial (`/`): explica o site, os passos, recursos, estilos e perguntas frequentes |
 | index.html | O gerador de vídeo, em `/gerar` |
 | motor-extra.js | Motor extra (build 12): 29 animações de personagem, 80 objetos, 6 efeitos, 4 transições e 6 cenários. Carregado depois do script do index.html; para acrescentar algo, edite aqui e descreva no schema.js |
+| motor-extra2.js | Motor extra 2 (build 13): objetos `bigtext`, `highlight` e `steps` e pós-efeitos de cinema (vinheta, grão, linhas de monitor, correção de cor, fade e barra de progresso). Carregado depois do motor-extra.js |
 | guia.js | Graveto, o boneco-guia do tutorial (desenhado pelo motor dos vídeos; abre na primeira visita ao gerador) |
 | docs.html | Documentação (guia, referência do JSON, solução de problemas), em `/docs` |
 | admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
@@ -152,3 +153,10 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 - **Enquadramento automático:** ao ler a história, o gerador move personagens parados que ficariam cortados pela câmera e afasta os que estão colados (as etiquetas dos nomes não se sobrepõem). O log avisa quando corrige algo.
 - **Correções:** cenários como `city`, `night` e `space` não quebram mais quando a cena não traz `bg`; colar o JSON completo da IA (plano, roteiro, story, publicacao) agora funciona e preenche o roteiro; `total` ausente ou 0 é recalculado; a duração inválida mostra uma mensagem em vez de erro técnico.
 - **Dica para etiquetas:** use nomes curtos nos personagens (ex.: "Zé"), porque a etiqueta cresce com o nome.
+
+
+## Novidades do build 13
+
+- **Motor extra 2 ligado ao gerador:** o `motor-extra2.js` agora é carregado pelo `index.html` (antes ficava de fora) e aparece no schema, nos Docs e no prompt da IA.
+- **Objetos novos:** `bigtext` (título grande com contorno e legenda), `highlight` (marca-texto animado) e `steps` (etapas que acendem).
+- **Pós-efeitos de cinema:** `vignette`, `grain`, `scanlines`, `grade`, `fadeIn`, `fadeOut` e `progress`, na cena ou em `style`. Histórias sem esses campos saem exatamente como antes.
