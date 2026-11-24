@@ -134,15 +134,49 @@ function synthBed(story) {
 }
 const rms = (a, n) => { let s = 0; n = Math.min(n, a.length); for (let i = 0; i < n; i++) s += a[i] * a[i]; return Math.sqrt(s / Math.max(1, n)); };
 
-// Lista pausas da fala (para ajudar a marcar o tempo das cenas).
-function detectPauses(buf, thr = 0.0126, minDur = 0.28) {
-  const d = buf.getChannelData(0), win = Math.floor(buf.sampleRate * 0.02), out = [];
-  let start = null;
-  for (let i = 0; i + win <= d.length; i += win) {
-    let s = 0; for (let j = 0; j < win; j++) s += d[i + j] * d[i + j];
-    const quiet = Math.sqrt(s / win) < thr, t = i / buf.sampleRate;
-    if (quiet && start === null) start = t;
-    if (!quiet && start !== null) { if (t - start >= minDur) out.push([+start.toFixed(2), +t.toFixed(2)]); start = null; }
+// Análise da voz (build 14): acha onde a pessoa realmente fala e onde faz pausa.
+// O limiar é ADAPTATIVO (relativo ao volume da própria gravação), então funciona com voz baixa, alta,
+// com ruído de fundo ou vinda do TTS. Devolve:
+//   speech: trechos de fala [[ini, fim], ...] em segundos
+//   env:    volume suavizado e normalizado (0 a 1), 100 valores por segundo (usado na boca)
+//   dur:    duração do áudio
+function analyzeVoice(buf) {
+  const sr = buf.sampleRate, n = buf.length, chs = [];
+  for (let c = 0; c < buf.numberOfChannels; c++) chs.push(buf.getChannelData(c));
+  const hop = Math.max(1, Math.round(sr / 100)), m = Math.floor(n / hop), raw = new Float32Array(m);
+  for (let i = 0; i < m; i++) {
+    let s = 0; const a = i * hop;
+    for (const d of chs) for (let j = 0; j < hop; j++) { const v = d[a + j]; s += v * v; }
+    raw[i] = Math.sqrt(s / (hop * chs.length));
   }
+  const env = new Float32Array(m);
+  for (let i = 0; i < m; i++) env[i] = (raw[Math.max(0, i - 1)] + 2 * raw[i] + raw[Math.min(m - 1, i + 1)]) / 4;
+  const dur = n / sr;
+  if (!m) return { speech: [], env, dur, rate: 100 };
+  const sorted = Float32Array.from(env).sort(), q = p => sorted[Math.min(m - 1, Math.floor(p * (m - 1)))];
+  const lo = q(0.10), hi = q(0.95);
+  if (hi < 1e-4) return { speech: [], env: new Float32Array(m), dur, rate: 100 };
+  const on = lo + (hi - lo) * 0.10, off = lo + (hi - lo) * 0.06; // histerese: liga em "on", desliga abaixo de "off"
+  const segs = []; let st = -1;
+  for (let i = 0; i < m; i++) {
+    if (st < 0) { if (env[i] > on) st = i; }
+    else if (env[i] < off) { segs.push([st / 100, i / 100]); st = -1; }
+  }
+  if (st >= 0) segs.push([st / 100, m / 100]);
+  const merged = []; // junta buracos curtos (consoantes fracas) e descarta estalos
+  for (const sg of segs) {
+    const last = merged[merged.length - 1];
+    if (last && sg[0] - last[1] < 0.12) last[1] = sg[1]; else merged.push([sg[0], sg[1]]);
+  }
+  const speech = merged.filter(sg => sg[1] - sg[0] >= 0.07).map(sg => [+sg[0].toFixed(3), +sg[1].toFixed(3)]);
+  const norm = new Float32Array(m); for (let i = 0; i < m; i++) norm[i] = Math.min(1, Math.max(0, (env[i] - lo) / Math.max(1e-6, hi - lo)));
+  return { speech, env: norm, dur, rate: 100 };
+}
+
+// Lista pausas da fala (para ajudar a marcar o tempo das cenas). Inclui silêncio no início e no fim.
+function detectPauses(buf, thr, minDur = 0.2) {
+  const A = analyzeVoice(buf), out = []; let prev = 0;
+  for (const sg of A.speech) { if (sg[0] - prev >= minDur) out.push([+prev.toFixed(2), +sg[0].toFixed(2)]); prev = sg[1]; }
+  if (A.dur - prev >= minDur) out.push([+prev.toFixed(2), +A.dur.toFixed(2)]);
   return out;
 }

@@ -113,6 +113,7 @@ footer{max-width:1120px;margin:40px auto 0;color:var(--muted);font-size:12.5px;t
 
 <section class="step" id="s3"><div class="sh"><span class="n">3</span><h2>Vídeo</h2></div>
 <div class="row"><label class="fld">Estilo visual<select id="look"><option value="cartoon">Cartoon</option><option value="sketch">Desenho a lápis</option><option value="comic">Quadrinhos</option><option value="noir">Preto e branco</option><option value="neon">Neon</option><option value="retro">Retrô VHS</option><option value="pixel">Pixel art</option><option value="blueprint">Planta azul</option><option value="pastel">Pastel</option><option value="vintage">Filme antigo</option></select></label></div>
+<label class="fld" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:6px"><input type="checkbox" id="usetc" checked>Seguir à risca a minutagem escrita no roteiro (ex.: 0:05 – 0:12)</label>
 <div class="row start"><button class="sec" id="fit">Ajustar ao áudio</button><button class="sec" id="prev">Prévia</button><button class="go push" id="gen">Gerar vídeo</button></div>
 <progress id="bar" value="0" max="100"></progress><pre id="log">Gere a voz (passo 2) e clique em Gerar vídeo. Deixe a aba aberta e visível (Chrome ou Edge).</pre>
 <details class="more"><summary>Ajustes do vídeo</summary><div class="in">
@@ -155,7 +156,7 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
     anim:pop|float|spin|shake|pulse|fall|none, to:{x,y}, dur, front:true
 </pre></div></details></div></div></details>
 </div></main>
-<footer>Animaê · build 13</footer>
+<footer>Animaê · build 15</footer>
 <script src="audio.js"></script>
 <script src="schema.js"></script>
 <script src="auth.js"></script>
@@ -223,11 +224,16 @@ const PR={
  shelf:(p,s)=>{rr(-s*.7,-s*.02,s*1.4,s*.06,'#8a5a2b',3);const r=mulberry32(4),cl=['#e23b3b','#3b82e2','#f2c21b','#3fa34d','#9b59b6'];for(let i=0;i<9;i++){const hh=s*(.25+r()*.2);rr(-s*.64+i*s*.14,-hh,s*.11,hh,cl[i%5],3)}},
  sign:(p,s)=>{rr(-s*.7,-s*.3,s*1.4,s*.6,p.color||'#fff',14);c.fillStyle=K;c.font=`900 ${s*.28}px "Arial Black",Impact,sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(p.t||'',0,0)}
 };
+/* ---- voz (build 14): análise da fala real, usada na boca e no ajuste ---- */
+let VOICE=null;
+function mouthOpen(t){if(VOICE&&VOICE.env.length){const g=(CUR.t0||0)+t+.03,i=Math.floor(g*VOICE.rate),e=Math.max(VOICE.env[i]||0,VOICE.env[i+1]||0);return Math.min(1,Math.pow(e*1.3,.8))}return Math.abs(Math.sin(t*14))}
+function capGroups(txt){const ws=String(txt||'').trim().split(/\s+/).filter(Boolean),gs=[];
+  for(let i=0;i<ws.length;i++){let g=ws[i];if(i+1<ws.length&&(g.length<=3||ws[i+1].length<=3)&&(g+ws[i+1]).length<=11)g+=' '+ws[++i];gs.push(g)}return gs}
 function caption2(s,tt,dur){
-  const ws=String(s.caption).trim().split(/\s+/),gs=[];
-  for(let i=0;i<ws.length;i++){let g=ws[i];if(i+1<ws.length&&(g.length<=3||ws[i+1].length<=3)&&(g+ws[i+1]).length<=11)g+=' '+ws[++i];gs.push(g)}
+  const gs=capGroups(s.caption);if(!gs.length)return;
   const a=s.capStart??0,b=dur-(s.capEnd??.15),tot=gs.reduce((q,g)=>q+g.length+1,0);let acc=a,pick=null,gi=0;
-  for(const g of gs){const w=(b-a)*(g.length+1)/tot;if(tt>=acc&&tt<acc+w){pick=[g,tt-acc,gi];break}acc+=w;gi++;pick=tt>=b?[g,9,gi-1]:null}
+  if(Array.isArray(s.capT)&&s.capT.length===gs.length){let j=-1;for(let k=0;k<gs.length;k++)if(tt>=s.capT[k])j=k;if(j>=0)pick=[gs[j],tt-s.capT[j],j]}
+  else for(const g of gs){const w=(b-a)*(g.length+1)/tot;if(tt>=acc&&tt<acc+w){pick=[g,tt-acc,gi];break}acc+=w;gi++;pick=tt>=b?[g,9,gi-1]:null}
   if(!pick)return;const cs={...DEFCAP,...((story.style||{}).caption||{}),...(s.cs||{})};if(cs.upper)pick[0]=pick[0].toUpperCase();let sz=cs.size||130;const f=z=>`900 ${z}px "Arial Black",Impact,sans-serif`;c.font=f(sz);
   while(c.measureText(pick[0]).width>W-140&&sz>50){sz-=6;c.font=f(sz)}
   const sc=back(pick[1]/.18);c.save();c.translate(W/2,H*(cs.y??.69));c.scale(sc,sc);c.textAlign='center';c.textBaseline='middle';c.lineJoin='round';
@@ -371,7 +377,7 @@ function figure(a,t){
     const tl=mood==='angry'?.35*sd:(mood==='worry'||mood==='scared'||mood==='cry')?-.3*sd:0,by=ey-1.0*u-(mood==='shock'?.3*u:0);c.lineWidth=u*.2;c.beginPath();c.moveTo(ex-.7*u,by+tl*u*-sd*-1);c.lineTo(ex+.7*u,by-tl*u*-sd*-1);c.stroke()}
   if(a.glasses){c.lineWidth=u*.14;for(const sd of[-1,1]){c.beginPath();c.arc(hd[0]+sd*.85*u,ey,.95*u,0,7);c.stroke()}c.beginPath();c.moveTo(hd[0]-.1*u,ey);c.lineTo(hd[0]+.1*u,ey);c.stroke()}
   const mx=hd[0],my=hd[1]+1.05*u;c.lineWidth=u*.2;c.beginPath();
-  if(a.talk&&t>=a.talk[0]&&t<=a.talk[1]){c.fillStyle='#3a1020';c.ellipse(mx,my,.55*u,.15*u+Math.abs(Math.sin(t*14))*.45*u,0,0,7);c.fill();c.stroke()}
+  if(a.talk&&t>=a.talk[0]&&t<=a.talk[1]){c.fillStyle='#3a1020';c.ellipse(mx,my,.55*u,.15*u+mouthOpen(t)*.45*u,0,0,7);c.fill();c.stroke()}
   else if(mood==='shock'){c.fillStyle='#3a1020';c.ellipse(mx,my+.1*u,.4*u,.6*u,0,0,7);c.fill()}
   else if(mood==='laugh'){c.fillStyle='#3a1020';c.arc(mx,my-.3*u,.9*u,0,Math.PI);c.fill();c.stroke()}
   else if(mood==='grin'){c.arc(mx,my-.3*u,.9*u,.1*Math.PI,.9*Math.PI);c.fillStyle='#fff';c.fill();c.stroke()}
@@ -849,25 +855,84 @@ function lowerThird(l,tt){const at=l.at||0;if(!l.t||tt<at||(l.end!=null&&tt>l.en
 function lateExtras(s,tt){if(s.title)safe(()=>titleDraw(s.title,tt));if(s.lower)safe(()=>lowerThird(s.lower,tt))}
 
 /* ---- ajuste inteligente à voz: alinha as cenas às pausas da fala e reescala os tempos internos ---- */
-const SCALEK=new Set(['at','t','end','move','dur','shake','capStart','capEnd','start','hold']);
-function scaleScene(o,f,top){if(Array.isArray(o)){o.forEach(v=>scaleScene(v,f))}else if(o&&typeof o==='object'){for(const k of Object.keys(o)){if(top&&(k==='t0'||k==='t1'))continue;const v=o[k];if(v&&typeof v==='object')scaleScene(v,f);else if(SCALEK.has(k)&&typeof v==='number')o[k]=+(v*f).toFixed(3)}}}
-function smartFit(st,buf,autoTalk){
-  const sc=st.scenes,D=buf.duration,P=detectPauses(buf);let sp0=0,sp1=D;
-  if(P.length&&P[0][0]<.05)sp0=P[0][1];if(P.length&&P[P.length-1][1]>D-.05)sp1=P[P.length-1][0];
-  const inner=P.filter(p=>p[0]>sp0+.3&&p[1]<sp1-.3),ch=sc.map(s=>Math.max(1,String(s.caption||'').trim().length)),tot=ch.reduce((a,b)=>a+b,0);
-  const b=[0];let acc=0,snapped=0,lastIdx=-1;
-  for(let i=0;i<sc.length-1;i++){acc+=ch[i];const est=sp0+(sp1-sp0)*acc/tot;let best=est,bs=1e9,bi=-1;
-    inner.forEach((p,k)=>{if(k<=lastIdx)return;const m=(p[0]+p[1])/2,d=Math.abs(m-est);if(d>2.2)return;const sc2=d-.4*(p[1]-p[0]);if(sc2<bs){bs=sc2;best=m;bi=k}});
-    if(bi>=0){lastIdx=bi;snapped++}b.push(Math.max(best,b[i]+.8))}
-  b.push(Math.max(D,b[b.length-1]+.8));
-  const old=sc.map(s=>({t0:s.t0,t1:s.t1})),oldSfx=arr(st.sfx).map(x=>({...x}));
-  sc.forEach((s,i)=>{const od=old[i].t1-old[i].t0,nd=b[i+1]-b[i],f=od>0?nd/od:1;scaleScene(s,f,true);s.t0=+b[i].toFixed(2);s.t1=+b[i+1].toFixed(2);
-    const pa=P.find(p=>p[0]<=s.t0+.1&&p[1]>s.t0+.05);if(pa&&i>0)s.capStart=+clamp(pa[1]-s.t0,0,1.2).toFixed(2);else if(i===0)s.capStart=+clamp(sp0,0,1.2).toFixed(2);
-    const pb=P.find(p=>p[0]>s.t1-1.2&&p[0]<s.t1-.1&&p[1]>=s.t1-.05);s.capEnd=pb?+clamp(s.t1-pb[0],.1,1.2).toFixed(2):.15;
-    if(autoTalk){const a0=arr(s.actors)[0];if(a0&&!a0.talk&&s.caption)a0.talk=[+(s.capStart||.15).toFixed(2),+(Math.max((s.capStart||.15)+.5,s.t1-s.t0-s.capEnd)).toFixed(2)]}});
-  st.sfx=oldSfx.filter(x=>typeof x.t==='number').map(x=>{let i=old.findIndex(o=>x.t>=o.t0&&x.t<o.t1);if(i<0)i=old.length-1;const o=old[i],f=(b[i+1]-b[i])/Math.max(.01,o.t1-o.t0);x.t=+(b[i]+(x.t-o.t0)*f).toFixed(2);return x});
+const SCALEK=new Set(['at','t','end','move','dur','shake','capStart','capEnd','start','hold','leanAt','leanDur']);
+function scaleScene(o,f,top){if(Array.isArray(o)){o.forEach(v=>scaleScene(v,f))}else if(o&&typeof o==='object'){for(const k of Object.keys(o)){if(top&&(k==='t0'||k==='t1'))continue;const v=o[k];if(k==='talk'&&Array.isArray(v)&&v.every(x=>typeof x==='number')){o[k]=v.map(x=>+(x*f).toFixed(3));continue}if(v&&typeof v==='object')scaleScene(v,f);else if(SCALEK.has(k)&&typeof v==='number')o[k]=+(v*f).toFixed(3)}}}
+/* ---- minutagem escrita no roteiro (build 15): "0:05 – 0:12 texto..." manda nos cortes das cenas ---- */
+const TCT='(?:\\d{1,2}:)?\\d{1,2}:\\d{2}(?:[.,]\\d{1,3})?';
+const tcSec=t=>{const p=t.replace(',','.').split(':').map(Number);return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1]};
+function parseTimecodes(text){
+  const R=new RegExp('('+TCT+')\\s*(?:[-–—]+>?|->|até|a)\\s*('+TCT+')'),S1=new RegExp('^\\s*[\\[(]?\\s*('+TCT+')\\s*[\\])]?(?![\\d:])'),out=[];
+  for(const ln of String(text||'').split(/\r?\n/)){let m=ln.match(R);
+    if(m){out.push({t0:tcSec(m[1]),t1:tcSec(m[2])});continue}
+    m=ln.match(S1);if(m)out.push({t0:tcSec(m[1]),t1:null})}
+  for(let i=0;i<out.length;i++)if(out[i].t1==null&&i+1<out.length)out[i].t1=out[i+1].t0;
+  return out}
+function strictFit(st,tc,buf,autoTalk){
+  const sc=st.scenes,n=sc.length,S=buf?analyzeVoice(buf).speech:[],D=buf?buf.duration:0,warn=[];
+  const old=sc.map(x=>({t0:x.t0,t1:x.t1})),oldSfx=arr(st.sfx).map(x=>({...x}));
+  const use=tc.slice(0,n);
+  if(tc.length>n)warn.push(`o roteiro tem ${tc.length} tempos e a história só ${n} cenas (sobraram ${tc.length-n} tempos sem cena)`);
+  if(tc.length<n)warn.push(`o roteiro tem ${tc.length} tempos para ${n} cenas (as últimas ${n-tc.length} cenas dividem o tempo que sobra)`);
+  const b=[0];
+  for(let i=1;i<use.length;i++){let v=use[i].t0;if(v<=b[i-1]+.05){warn.push(`o tempo ${i+1} (${v.toFixed(2)} s) não vem depois do anterior`);v=b[i-1]+.1}b.push(v)}
+  if(use.length===tc.length&&tc[tc.length-1].t1==null)warn.push('o último tempo do roteiro não tem horário de fim; usei o fim da voz'+(D?'':' (ou da história, sem voz)'));
+  const lastEnd=use[use.length-1].t1??(D||old[n-1].t1);
+  if(use.length<n){const rest=n-use.length,span=Math.max(lastEnd,b[b.length-1]+.3)+Math.max(rest*.8,(D||0)-lastEnd),base=Math.max(lastEnd,b[b.length-1]+.3),ow=sc.slice(use.length).map((x,k)=>Math.max(.3,old[use.length+k].t1-old[use.length+k].t0)),ot=ow.reduce((q,v)=>q+v,0);
+    let acc=base;for(let k=0;k<rest;k++){b.push(acc);acc+=(span-base)*ow[k]/ot}b.push(span)}
+  else b.push(Math.max(lastEnd,b[n-1]+.3));
+  if(use[0].t0>.05)warn.push(`a 1ª cena começa em ${use[0].t0.toFixed(2)} s no roteiro, mas o vídeo sempre começa em 0`);
+  if(D&&b[n]>D+.5)warn.push(`o roteiro termina em ${b[n].toFixed(1)} s e a voz só tem ${D.toFixed(1)} s (o vídeo é cortado no fim da voz)`);
+  applyBounds(st,b,S,old,oldSfx,autoTalk);
+  return `Cenas ajustadas à minutagem do roteiro: ${n} cortes exatos nos tempos escritos (duração ${st.total.toFixed(1)} s).`+(S.length?' Legendas e boca seguem a fala dentro de cada cena.':' (sem voz carregada: legendas espaçadas igualmente dentro da cena)')+(warn.length?'\nAtenção: '+warn.join('; ')+'.':'')}
+
+const sylW=w=>{const x=String(w).toLowerCase();return Math.max(1,(x.match(/[aeiouáéíóúâêôãõàèìòùü]+/g)||[]).length)+(x.match(/\d/g)||[]).length*.8+.35};
+const capW=txt=>String(txt||'').trim().split(/\s+/).filter(Boolean).reduce((q,w)=>q+sylW(w),0);
+function applyBounds(st,b,S,old,oldSfx,autoTalk){
+  const sc=st.scenes;
+  sc.forEach((s,i)=>{const od=old[i].t1-old[i].t0,nd=b[i+1]-b[i],fk=od>0?nd/od:1;scaleScene(s,fk,true);s.t0=+b[i].toFixed(2);s.t1=+b[i+1].toFixed(2);delete s.capT;
+    const t0=b[i],t1=b[i+1],seg=S.map(g=>[Math.max(g[0],t0),Math.min(g[1],t1)]).filter(g=>g[1]-g[0]>.04);
+    if(!seg.length)return;
+    const first=seg[0][0],last=seg[seg.length-1][1];s.capStart=+clamp(first-t0-.04,0,1.5).toFixed(2);s.capEnd=+clamp(t1-last,.1,1.5).toFixed(2);
+    if(s.caption){const gs=capGroups(s.caption);if(gs.length){
+      const sl=seg.map(g=>g[1]-g[0]),so=[];let T=0;seg.forEach((g,k)=>{so.push(T);T+=sl[k]});
+      const tAt=y=>{y=clamp(y,0,T);for(let k=seg.length-1;k>=0;k--)if(y>=so[k])return seg[k][0]+Math.min(y-so[k],sl[k]);return seg[0][0]};
+      const gw=gs.map(capW),tw=gw.reduce((q,v)=>q+v,0),used=new Set(),starts=[];let cw=0;
+      gs.forEach((g,j)=>{let q=tAt(T*cw/tw);
+        if(j>0&&/[,.;:!?…]["')»”]*$/.test(gs[j-1])){let bi=-1,bd=.55;seg.forEach((z,k)=>{if(k===0||used.has(k))return;const d=Math.abs(z[0]-q);if(d<bd){bd=d;bi=k}});if(bi>=0){used.add(bi);q=seg[bi][0]}}
+        if(j>0)q=Math.max(q,starts[j-1]+.08);starts.push(q);cw+=gw[j]});
+      s.capT=starts.map(q=>+Math.max(0,q-t0-.04).toFixed(3))}}
+    if(autoTalk){const a0=arr(s.actors)[0];if(a0&&s.caption)a0.talk=[s.capStart,+Math.max(s.capStart+.3,t1-t0-s.capEnd).toFixed(2)]}});
+  st.sfx=oldSfx.filter(x=>typeof x.t==='number').map(x=>{let i=old.findIndex(o=>x.t>=o.t0&&x.t<o.t1);if(i<0)i=old.length-1;const o=old[i],fk=(b[i+1]-b[i])/Math.max(.01,o.t1-o.t0);x.t=+(b[i]+(x.t-o.t0)*fk).toFixed(2);return x});
   st.total=+b[b.length-1].toFixed(2);
-  return `Cenas alinhadas à voz (${snapped} de ${sc.length-1} cortes ajustados a pausas reais; duração ${st.total.toFixed(1)} s).`+(autoTalk?' Boca do 1º personagem sincronizada com a fala.':'')}
+}
+/* Ajuste à voz (build 14). Em vez de repartir a duração total por letras, usa só o tempo de FALA real:
+   1) acha os trechos falados e os buracos (pausas); 2) estima onde cada cena deveria acabar em "segundos de fala"
+   (por sílabas, pausas não contam); 3) escolhe, por programação dinâmica, os buracos reais que melhor casam com
+   esses pontos (preferindo pausa longa após frase terminada); 4) dentro de cada cena calcula quando cada palavra
+   da legenda é falada (capT) e quando a boca fala (talk). */
+function smartFit(st,buf,autoTalk){
+  const sc=st.scenes,A=analyzeVoice(buf),D=buf.duration,S=A.speech;
+  if(!S.length)return 'Não achei fala no áudio (volume muito baixo ou arquivo vazio). Confira o arquivo de voz.';
+  const cum=[];let Ts=0;S.forEach(g=>{cum.push(Ts);Ts+=g[1]-g[0]});
+  const timeAt=x=>{x=clamp(x,0,Ts);for(let k=S.length-1;k>=0;k--)if(x>=cum[k])return S[k][0]+Math.min(x-cum[k],S[k][1]-S[k][0]);return S[0][0]};
+  const G=[];for(let k=0;k<S.length-1;k++){const len=S[k+1][0]-S[k][1];if(len>=.15)G.push({a:S[k][1],b:S[k+1][0],len,x:cum[k+1]})}
+  const old=sc.map(s=>({t0:s.t0,t1:s.t1})),oldSfx=arr(st.sfx).map(x=>({...x}));
+  const wt=sc.map((s,i)=>s.caption?capW(s.caption):Math.max(1.5,(old[i].t1-old[i].t0)*1.5)),WT=wt.reduce((q,v)=>q+v,0);
+  const X=[];let acc=0;for(let i=0;i<sc.length-1;i++){acc+=wt[i];X.push(Ts*acc/WT)}
+  const term=sc.map(s=>/[.!?…]["')»”]*\s*$/.test(String(s.caption||'').trim()));
+  const K=X.length,P=G.length,U=1.3,INF=1e9,cost=(i,g)=>Math.abs(G[g].x-X[i])-(term[i]?.9:.35)*Math.min(G[g].len,.9);
+  const f=Array.from({length:K+1},()=>new Float64Array(P+1).fill(INF)),bk=Array.from({length:K+1},()=>new Int32Array(P+1)),ch=Array.from({length:K+1},()=>new Int32Array(P+1).fill(-1));
+  f[0][0]=0;
+  for(let i=0;i<K;i++)for(let p=-1;p<P;p++){const base=f[i][p+1];if(base>=INF)continue;
+    if(base+U<f[i+1][p+1]){f[i+1][p+1]=base+U;bk[i+1][p+1]=p;ch[i+1][p+1]=-1}
+    for(let g=p+1;g<P;g++){const v=base+cost(i,g);if(v<f[i+1][g+1]){f[i+1][g+1]=v;bk[i+1][g+1]=p;ch[i+1][g+1]=g}}}
+  let bs=0;for(let p=0;p<=P;p++)if(f[K][p]<f[K][bs])bs=p;
+  const asg=new Array(K).fill(-1);{let state=bs;for(let i=K;i>=1;i--){asg[i-1]=ch[i][state];state=bk[i][state]+1}}
+  const snapped=asg.filter(g=>g>=0).length;
+  const b=[0];asg.forEach((g,i)=>b.push(Math.max(g>=0?G[g].b-Math.min(.18,G[g].len*.5):timeAt(X[i]),b[i]+.8)));
+  b.push(Math.max(D,b[b.length-1]+.8));
+  applyBounds(st,b,S,old,oldSfx,autoTalk);
+  return `Cenas alinhadas à voz: ${snapped} de ${sc.length-1} cortes caíram em pausas reais; legendas palavra por palavra pela fala (${Ts.toFixed(1)} s de fala em ${D.toFixed(1)} s); duração ${st.total.toFixed(1)} s.`+(autoTalk?' Boca do 1º personagem acompanha o volume da voz.':'')}
 
 function drawFrame(st,t){
   const sc=st.scenes,s=sc.find(q=>t>=q.t0&&t<q.t1)||sc[sc.length-1],tt=Math.max(0,t-s.t0),dur=s.t1-s.t0,e=eio(tt/dur),cm=s.cam||{},CK=camAt(cm,tt,e);if(cm.follow!=null&&arr(s.actors)[cm.follow]){const fa=track(s.actors[cm.follow],tt),fk=cm.fk??.85;CK.x=lerp(CK.x,fa.x+(cm.fx||0),fk);CK.y=lerp(CK.y,fa.y-(cm.fy??380),fk)}
@@ -938,7 +1003,7 @@ show();drawFrame(story,2.5);
 $('look').onchange=()=>{if(!readStory())return;story.style=story.style||{};story.style.look=$('look').value;show();drawFrame(story,Math.min(2.5,story.total-.1))};
 $('jf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('story').value=await f.text();if(readStory()){drawFrame(story,.5);log('História carregada.'+WARN)}};
 async function setVoice(ab,label){ac=new(window.AudioContext||window.webkitAudioContext)({sampleRate:SR});
-  try{voiceBuf=await ac.decodeAudioData(ab);log((label||'Áudio')+`: ${voiceBuf.duration.toFixed(1)} s`);return true}catch(x){log('Áudio inválido: '+x.message);return false}}
+  try{voiceBuf=await ac.decodeAudioData(ab);VOICE=analyzeVoice(voiceBuf);log((label||'Áudio')+`: ${voiceBuf.duration.toFixed(1)} s`);return true}catch(x){log('Áudio inválido: '+x.message);return false}}
 $('audio').onchange=async e=>{const f=e.target.files[0];if(!f)return;await setVoice(await f.arrayBuffer())};
 const openAdv=()=>{const d=$('advanced');d.open=true;d.scrollIntoView({behavior:'smooth',block:'center'})};
 /* ---- voz com IA (TTS no servidor): texto do roteiro -> MP3 -> mesmo caminho do áudio enviado ---- */
@@ -961,7 +1026,7 @@ $('ttsgo').onclick=async()=>{if(busy||!ttsOk)return;const text=$('script').value
   catch(e){st.textContent=e.message;log(e.message)}finally{b.disabled=false}};
 $('ttsplay').onclick=()=>{if(!ttsUrl)return;if(window._ttsA){window._ttsA.pause();window._ttsA=null;$('ttsplay').textContent='Ouvir';return}
   const a=new Audio(ttsUrl);window._ttsA=a;$('ttsplay').textContent='Parar';a.onended=()=>{window._ttsA=null;$('ttsplay').textContent='Ouvir'};a.play()};
-$('fit').onclick=()=>{if(!voiceBuf)return log('Falta a voz: gere a voz no passo 2 ou envie sua gravação em Avançado.');if(!readStory())return;if(story.scenes.some(s=>s&&s.caption)){const m=smartFit(story,voiceBuf,$('autotalk')?$('autotalk').checked:true);show();return log(m)}const f=voiceBuf.duration/story.total,r=v=>+(v*f).toFixed(2);
+$('fit').onclick=()=>{if(!readStory())return;{const tc=$('usetc')&&$('usetc').checked?parseTimecodes($('script').value):[];if(tc.length){const m=strictFit(story,tc,voiceBuf,$('autotalk')?$('autotalk').checked:true);show();return log(m)}}if(!voiceBuf)return log('Falta a voz: gere a voz no passo 2 ou envie sua gravação em Avançado.');if(story.scenes.some(s=>s&&s.caption)){const m=smartFit(story,voiceBuf,$('autotalk')?$('autotalk').checked:true);show();return log(m)}const f=voiceBuf.duration/story.total,r=v=>+(v*f).toFixed(2);
   story.scenes.forEach(s=>{s.t0=r(s.t0);s.t1=r(s.t1)});(story.sfx||[]).forEach(x=>x.t=r(x.t));story.total=+voiceBuf.duration.toFixed(2);show();log('Tempos ajustados (fator '+f.toFixed(2)+'). Marque as falas dos personagens (talk) à mão se precisar.')};
 $('pauses').onclick=()=>{if(!voiceBuf)return log('Falta a voz: gere a voz no passo 2 ou envie sua gravação em Avançado.');log('Pausas (s):\n'+detectPauses(voiceBuf).map(p=>p.join(' – ')).join('\n'))};
 const pickMime=()=>['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));

@@ -25,7 +25,12 @@ const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&
 
 // Limpa o texto: tira marcação, caracteres de controle e espaços repetidos.
 function clean(t) {
-  return String(t == null ? '' : t)
+  const TC = '(?:\\d{1,2}:)?\\d{1,2}:\\d{2}(?:[.,]\\d{1,3})?';
+  // minutagem do roteiro ("0:05 – 0:12", "[0:05]") não deve ser narrada
+  t = String(t == null ? '' : t)
+    .replace(new RegExp('[\\[(]?\\s*' + TC + '\\s*[\\])]?\\s*(?:[-–—]+>?|->|até|a)\\s*[\\[(]?\\s*' + TC + '\\s*[\\])]?\\s*[:|]?', 'g'), ' ')
+    .replace(new RegExp('^[ \\t]*[\\[(]?\\s*' + TC + '\\s*[\\])]?(?![\\d:])\\s*[:|–—-]?', 'gm'), ' ');
+  return String(t)
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ' ')
     .replace(/[*_#`>~|]+/g, ' ').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();

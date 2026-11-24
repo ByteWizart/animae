@@ -16,7 +16,7 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | server.js | Servidor local + API do Admin |
 | schema.js | Catálogo do formato de história e validador (usado por Docs, Admin e servidor) |
 | tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
-| audio.js | Trilha e efeitos sonoros gerados por código |
+| audio.js | Trilha e efeitos sonoros gerados por código + análise da voz (`analyzeVoice`: onde há fala e onde há pausa, com limiar adaptativo) |
 | auth.js | Login no navegador (Supabase): janela de entrar/criar conta, sessão e biblioteca na nuvem |
 | supabase.js | Ponte do servidor com o Supabase (confere o login, grava vídeos, lista usuários) |
 | supabase-schema.sql | **Único SQL do projeto**: tabelas `videos`, `stories` (RLS por usuário) e `ai_config` (provedor padrão e modelos, só o servidor acessa). Rode uma vez no SQL Editor do Supabase |
@@ -161,3 +161,25 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 - **Objetos novos:** `bigtext` (título grande com contorno e legenda), `highlight` (marca-texto animado) e `steps` (etapas que acendem).
 - **Pós-efeitos de cinema:** `vignette`, `grain`, `scanlines`, `grade`, `fadeIn`, `fadeOut` e `progress`, na cena ou em `style`. Histórias sem esses campos saem exatamente como antes.
 - **Chaves novas do Supabase:** o site aceita `sb_publishable_...` (no lugar da anon) e `sb_secret_...` (no lugar da service_role), além das antigas `eyJ...`. As novas vão só no cabeçalho `apikey`, porque o Supabase não as aceita como `Authorization: Bearer`.
+
+
+## Novidades do build 14: voz sincronizada
+
+O "Ajustar ao áudio" foi refeito para casar o vídeo com a fala real, não só com a duração do arquivo:
+
+- **Análise da voz adaptativa** (`analyzeVoice` em `audio.js`): o limiar de silêncio agora é relativo ao volume da própria gravação. Antes era um valor fixo, que errava com voz baixa, alta ou com ruído de fundo.
+- **Cortes de cena em pausas reais:** a posição de cada corte é estimada em "segundos de fala" (por sílabas, sem contar as pausas) e depois encaixada nos buracos reais da voz por programação dinâmica, preferindo pausa longa depois de frase terminada. Antes a duração total era dividida por número de letras.
+- **Legenda palavra por palavra pela fala** (`capT` na cena): cada palavra aparece quando é falada, respeitando as pausas de vírgula e ponto dentro da cena. Se o `capT` não existir (ou o texto da legenda mudar), vale o espaçamento antigo.
+- **Boca segue o volume da voz:** com a voz carregada, a boca abre e fecha conforme o volume real. Sem voz, continua o movimento padrão.
+- **Correção:** ao ajustar de novo, a janela `talk` e os tempos `leanAt`/`leanDur` agora são atualizados (antes ficavam com o tempo antigo, e a boca falava fora de hora). Com a opção "Boca do 1º personagem acompanha a fala" ligada, o `talk` é recalculado a cada ajuste.
+- **Como usar:** gere ou carregue a voz, clique em "Ajustar ao áudio" (de novo sempre que trocar a voz ou o roteiro), depois "Prévia".
+
+
+## Novidades do build 15: minutagem do roteiro manda
+
+- Escreva os tempos no roteiro, um por linha, no começo da cena: `0:05 – 0:12 texto da cena`, `[0:05-0:12] texto` ou só o início (`0:12 texto`, o fim é o início da próxima). Aceita `m:ss`, `h:mm:ss` e decimais (`0:05,5`). Os separadores podem ser `-`, `–`, `—`, `->`, `até` ou `a`.
+- Com a opção **"Seguir à risca a minutagem escrita no roteiro"** ligada (padrão), o botão **Ajustar ao áudio** usa esses tempos como cortes exatos: o 1º tempo vira a 1ª cena, o 2º a 2ª, e assim por diante. O tempo interno de cada cena (movimentos, balões, sons) é reescalado para caber. Sem tempos no roteiro, vale o ajuste automático pela fala (build 14).
+- Funciona até sem voz carregada. Com voz, as legendas e a boca continuam seguindo a fala **dentro** de cada cena.
+- O aviso no log diz quando o número de tempos é diferente do número de cenas, quando um tempo não vem depois do anterior ou quando o roteiro passa da duração da voz.
+- **Voz com IA:** os tempos escritos (`0:05 – 0:12`, `[0:05]`) são removidos antes de narrar. Um horário no meio da frase (ex.: "às 10:30") continua sendo lido.
+
