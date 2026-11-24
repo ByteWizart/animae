@@ -1,7 +1,7 @@
 {
   "name": "animae",
   "version": "0.4.0",
-  "description": "Gera shorts animados verticais no navegador. Voz com IA opcional (msedge-tts).",
+  "description": "Gera vídeos animados no navegador, verticais (9:16) ou horizontais (16:9). Voz com IA opcional (msedge-tts).",
   "scripts": { "start": "node server.js" },
   "dependencies": { "msedge-tts": "^2.1.1" },
   "license": "MIT"

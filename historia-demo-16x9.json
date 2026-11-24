@@ -1,0 +1,176 @@
+{
+ "total": 18,
+ "style": {
+  "aspect": "16:9",
+  "look": "cartoon",
+  "music": "happy"
+ },
+ "scenes": [
+  {
+   "t0": 0,
+   "t1": 6,
+   "scenery": "room",
+   "wall": "#e8a05a",
+   "floor": "#7a4a2a",
+   "tex": "plank",
+   "tr": "fade",
+   "cam": {
+    "z0": 1,
+    "z1": 1.15,
+    "x0": 960,
+    "x1": 1040,
+    "y0": 540,
+    "y1": 560
+   },
+   "caption": "Você levanta do sofá e esquece o que ia buscar.",
+   "title": {
+    "t": "ESQUECEU?",
+    "anim": "slam",
+    "at": 0.4,
+    "y": 0.2
+   },
+   "punch": [
+    {
+     "t": 4.2,
+     "z": 0.1
+    }
+   ],
+   "props": [
+    {
+     "type": "window",
+     "x": 1400,
+     "y": 300,
+     "s": 320
+    },
+    {
+     "type": "lamp",
+     "x": 170,
+     "y": 820,
+     "s": 260
+    },
+    {
+     "type": "sofa",
+     "x": 640,
+     "y": 900,
+     "s": 380
+    }
+   ],
+   "actors": [
+    {
+     "x": 1080,
+     "y": 920,
+     "h": 400,
+     "outfit": "hoodie",
+     "hair": "spiky",
+     "anim": "idle",
+     "mood": "scared",
+     "seq": [
+      {
+       "t": 3,
+       "anim": "think",
+       "mood": "worry"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "t0": 6,
+   "t1": 12,
+   "scenery": "street",
+   "scroll": 90,
+   "tr": "slide",
+   "cam": {
+    "z0": 1,
+    "z1": 1.1,
+    "x0": 960,
+    "x1": 1000,
+    "y0": 540,
+    "y1": 560
+   },
+   "caption": "Na rua, todo mundo parece saber para onde vai.",
+   "props": [
+    {
+     "type": "streetlamp",
+     "x": 1600,
+     "y": 900,
+     "s": 300
+    }
+   ],
+   "actors": [
+    {
+     "x": 560,
+     "y": 930,
+     "h": 400,
+     "outfit": "hoodie",
+     "hair": "spiky",
+     "anim": "walk"
+    },
+    {
+     "x": 1200,
+     "y": 930,
+     "h": 380,
+     "outfit": "lab",
+     "hair": "bun",
+     "tag": "Ana",
+     "anim": "idle",
+     "mood": "smile"
+    }
+   ]
+  },
+  {
+   "t0": 12,
+   "t1": 18,
+   "scenery": "sunset",
+   "tr": "iris",
+   "cam": {
+    "z0": 1.1,
+    "z1": 1,
+    "x0": 960,
+    "x1": 960,
+    "y0": 560,
+    "y1": 540
+   },
+   "fx": [
+    "birds"
+   ],
+   "caption": "No fim, a gente lembra: era só o celular.",
+   "actors": [
+    {
+     "x": 760,
+     "y": 900,
+     "h": 400,
+     "outfit": "hoodie",
+     "hair": "spiky",
+     "anim": "cheer",
+     "mood": "grin"
+    },
+    {
+     "x": 1180,
+     "y": 900,
+     "h": 380,
+     "outfit": "lab",
+     "hair": "bun",
+     "tag": "Ana",
+     "anim": "laugh",
+     "mood": "grin"
+    }
+   ]
+  }
+ ],
+ "sfx": [
+  {
+   "t": 0.05,
+   "type": "whoosh"
+  },
+  {
+   "t": 6.05,
+   "type": "whoosh"
+  },
+  {
+   "t": 12.05,
+   "type": "ping",
+   "f": 880
+  }
+ ]
+}

@@ -135,7 +135,26 @@ CHECAGEM FINAL (mentalmente, antes de responder): captions somam o roteiro; nenh
 
   const tarefa = edit ? '' : '\nTAREFA: crie o short para a ideia abaixo.';
   const extra = opts.extra ? `\n\nINSTRUÇÕES DA CASA (têm prioridade sobre o estilo padrão acima):\n${String(opts.extra).slice(0, 2000)}` : '';
-  return [head, roteiro, story, catalogText(level), level >= 2 ? DIR_MIN : direcao].concat(level >= 1 ? [] : [rec.join('\n\n')]).join('\n\n') + tarefa + extra;
+  const land = opts.aspect === '16:9';
+  const parts = [head, roteiro, story, catalogText(level), level >= 2 ? DIR_MIN : direcao].concat(level >= 1 ? [] : [land ? LAND_EXAMPLE : rec.join('\n\n')]);
+  return (land ? toLand(parts.join('\n\n')) : parts.join('\n\n')) + tarefa + extra;
+}
+
+/* Formato horizontal 16:9: o catálogo e os exemplos acima foram escritos para a tela vertical (1080x1920);
+   aqui os trechos que citam coordenadas são trocados pelos equivalentes da tela horizontal (1920x1080). */
+const LAND_RULE = 'FORMATO HORIZONTAL 16:9 (YouTube): a tela tem 1920 px de largura por 1080 de altura. Centro = (960, 540). Chão (pés dos personagens) em y 800–960; personagens com h 300–420; x entre 200 e 1720; no máximo 4 personagens por cena. Teto e janelas em y 150–450. Aproveite a largura: distribua personagens e objetos em x 250–1700, não os junte no meio. A legenda ocupa y 880–1000: deixe livre de sign/text. Coloque obrigatoriamente \"style\":{\"aspect\":\"16:9\"} (junto com look e music). Ignore as coordenadas verticais dos exemplos, se houver: use só esta tela.';
+const LAND_EXAMPLE = `EXEMPLO DE CENA HORIZONTAL (formato; crie as suas):
+{"t0":0,"t1":5,"scenery":"room","wall":"#e8a05a","floor":"#7a4a2a","tex":"plank","tr":"fade","cam":{"z0":1,"z1":1.15,"x0":960,"x1":1040,"y0":540,"y1":560},"caption":"Você levanta do sofá e esquece o que ia buscar.","title":{"t":"ESQUECEU?","anim":"slam","at":0.4,"y":0.2},"punch":[{"t":3.8,"z":0.1}],"props":[{"type":"window","x":1400,"y":300,"s":320},{"type":"lamp","x":170,"y":820,"s":260},{"type":"sofa","x":640,"y":900,"s":380}],"actors":[{"x":1080,"y":920,"h":400,"outfit":"hoodie","hair":"spiky","anim":"idle","mood":"scared","seq":[{"t":2.5,"anim":"cheer","mood":"grin"}]}]}`;
+function toLand(t) {
+  return t
+    .replace('shorts verticais animados (9:16, 1080x1920)', 'vídeos animados horizontais (16:9, 1920x1080)')
+    .replace('shorts animados verticais (9:16, 1080x1920) para YouTube Shorts, Reels e TikTok', 'vídeos animados horizontais (16:9, 1920x1080) para YouTube')
+    .replace('posições em px numa tela 1080x1920)', 'posições em px numa tela horizontal 1920x1080)')
+    .replace('Valores típicos: y 1350–1560, h 420–560, x 150–930.', 'Valores típicos (tela horizontal): y 800–960, h 300–420, x 200–1720.')
+    .replace('"x0":540,"x1":600,"y0":960,"y1":1050', '"x0":960,"x1":1040,"y0":540,"y1":580')
+    .replace('(zoom 1–1.6, x 400–680, y 900–1150)', '(zoom 1–1.6, x 760–1160, y 480–620)')
+    .replace('A região y 1250–1450 fica livre de sign/text: a legenda do vídeo fica ali.', LAND_RULE)
+    .replace(/y 1250–1450/g, 'y 880–1000');
 }
 
 /* ------------------------------------------------------------------ limpeza e direção automática ------------------------------------------------------------------ */
@@ -166,6 +185,7 @@ function fixStory(st, look, ctx) {
   if (!st || typeof st !== 'object' || !Array.isArray(st.scenes)) return st;
   coerceNums(st);
   const SET = SCHEMA.SET;
+  const land = (ctx && ctx.aspect === '16:9') || (isObj(st.style) && st.style.aspect === '16:9'); // formato horizontal: tela de 1920x1080
   let cur = 0;
   st.scenes = st.scenes.filter(s => s && typeof s === 'object').map(s => {
     let d = (typeof s.t0 === 'number' && typeof s.t1 === 'number' ? s.t1 - s.t0 : 0);
@@ -179,14 +199,14 @@ function fixStory(st, look, ctx) {
       a.bubbles = asArr(a.bubbles).filter(q => q && typeof q === 'object');
       if (!(Array.isArray(a.talk) && a.talk.length === 2 && a.talk.every(n => typeof n === 'number'))) delete a.talk;
       if (a.to && typeof a.to !== 'object') delete a.to;
-      if (typeof a.h !== 'number') a.h = 520;
+      if (typeof a.h !== 'number') a.h = land ? 400 : 520;
       if (a.anim && !SET.anim.has(a.anim)) a.anim = 'idle';
       if (a.mood && !SET.mood.has(a.mood)) delete a.mood;
       for (const [k, set] of [['outfit', SET.outfit], ['hair', SET.hair], ['hat', SET.hat], ['hold', SET.hold], ['holdL', SET.hold]]) if (a[k] && !set.has(a[k])) delete a[k];
       a.seq.forEach(q => { if (q.anim && !SET.anim.has(q.anim)) delete q.anim; if (q.mood && !SET.mood.has(q.mood)) delete q.mood; });
       a.bubbles.forEach(q => { if (q.say) q.say = String(q.say).split(/\s+/).slice(0, 4).join(' '); if (q.mark && !SET.mark.has(q.mark)) q.mark = '!'; });
       if (a.tag != null) a.tag = String(a.tag).slice(0, 14);
-      if (!a.to && (a.x < -150 || a.x > 1230)) a.x = Math.min(960, Math.max(120, a.x));
+      if (!a.to && (a.x < -150 || a.x > (land ? 2070 : 1230))) a.x = Math.min(land ? 1800 : 960, Math.max(120, a.x));
     });
     if (s.cam && (typeof s.cam !== 'object' || Array.isArray(s.cam))) delete s.cam;
     if (s.look && !SET.look.has(s.look)) delete s.look;
@@ -202,13 +222,14 @@ function fixStory(st, look, ctx) {
     s.props.forEach(p => {
       if (typeof p.s !== 'number') p.s = 240;
       if ((p.type === 'sign' || p.type === 'text') && p.t != null) p.t = String(p.t).split(/\s+/).slice(0, 3).join(' ').slice(0, 18);
-      if ((p.type === 'sign' || p.type === 'text') && p.y > 1250 && p.y < 1450) p.y = 1180; // faixa da legenda
+      if ((p.type === 'sign' || p.type === 'text') && (land ? (p.y > 880 && p.y < 1000) : (p.y > 1250 && p.y < 1450))) p.y = land ? 780 : 1180; // faixa da legenda
     });
     return s;
   });
   st.total = +cur.toFixed(2);
   st.style = isObj(st.style) ? st.style : {};
   delete st.style.caption;
+  if (land) st.style.aspect = '16:9'; else delete st.style.aspect;
   if (look && SET.look.has(look)) st.style.look = look;
   else if (!SET.look.has(st.style.look)) st.style.look = 'cartoon';
   const mu = isObj(st.style.music) ? st.style.music.type : st.style.music;
@@ -227,7 +248,10 @@ function autoDirect(st) {
   const durs = sc.map(s => { const d = s.t1 - s.t0, w = nWords(s.caption); return (w / d > 3.4) ? Math.min(w / 3.0, d * 1.35) : d; });
   if (durs.some((d, i) => Math.abs(d - (sc[i].t1 - sc[i].t0)) > .01)) retime(st, durs);
   // 2) câmera em toda cena
-  const camPool = [{ z0: 1, z1: 1.14, x0: 540, x1: 565, y0: 960, y1: 1010 }, { z0: 1.22, z1: 1, x0: 560, x1: 540, y0: 1040, y1: 960 }, { z0: 1, z1: 1.1, x0: 600, x1: 480, y0: 980, y1: 980 }];
+  const land = !!(st.style && st.style.aspect === '16:9');
+  const camPool = land
+    ? [{ z0: 1, z1: 1.14, x0: 960, x1: 990, y0: 540, y1: 570 }, { z0: 1.22, z1: 1, x0: 980, x1: 960, y0: 580, y1: 540 }, { z0: 1, z1: 1.1, x0: 1020, x1: 900, y0: 550, y1: 550 }]
+    : [{ z0: 1, z1: 1.14, x0: 540, x1: 565, y0: 960, y1: 1010 }, { z0: 1.22, z1: 1, x0: 560, x1: 540, y0: 1040, y1: 960 }, { z0: 1, z1: 1.1, x0: 600, x1: 480, y0: 980, y1: 980 }];
   sc.forEach((s, i) => { if (!s.cam) s.cam = { ...camPool[i % 3] }; });
   // 3) transições variadas
   const cnt = {}; sc.forEach((s, i) => { if (i) cnt[s.tr || 'fade'] = (cnt[s.tr || 'fade'] || 0) + 1; });
@@ -384,6 +408,7 @@ async function runStory({ llm, maxTokens, messages, look, ctx, tpm }) {
 }
 
 const optClean = o => ({
+  aspect: o.aspect === '16:9' ? '16:9' : '9:16',
   seconds: [20, 30, 45, 60].includes(+o.seconds) ? +o.seconds : 30,
   look: SCHEMA.SET.look.has(o.look) ? o.look : '',
   format: FORMATS[o.format] ? o.format : 'auto', tone: TONES[o.tone] ? o.tone : 'auto',
@@ -404,7 +429,7 @@ async function generate({ llm, maxTokens, tpm, idea, extra, ...raw }) {
   }
   if (b.out < 2800) throw httpErr(413, 'A ideia é longa demais para o limite de tokens por minuto do provedor de IA. Resuma a ideia.');
   const messages = [{ role: 'system', content: b.sys }, { role: 'user', content: user }];
-  const ctx = { music: o.music, toneMusic: (TONES[o.tone] || {}).music || '' };
+  const ctx = { music: o.music, toneMusic: (TONES[o.tone] || {}).music || '', aspect: o.aspect };
   const { out, issues, script } = await runStory({ llm, maxTokens: b.out, messages, look: o.look, ctx, tpm });
   return { title: cleanStr(out.titulo || 'Sem título', 80), script, story: out.story, issues, plan: cleanPlan(out.plano), publish: cleanPublish(out.publicacao), notice };
 }
@@ -412,12 +437,12 @@ async function generate({ llm, maxTokens, tpm, idea, extra, ...raw }) {
 // Edita uma história existente seguindo uma instrução ("deixe mais dinâmico", "troque para noite"...).
 async function refine({ llm, maxTokens, tpm, story, script, instruction, extra, ...raw }) {
   tpm = tpm || 8000;
-  const o = optClean({ ...raw, extra }), sj = JSON.stringify(story);
+  const o = optClean({ ...raw, aspect: (story && story.style && story.style.aspect) || raw.aspect, extra }), sj = JSON.stringify(story);
   const user = `INSTRUÇÃO DE EDIÇÃO:\n${instruction}\n\nROTEIRO ATUAL:\n${script || '(use as captions das cenas)'}\n\nSTORY ATUAL (JSON):\n${sj}`;
   const b = budget({ build: l => systemPrompt({ ...o, mode: 'edit', level: Math.max(1, l) }), user, maxTokens, tpm, minOut: Math.min(5200, Math.ceil(estTok(sj) * 1.15) + 500) });
   if (b.out < Math.ceil(estTok(sj) * 1.05) + 300) throw httpErr(413, `A história é grande demais para a IA editar dentro do limite de ${tpm} tokens por minuto do provedor de IA. Edite pelo JSON ou use um provedor/modelo com limite maior.`);
   const messages = [{ role: 'system', content: b.sys }, { role: 'user', content: user }];
-  const { out, issues, script: sc } = await runStory({ llm, maxTokens: b.out, messages, look: o.look || '', ctx: { music: '', toneMusic: '' }, tpm });
+  const { out, issues, script: sc } = await runStory({ llm, maxTokens: b.out, messages, look: o.look || '', ctx: { music: '', toneMusic: '', aspect: o.aspect }, tpm });
   return { title: cleanStr(out.titulo || '', 80), script: sc, story: out.story, issues, summary: cleanStr(out.resumo_mudancas, 400) };
 }
 

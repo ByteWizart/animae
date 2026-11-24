@@ -397,6 +397,7 @@
     L('cape', 'Capa', 'No personagem: "cape":true ou cor "#hex" (qualquer roupa), ou "outfit":"cape".'),
     L('skin', 'Tom de pele e cabelo', 'No personagem: "skin":"#8d5524" (ex.: #f7e2d0, #e8c39e, #c68b59, #8d5524, #5c3a21), "hairc":"#hex", "hatc":"#hex" (cor do chapéu), "color":"#hex" (cor da roupa), "stripec" (listras), "num" (camisa jersey).'),
     L('post', 'Pós-efeitos de cinema', 'Build 13. Na cena ou em "style": "vignette":0.5 (cantos escuros), "grain":0.3 (grão de filme), "scanlines":0.25 (linhas de monitor), "grade":{"sat":1.2,"contrast":1.1,"bright":1,"hue":0} (cor; Chrome/Edge). Só em "style": "fadeIn":0.6, "fadeOut":0.8 (abre/fecha do preto) e "progress":{"color":"#ff5fa2","h":10,"y":0} (barra de progresso).'),
+    L('aspect', 'Proporção da tela (vertical 9:16 ou horizontal 16:9)', 'No topo do JSON: "style":{"aspect":"16:9"} faz um vídeo horizontal para YouTube, com tela de 1920×1080 (centro 960,540; chão em y≈850; legenda em y≈930). Sem esse campo (ou com "9:16") o vídeo é vertical, com tela de 1080×1920. Todas as posições (x, y, tamanhos, câmera) são em pixels da tela do formato escolhido.'),
     L('music', 'Trilha', 'No topo do JSON: "style":{"music":"happy"} ou {"type":"tense","vol":0.8,"bpm":100}. Veja as trilhas disponíveis.'),
   ];
   const PROP_ANIMS = ['pop', 'float', 'spin', 'shake', 'pulse', 'fall', 'none', 'bounce', 'swing', 'wobble', 'grow', 'shrink', 'drift', 'blink', 'jelly', 'orbit', 'slidein', 'riseup', 'flipx', 'beat', 'zoomin'];
@@ -457,6 +458,7 @@
     if (!st || typeof st !== 'object' || Array.isArray(st)) { E('', 'A história precisa ser um objeto JSON.'); return out; }
     if (!num(st.total) || st.total <= 0) E('total', '"total" (duração em segundos) deve ser um número maior que 0.');
     if (!Array.isArray(st.scenes) || !st.scenes.length) { E('scenes', '"scenes" deve ser uma lista com pelo menos uma cena.'); return out; }
+    if (st.style && st.style.aspect !== undefined && st.style.aspect !== '9:16' && st.style.aspect !== '16:9') W('style.aspect', '"aspect" deve ser "9:16" (vertical) ou "16:9" (horizontal); outro valor será tratado como vertical.');
     if (st.style && st.style.look !== undefined) oneOf('style.look', st.style.look, SET.look, 'Estilo');
     if (st.style && st.style.music !== undefined) oneOf('style.music', typeof st.style.music === 'object' && st.style.music ? st.style.music.type : st.style.music, SET.music, 'Trilha');
     let prevEnd = null;

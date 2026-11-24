@@ -42,7 +42,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 
 <div class="hero">
   <h1>Documentação</h1>
-  <p>Tudo para transformar uma narração e uma história em JSON num short vertical animado (1080×1920), gerado direto no navegador, sem API paga.</p>
+  <p>Tudo para transformar uma narração e uma história em JSON num vídeo animado vertical (9:16, 1080×1920) ou horizontal (16:9, 1920×1080), gerado direto no navegador, sem API paga.</p>
   <a class="btn" href="#inicio">Começar em 4 passos</a> <a class="btn sec" href="#json">Referência do JSON</a>
 </div>
 
@@ -118,7 +118,8 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 <tr><td><b>Voz</b></td><td>Áudio da narração. Entra no vídeo junto com a trilha e os efeitos sonoros gerados por código.</td></tr>
 <tr><td><b>História (.json)</b></td><td>Arquivo ou texto com cenas, personagens e objetos. Erros de sintaxe aparecem no quadro de log.</td></tr>
 <tr><td><b>Estilo</b></td><td>Aparência de todo o vídeo. Grava <code>style.look</code> no JSON. Para uma cena só, use <code>"look"</code> dentro dela.</td></tr>
-<tr><td><b>720p / 1080p</b></td><td>720p gera mais rápido; 1080p fica mais nítido e o arquivo é maior.</td></tr>
+<tr><td><b>Proporção da tela</b></td><td>Vertical 9:16 (Shorts, Reels, TikTok) ou horizontal 16:9 (YouTube). Grava <code>style.aspect</code> no JSON e a IA já organiza as cenas para a tela escolhida. Ao trocar o formato de uma história pronta, as posições dela continuam as do formato antigo: gere de novo ou use "Melhorar com a IA".</td></tr>
+<tr><td><b>720p / 1080p</b></td><td>720p gera mais rápido; 1080p fica mais nítido e o arquivo é maior. No vertical é 720×1280 / 1080×1920; no horizontal, 1280×720 / 1920×1080.</td></tr>
 <tr><td><b>30 / 60 fps</b></td><td>60 fps deixa o movimento mais fluido, mas exige mais do computador.</td></tr>
 <tr><td><b>Ajustar ao áudio</b></td><td>Reescala <code>t0</code>, <code>t1</code> e os <code>sfx</code> para a duração real da voz. Marque falas (<code>talk</code>) à mão se precisar.</td></tr>
 <tr><td><b>Detectar pausas</b></td><td>Lista os silêncios da voz (em segundos) para você alinhar a troca de cenas.</td></tr>
@@ -129,7 +130,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 </section>
 
 <section class="doc" id="json" data-g="Referência do JSON"><h2>Estrutura da história</h2>
-<p>O arquivo é um objeto com a duração total, um estilo opcional e a lista de cenas. Tempos são sempre em <b>segundos</b>; posições, em pixels de uma tela de <b>1080×1920</b> (os pés do personagem ficam em <code>y</code>).</p>
+<p>O arquivo é um objeto com a duração total, um estilo opcional e a lista de cenas. Tempos são sempre em <b>segundos</b>; posições, em pixels da tela do formato escolhido: <b>1080×1920</b> no vertical e <b>1920×1080</b> no horizontal (<code>"style":{"aspect":"16:9"}</code>). Os pés do personagem ficam em <code>y</code>.</p>
 <pre><code>{
   "total": 12,
   "style": { "look": "sketch", "caption": { "size": 110, "color": "#fff", "alt": "#ffd93b", "y": 0.69 } },
@@ -249,7 +250,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 </section>
 </main></div>
 
-<footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Animaê · build 11 · <a href="/gerar">voltar ao gerador</a></footer>
+<footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Animaê · build 16 · <a href="/gerar">voltar ao gerador</a></footer>
 </div>
 <script src="schema.js"></script>
 <script>

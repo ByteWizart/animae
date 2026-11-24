@@ -1,4 +1,4 @@
-# Animaê: gerador de shorts animados (no navegador, sem API paga)
+# Animaê: gerador de vídeos animados, verticais 9:16 ou horizontais 16:9 (no navegador, sem API paga)
 
 Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (voz com IA): rode `npm install` uma vez. Sem ela, tudo funciona, menos a voz com IA.
 
@@ -22,9 +22,9 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | supabase-schema.sql | **Único SQL do projeto**: tabelas `videos`, `stories` (RLS por usuário) e `ai_config` (provedor padrão e modelos, só o servidor acessa). Rode uma vez no SQL Editor do Supabase |
 | theme.js | Botão de tema claro/escuro (lua/sol na barra); a escolha fica salva no navegador |
 | ui.css | Estilos compartilhados (visual novo: degradê violeta/rosa/âmbar, claro e escuro automático) |
-| PROMPT-MOVIMENTOS.md | Bloco para colar no seu prompt de IA |
 | historia-teste.json | História de exemplo simples |
 | historia-demo-v9.json | História de 30 s que mostra os recursos novos (rua em movimento, gráfico, chat, glitch, holofote, palco...). Carregue em Avançado > Carregar história |
+| historia-demo-16x9.json | Exemplo de 18 s no formato horizontal 16:9 (tela de 1920×1080). Carregue em Avançado > Carregar história |
 | dados.json | Criado automaticamente: configurações, chaves de IA, histórico, senha (com hash) e endereço do painel. Não compartilhe |
 
 ## Como usar
@@ -183,3 +183,12 @@ O "Ajustar ao áudio" foi refeito para casar o vídeo com a fala real, não só 
 - O aviso no log diz quando o número de tempos é diferente do número de cenas, quando um tempo não vem depois do anterior ou quando o roteiro passa da duração da voz.
 - **Voz com IA:** os tempos escritos (`0:05 – 0:12`, `[0:05]`) são removidos antes de narrar. Um horário no meio da frase (ex.: "às 10:30") continua sendo lido.
 
+
+## Novidades do build 16: escolha entre 9:16 e 16:9
+
+- **Seletor "Proporção da tela"** no passo 1 do gerador: Vertical 9:16 (Shorts, Reels, TikTok; tela de 1080×1920, o padrão) ou Horizontal 16:9 (YouTube; tela de 1920×1080). Não confundir com o campo "Formato" de "Mais opções", que é o tipo de conteúdo (curiosidade, notícia...). A escolha vale para a prévia, para a IA e para o vídeo gravado, e fica salva no JSON em `style.aspect` (`"16:9"`; sem o campo, é vertical).
+- **Resolução:** vertical 720p = 720×1280 e 1080p = 1080×1920; horizontal 720p = 1280×720 e 1080p = 1920×1080.
+- **IA:** recebe o formato e organiza as cenas para a tela escolhida (centro 960,540, chão em y≈850, legenda em y≈930 no horizontal). "Copiar prompt para outra IA" e "Melhorar com a IA" também respeitam o formato.
+- **Motor:** chão, horizonte, legenda e título têm padrões próprios no horizontal; cenários, clima e efeitos preenchem toda a largura.
+- **Atenção:** trocar o formato de uma história pronta não converte as posições. Gere de novo ou use "Melhorar com a IA".
+- **Limpeza:** removidos `ajuda.html` (o endereço `/ajuda` continua redirecionando para `/docs`), `PROMPT-MOVIMENTOS.md` (substituído por "Copiar prompt para outra IA") e as histórias de teste `historia-demo-v12.json` e `historia-teste-build13.json`.
