@@ -46,10 +46,34 @@ const DEFAULTS = () => ({
   supabase: { url: '', anonKey: '', serviceKey: '', required: true, google: false },
   history: [], aiLog: [], aiStats: { total: 0, ok: 0, fail: 0, ms: 0 },
 });
+/* ---------- chaves criptografadas em disco (opcional: defina DATA_KEY) ---------- */
+// Com DATA_KEY no ambiente, as chaves de IA, a service_role e o segredo do 2FA são gravadas cifradas (AES-256-GCM) no dados.json.
+// Sem ela, continuam em texto puro (permissão 0600). Errar a DATA_KEY encerra o servidor, para nunca apagar as chaves por engano.
+const DATA_KEY = process.env.DATA_KEY ? crypto.scryptSync(process.env.DATA_KEY, 'animae-data-v1', 32) : null;
+const encS = v => {
+  if (!DATA_KEY || typeof v !== 'string' || !v || v.startsWith('enc:v1:')) return v;
+  const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', DATA_KEY, iv), ct = Buffer.concat([c.update(v, 'utf8'), c.final()]);
+  return 'enc:v1:' + [iv, c.getAuthTag(), ct].map(x => x.toString('base64')).join(':');
+};
+const decS = v => {
+  if (typeof v !== 'string' || !v.startsWith('enc:v1:')) return v;
+  try {
+    if (!DATA_KEY) throw 0;
+    const [iv, tag, ct] = v.slice(7).split(':').map(x => Buffer.from(x, 'base64')), d = crypto.createDecipheriv('aes-256-gcm', DATA_KEY, iv);
+    d.setAuthTag(tag); return Buffer.concat([d.update(ct), d.final()]).toString('utf8');
+  } catch { console.error('ERRO: o dados.json tem chaves cifradas, mas DATA_KEY está ausente ou incorreta. Defina a DATA_KEY original e reinicie.'); process.exit(1); }
+};
+function mapSecrets(d, f) {
+  if (!d || typeof d !== 'object') return d;
+  const pv = d.ai && d.ai.providers; if (pv && typeof pv === 'object') for (const v of Object.values(pv)) if (v && typeof v === 'object' && v.key) v.key = f(v.key);
+  if (d.supabase && d.supabase.serviceKey) d.supabase.serviceKey = f(d.supabase.serviceKey);
+  if (d.auth && d.auth.totp && d.auth.totp.secret) d.auth.totp.secret = f(d.auth.totp.secret);
+  return d;
+}
 let db = DEFAULTS();
 function load() {
   try {
-    const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')), base = DEFAULTS();
+    const d = mapSecrets(JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')), decS), base = DEFAULTS();
     db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } }, ai: { ...base.ai, ...(d.ai || {}) }, tts: { ...base.tts, ...(d.tts || {}) }, supabase: { ...base.supabase, ...(d.supabase || {}) } };
     delete db.stories; // a biblioteca agora fica no navegador de cada usuário
     // migração: o formato antigo (uma única chave, da Groq) vira o provedor "groq" do novo formato
@@ -70,7 +94,7 @@ function load() {
 }
 function save() {
   const tmp = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db, null, 1), { mode: 0o600 });
+  fs.writeFileSync(tmp, JSON.stringify(DATA_KEY ? mapSecrets(JSON.parse(JSON.stringify(db)), encS) : db, null, 1), { mode: 0o600 });
   fs.renameSync(tmp, DATA_FILE);
 }
 load();
@@ -80,14 +104,27 @@ const hashPw = (pw, salt) => crypto.scryptSync(String(pw), salt, 32).toString('h
 const hashPwAsync = (pw, salt) => new Promise((ok, no) => crypto.scrypt(String(pw).slice(0, 1024), salt, 32, (e, k) => e ? no(e) : ok(k.toString('hex'))));
 // Compara os SHA-256 dos dois textos: tempo constante e sem revelar o tamanho da senha.
 const safeEq = (a, b) => { const h = v => crypto.createHash('sha256').update(String(v)).digest(); return crypto.timingSafeEqual(h(a), h(b)); };
-function setPassword(pw) { pw = String(pw).slice(0, 1024); const salt = crypto.randomBytes(16).toString('hex'); db.auth = { salt, hash: hashPw(pw, salt) }; save(); }
+function setPassword(pw) { pw = String(pw).slice(0, 1024); const salt = crypto.randomBytes(16).toString('hex'); db.auth = { ...(db.auth || {}), salt, hash: hashPw(pw, salt) }; save(); }
 async function checkPassword(pw) {
   pw = String(pw == null ? '' : pw).slice(0, 1024);
   if (process.env.ADMIN_PASSWORD) return safeEq(pw, process.env.ADMIN_PASSWORD);
-  return !!db.auth && safeEq(await hashPwAsync(pw, db.auth.salt), db.auth.hash);
+  return !!(db.auth && db.auth.salt) && safeEq(await hashPwAsync(pw, db.auth.salt), db.auth.hash);
 }
+/* ---------- 2FA (TOTP, RFC 6238: Google Authenticator, Authy, 1Password...) ---------- */
+const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const b32enc = buf => { let bits = '', out = ''; for (const b of buf) bits += b.toString(2).padStart(8, '0'); for (let i = 0; i < bits.length; i += 5) out += B32[parseInt(bits.slice(i, i + 5).padEnd(5, '0'), 2)]; return out; };
+const b32dec = t => { let bits = ''; for (const c of t) bits += Math.max(0, B32.indexOf(c)).toString(2).padStart(5, '0'); const o = []; for (let i = 0; i + 8 <= bits.length; i += 8) o.push(parseInt(bits.slice(i, i + 8), 2)); return Buffer.from(o); };
+const hotp = (secret, ctr) => { const b = Buffer.alloc(8); b.writeBigUInt64BE(BigInt(ctr)); const h = crypto.createHmac('sha1', b32dec(secret)).update(b).digest(), o = h[19] & 15; return String((((h[o] & 0x7f) << 24) | (h[o + 1] << 16) | (h[o + 2] << 8) | h[o + 3]) % 1e6).padStart(6, '0'); };
+// Devolve o passo de tempo aceito (> 0) ou 0. Aceita ±30 s de diferença de relógio e recusa reutilizar um código já usado (last).
+function totpCheck(secret, code, last) {
+  code = String(code == null ? '' : code).replace(/\s/g, ''); if (!/^\d{6}$/.test(code) || !secret) return 0;
+  const now = Math.floor(Date.now() / 30000); let hit = 0;
+  for (let d = -1; d <= 1; d++) { const st = now + d; if (safeEq(hotp(secret, st), code) && st > (last || 0)) hit = st; }
+  return hit;
+}
+const totpOn = () => !!(db.auth && db.auth.totp && db.auth.totp.enabled);
 let firstRunPassword = null;
-if (!process.env.ADMIN_PASSWORD && !db.auth) {
+if (!process.env.ADMIN_PASSWORD && !(db.auth && db.auth.hash)) {
   firstRunPassword = crypto.randomBytes(6).toString('base64url');
   setPassword(firstRunPassword);
 }
@@ -105,6 +142,7 @@ function isAdmin(req) {
   return true;
 }
 const fails = new Map(); // ip -> {n, until}
+const loginFails = []; let loginBusy = 0; // falhas de login de todos os IPs (últimos 10 min) e conferências em andamento
 // Atrás de um proxy/hospedagem (Render, Railway, Nginx...), defina TRUST_PROXY=1 (quantos proxies confiáveis existem na frente).
 // Sem isso, todos os visitantes pareceriam ter o mesmo IP. Com isso ligado, o IP vem do X-Forwarded-For.
 const TRUST_PROXY = /^(true|yes|sim)$/i.test(process.env.TRUST_PROXY || '') ? 1 : Math.max(0, parseInt(process.env.TRUST_PROXY, 10) || 0);
@@ -391,7 +429,7 @@ function status() {
   db.history.forEach(h => { const t = new Date(h.at); t.setHours(0, 0, 0, 0); const e = byDay.find(x => x.day === t.getTime()); if (e) e.n++; });
   return {
     build: BUILD, node: process.version, platform: process.platform, port: PORT, uptime: Math.round((Date.now() - STARTED) / 1000),
-    passwordFromEnv: !!process.env.ADMIN_PASSWORD, dataBytes, files,
+    passwordFromEnv: !!process.env.ADMIN_PASSWORD, totp: totpOn(), encrypted: !!DATA_KEY, dataBytes, files,
     tts: ttsInfo(), counts: { videos: db.history.length, seconds: Math.round(secs), ideas: db.aiCount || 0 }, byLook,
     supabase: { enabled: sbCfg().enabled, required: sbCfg().required }, byDay, aiStats: db.aiStats || { total: 0, ok: 0, fail: 0, ms: 0 }, ai: aiInfo(), adminPath: adminPath(), adminPathFromEnv: !!process.env.ADMIN_PATH,
   };
@@ -447,7 +485,7 @@ async function api(req, res, p) {
   try {
     if (m !== 'GET' && m !== 'HEAD' && !sameOrigin(req)) return send(res, 403, { error: 'Origem não permitida.' });
     if (p === '/api/settings' && m === 'GET') return send(res, 200, publicSettings());
-    if (p === '/api/session' && m === 'GET') return send(res, 200, { admin: isAdmin(req), build: BUILD });
+    if (p === '/api/session' && m === 'GET') return send(res, 200, { admin: isAdmin(req), build: BUILD, totp: totpOn() });
 
     if (p === '/api/login' && m === 'POST') {
       const ip = ipOf(req), f = fails.get(ip);
@@ -455,7 +493,19 @@ async function api(req, res, p) {
       // A tentativa é contada ANTES de conferir a senha: chutes simultâneos não furam o limite.
       { const n = (f ? f.n : 0) + 1, lvl = f ? f.lvl || 0 : 0; fails.set(ip, n >= 5 ? { n: 0, lvl: lvl + 1, until: Date.now() + Math.min(900e3, 60e3 * 2 ** lvl), at: Date.now() } : { n, lvl, until: 0, at: Date.now() }); }
       const b = await body(req, 1e4);
-      if (!(await checkPassword(b.password))) return send(res, 401, { error: 'Senha incorreta.' });
+      // Ataque distribuído (muitos IPs): no máximo 3 conferências ao mesmo tempo e, se houver muitas falhas no total, cada tentativa espera mais.
+      if (loginBusy >= 3) return send(res, 429, { error: 'Muitas tentativas ao mesmo tempo. Aguarde alguns segundos.' });
+      loginBusy++;
+      let okLogin = false;
+      try {
+        const now = Date.now(); while (loginFails.length && now - loginFails[0] > 600e3) loginFails.shift();
+        if (loginFails.length > 30) await new Promise(r => setTimeout(r, Math.min(5000, 500 + (loginFails.length - 30) * 100)));
+        const tot = totpOn() ? db.auth.totp : null;
+        const okPw = await checkPassword(b.password), step = tot ? totpCheck(tot.secret, b.code, tot.last) : 1; // confere os dois sempre (sem revelar qual errou)
+        okLogin = okPw && !!step;
+        if (okLogin && tot) { tot.last = step; save(); }
+      } finally { loginBusy--; }
+      if (!okLogin) { loginFails.push(Date.now()); return send(res, 401, { error: totpOn() ? 'Senha ou código incorretos.' : 'Senha incorreta.' }); }
       fails.delete(ip);
       return send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${newSession()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MS / 1000}${isHttps(req) ? '; Secure' : ''}` });
     }
@@ -651,6 +701,25 @@ async function api(req, res, p) {
       if (typeof b.voice === 'string' && /^[a-z]{2,3}-[A-Z]{2}-[A-Za-z]{2,40}Neural$/.test(b.voice)) a.voice = b.voice;
       save(); return send(res, 200, ttsInfo());
     }
+    if (r[0] === 'totp' && m === 'POST') {
+      const b = await body(req, 1e3);
+      if (id === 'setup') {
+        if (totpOn()) return send(res, 409, { error: 'O 2FA já está ativo. Desative antes de gerar outro segredo.' });
+        const secret = b32enc(crypto.randomBytes(20)); db.auth = db.auth || {}; db.auth.totp = { secret, enabled: false, last: 0 }; save();
+        return send(res, 200, { secret, uri: 'otpauth://totp/Anima%20Admin?issuer=Anima&secret=' + secret });
+      }
+      if (id === 'enable') {
+        const t = db.auth && db.auth.totp; if (!t || t.enabled) return send(res, 400, { error: 'Gere o segredo primeiro.' });
+        const st = totpCheck(t.secret, b.code, 0); if (!st) return send(res, 400, { error: 'Código incorreto. Confira a hora do celular e tente de novo.' });
+        t.enabled = true; t.last = st; save(); return send(res, 200, { ok: true });
+      }
+      if (id === 'disable') {
+        const t = db.auth && db.auth.totp; if (!t) return send(res, 200, { ok: true });
+        const okPw = await checkPassword(b.password), st = t.enabled ? totpCheck(t.secret, b.code, t.last) : 1;
+        if (!okPw || !st) return send(res, 403, { error: 'Senha ou código incorretos.' });
+        delete db.auth.totp; save(); return send(res, 200, { ok: true });
+      }
+    }
     if (r[0] === 'adminpath' && m === 'POST') {
       if (process.env.ADMIN_PATH) return send(res, 409, { error: 'O caminho vem da variável ADMIN_PATH. Altere-a no ambiente.' });
       const b = await body(req, 1e4), v = String(b.path || '').replace(/^\/+/, '');
@@ -723,6 +792,8 @@ server.listen(PORT, async () => {
     }
   }
   else if (process.env.ADMIN_PASSWORD) console.log('  Senha do admin vem de ADMIN_PASSWORD.');
+  if (!DATA_KEY) console.log('  DICA: defina DATA_KEY no ambiente para gravar as chaves de API cifradas no dados.json.');
+  if (!totpOn()) console.log('  DICA: ative a verificação em duas etapas em Admin > Segurança.');
   if (!sbCfg().enabled) console.log('  AVISO: sem login, qualquer visitante usa a IA e a voz (limite global: ' + GLOBAL_MAX.ai + ' IA e ' + GLOBAL_MAX.tts + ' vozes por hora, ajustável por AI_ANON_PER_HOUR e TTS_ANON_PER_HOUR). Para abrir ao público, configure o login com Supabase.');
 });
 

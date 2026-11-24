@@ -17,9 +17,17 @@
 | 12 | Média | `database/supabase-schema.sql` | Qualquer conta grátis podia gravar linhas gigantes/ilimitadas. Adicionados limites de tamanho (CHECK), teto de linhas por usuário (trigger) e `revoke` do papel `anon`. **Rode o SQL de novo no Supabase.** |
 | 13 | Média | `package.json` | `axios 1.21.1` (dependência do msedge-tts) tem vulnerabilidades conhecidas. Adicionado `overrides` para `^1.13.0`: **rode `npm install`** para atualizar o lockfile. |
 
-## Riscos que continuam (decisão sua)
-- **Login CSRF no retorno OAuth/e-mail** (`auth.js`, tokens no `#hash`): um link forjado pode logar a vítima na conta do atacante. É inerente ao fluxo implícito do Supabase; o ideal é migrar para PKCE com `@supabase/supabase-js`.
-- Chaves de API e `service_role` ficam em texto puro no `dados.json` (permissão 0600). Prefira variáveis de ambiente.
-- Sem Supabase configurado, o site é aberto: só há limites por IP e globais.
-- Painel admin protegido por senha única + caminho secreto, sem 2FA.
-- O limite do login é por IP; um ataque distribuído (muitos IPs) ainda consegue tentar senhas. Use senha longa (≥ 16 caracteres) ou `ADMIN_PASSWORD`.
+## Segunda rodada (riscos que tinham ficado de fora)
+| # | Onde | O que foi feito |
+|---|------|-----------------|
+| 14 | `public/js/auth.js` | **Login CSRF corrigido com PKCE.** O retorno do Google/e-mail agora usa `?code=` e só vale no navegador que iniciou o pedido (o `code_verifier` fica guardado lá). Tokens no `#hash` não são mais aceitos e são removidos do endereço. |
+| 15 | `server.js` + Admin > Segurança | **2FA (TOTP)** para o painel: Google Authenticator, Authy, 1Password etc. Aceita ±30 s de relógio, não aceita reutilizar o mesmo código, e a resposta não revela se errou a senha ou o código. Ativação e desativação pelo painel. |
+| 16 | `server.js` login | **Força bruta distribuída:** no máximo 3 conferências simultâneas e, se houver muitas falhas somadas de todos os IPs, cada tentativa passa a esperar (até 5 s), sem trancar o admin legítimo. |
+| 17 | `server.js` | **Chaves cifradas em disco:** com `DATA_KEY` no ambiente, as chaves de IA, a `service_role` e o segredo do 2FA são gravadas com AES-256-GCM. Errar a `DATA_KEY` encerra o servidor (não apaga nada). |
+
+Como usar: `DATA_KEY=uma-frase-longa node server.js` (guarde essa frase: sem ela as chaves cifradas não abrem). Para o 2FA: Admin > Segurança > Ativar 2FA.
+
+## Limitações que continuam
+- Sem Supabase configurado, o site é aberto a qualquer visitante (só há limites por IP e globais).
+- Com `DATA_KEY` na mesma máquina/painel de hospedagem do `dados.json`, a proteção é contra vazamento do arquivo (backup, repositório), não contra quem já controla o servidor.
+- No Supabase, ative *Confirm email* e confira *Redirect URLs*: o PKCE exige que o link de retorno seja o mesmo domínio do site.

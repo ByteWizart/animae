@@ -221,3 +221,8 @@ O "Ajustar ao áudio" foi refeito para casar o vídeo com a fala real, não só 
 - **Login do admin:** 5 erros travam por 1 minuto, dobrando a cada nova rodada (máx. 15 min). A senha nova exige 10 caracteres. Sem terminal interativo, a senha inicial vai para `.dados/senha-inicial.txt` em vez do log.
 - **IA:** o texto e o JSON do usuário são tratados como dados; o prompt manda ignorar instruções escondidos neles.
 - Prefira definir as chaves por variável de ambiente (`GEMINI_API_KEY` etc.): assim nem chegam ao arquivo de dados.
+
+## Segurança extra (opcional)
+- `DATA_KEY`: grava as chaves de API cifradas no `dados.json`.
+- **2FA** do painel: Admin > Segurança. Se perder o app, apague `auth.totp` do `dados.json` (ou o arquivo inteiro, como na senha esquecida) e reinicie.
+- Veja `SEGURANCA.md` para a lista de correções.

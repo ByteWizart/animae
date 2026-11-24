@@ -31,6 +31,20 @@
   }
   function fromToken(j) { return { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at ? j.expires_at * 1000 : Date.now() + (j.expires_in || 3600) * 1000, user: j.user }; }
 
+  /* ---------- PKCE: o retorno do Google / e-mail só vale no navegador que iniciou o pedido ---------- */
+  // Sem isso, um link forjado com o token do atacante no #hash poderia logar a vítima na conta dele (login CSRF).
+  var PK = 'animae.pkce';
+  function b64u(buf) { var s = ''; new Uint8Array(buf).forEach(function (b) { s += String.fromCharCode(b); }); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function pkceStart(type) {
+    if (!(window.crypto && crypto.subtle)) return Promise.reject(new Error('Este navegador não permite login seguro nesta página (use HTTPS).'));
+    var v = b64u(crypto.getRandomValues(new Uint8Array(48)).buffer);
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)).then(function (h) {
+      try { localStorage.setItem(PK, JSON.stringify({ v: v, type: type || '', t: Date.now() })); } catch (e) {}
+      return b64u(h);
+    });
+  }
+  function pkceTake() { try { var j = JSON.parse(localStorage.getItem(PK)); localStorage.removeItem(PK); return j && j.v && Date.now() - j.t < 3600e3 ? j : null; } catch (e) { return null; } }
+
   function ensureFresh() {
     if (!S) return Promise.resolve();
     if (S.expires_at - Date.now() > 60e3) return Promise.resolve();
@@ -88,7 +102,7 @@
     document.body.appendChild(modal); document.body.style.overflow = 'hidden';
     var form = $('form', modal), msg = $('.amsg', modal);
     function say(t, ok) { msg.hidden = !t; msg.textContent = t || ''; msg.className = 'amsg' + (ok ? ' ok' : ''); }
-    modal.addEventListener('click', function (e) { if (e.target === modal || e.target.classList.contains('x')) { if (m !== 'newpass') close(); } var l = e.target.closest('[data-m]'); if (l) { e.preventDefault(); open(l.getAttribute('data-m')); } if (e.target.closest('[data-g]')) { location.href = CFG.url + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(location.origin + location.pathname); } });
+    modal.addEventListener('click', function (e) { if (e.target === modal || e.target.classList.contains('x')) { if (m !== 'newpass') close(); } var l = e.target.closest('[data-m]'); if (l) { e.preventDefault(); open(l.getAttribute('data-m')); } if (e.target.closest('[data-g]')) { pkceStart('oauth').then(function (ch) { location.href = CFG.url + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(location.origin + location.pathname) + '&code_challenge=' + ch + '&code_challenge_method=s256'; }).catch(function (er) { say(er.message); }); } });
     modal.addEventListener('keydown', function (e) { if (e.key === 'Escape' && m !== 'newpass') close(); });
     var first = $('input', modal); if (first) first.focus();
     form.addEventListener('submit', function (e) {
@@ -99,8 +113,8 @@
       var btn = $('button[type=submit]', form); btn.disabled = true;
       var p;
       if (m === 'login') p = api('POST', '/auth/v1/token?grant_type=password', { email: email, password: pw }).then(function (j) { store(fromToken(j)); done(); });
-      else if (m === 'signup') p = api('POST', '/auth/v1/signup', { email: email, password: pw, data: name ? { name: name } : {} }).then(function (j) { if (j.access_token) { store(fromToken(j)); done(); } else say('Conta criada! Enviamos um e-mail de confirmação: clique no link e depois entre.', true); });
-      else if (m === 'reset') p = api('POST', '/auth/v1/recover', { email: email, redirect_to: location.origin + location.pathname }).then(function () { say('Se esse e-mail tiver conta, o link já está a caminho.', true); });
+      else if (m === 'signup') p = pkceStart('signup').then(function (ch) { return api('POST', '/auth/v1/signup', { email: email, password: pw, data: name ? { name: name } : {}, code_challenge: ch, code_challenge_method: 's256' }); }).then(function (j) { if (j.access_token) { store(fromToken(j)); done(); } else say('Conta criada! Enviamos um e-mail de confirmação: clique no link e depois entre.', true); });
+      else if (m === 'reset') p = pkceStart('recovery').then(function (ch) { return api('POST', '/auth/v1/recover?redirect_to=' + encodeURIComponent(location.origin + location.pathname), { email: email, code_challenge: ch, code_challenge_method: 's256' }); }).then(function () { say('Se esse e-mail tiver conta, o link já está a caminho.', true); });
       else p = api('PUT', '/auth/v1/user', { password: pw }, S && S.access_token).then(function () { say('Senha alterada!', true); setTimeout(close, 900); });
       p.catch(function (er) { say(er.message); }).then(function () { btn.disabled = false; });
     });
@@ -112,12 +126,16 @@
     if (t) api('POST', '/auth/v1/logout', null, t).catch(function () {});
   }
 
-  /* ---------- retorno de OAuth / link de e-mail (tokens no #hash) ---------- */
-  function fromHash() {
-    if (location.hash.indexOf('access_token=') < 0 && location.hash.indexOf('error_description=') < 0) return null;
-    var q = new URLSearchParams(location.hash.slice(1)); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
-    if (q.get('error_description')) return { error: q.get('error_description').replace(/\+/g, ' ') };
-    return { access_token: q.get('access_token'), refresh_token: q.get('refresh_token'), expires_in: +q.get('expires_in') || 3600, type: q.get('type') };
+  /* ---------- retorno de OAuth / link de e-mail (?code= do PKCE) ---------- */
+  function fromUrl() {
+    var q = new URLSearchParams(location.search), hq = new URLSearchParams(location.hash.slice(1));
+    var err = q.get('error_description') || hq.get('error_description'), code = q.get('code'), legacy = location.hash.indexOf('access_token=') >= 0;
+    if (!err && !code && !legacy) return null;
+    ['code', 'error', 'error_code', 'error_description'].forEach(function (k) { q.delete(k); });
+    try { history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : '')); } catch (e) {} // tira código e tokens do endereço
+    if (err) return { error: err.replace(/\+/g, ' ') };
+    if (legacy) return { error: 'Esse tipo de link de acesso não é mais aceito. Entre com o seu e-mail e senha.' };
+    return { code: code };
   }
 
   window.Auth = {
@@ -136,10 +154,15 @@
   window.Auth.ready = origFetch('/api/config').then(function (r) { return r.json(); }).then(function (c) {
     CFG = Object.assign({ enabled: false, required: false }, c.auth || {});
     if (!CFG.enabled) return;
-    var h = fromHash(); S = load();
+    var h = fromUrl(); S = load();
     var chain = Promise.resolve();
     if (h && h.error) chain = chain.then(function () { open('login', h.error); });
-    else if (h && h.access_token) chain = api('GET', '/auth/v1/user', null, h.access_token).then(function (u) { store({ access_token: h.access_token, refresh_token: h.refresh_token, expires_at: Date.now() + h.expires_in * 1000, user: u }); if (h.type === 'recovery') setTimeout(function () { open('newpass'); }, 50); }).catch(function () {});
+    else if (h && h.code && !S) {
+      var pk = pkceTake();
+      chain = pk
+        ? api('POST', '/auth/v1/token?grant_type=pkce', { auth_code: h.code, code_verifier: pk.v }).then(function (j) { store(fromToken(j)); if (pk.type === 'recovery') setTimeout(function () { open('newpass'); }, 50); }).catch(function (er) { open('login', er.message || 'Link inválido ou expirado. Tente de novo.'); })
+        : chain.then(function () { open('login', 'Esse link só funciona no mesmo navegador em que você pediu o acesso. Peça de novo.'); });
+    }
     return chain.then(function () { return ensureFresh(); }).then(function () { notify(); });
   }).catch(function () {});
   document.addEventListener('DOMContentLoaded', function () { render(); });
