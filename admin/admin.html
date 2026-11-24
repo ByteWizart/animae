@@ -98,9 +98,9 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
     <div class="lock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
     <h1>Painel administrativo</h1>
     <p class="muted">Entre com a senha do administrador. Na primeira execução, ela é mostrada no terminal onde você rodou <code>node server.js</code>.</p>
-    <form id="lf">
+    <form id="lf" novalidate>
       <label class="f">Senha<input id="pw" type="password" autocomplete="current-password" required autofocus></label>
-      <label class="f hidden" id="codef">Código de 6 dígitos do app autenticador<input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" pattern="[0-9 ]{6,7}"></label>
+      <label class="f hidden" id="codef">Código de 6 dígitos do app autenticador<input id="code" inputmode="numeric" autocomplete="off" maxlength="7"></label>
       <div id="lerr" class="notice bad hidden" role="alert"></div>
       <button type="submit" style="width:100%;justify-content:center">Entrar</button>
     </form>
@@ -346,9 +346,11 @@ async function api(path,method='GET',data){
 const run=async(f)=>{try{await f()}catch(e){if(e.message!=='Sessão expirada.')toast(e.message,true)}};
 
 /* ---- login / sessão ---- */
-function showLogin(on2fa){$('app').classList.add('hidden');$('login').classList.remove('hidden');$('codef').classList.toggle('hidden',!on2fa);$('code').required=!!on2fa;$('pw').focus()}
+function showLogin(on2fa){$('app').classList.add('hidden');$('login').classList.remove('hidden');$('codef').classList.toggle('hidden',!on2fa);$('code').required=false;if(!on2fa)$('code').value='';$('pw').focus()}
 function showApp(){$('login').classList.add('hidden');$('app').classList.remove('hidden');loadAll()}
 $('lf').onsubmit=async e=>{e.preventDefault();$('lerr').classList.add('hidden');
+  if(!$('pw').value){$('lerr').textContent='Digite a senha.';$('lerr').classList.remove('hidden');$('pw').focus();return}
+  if($('codef').classList.contains('hidden'))$('code').value='';
   try{await api('/api/login','POST',{password:$('pw').value,code:$('code').value});$('pw').value='';$('code').value='';showApp()}catch(x){$('lerr').textContent=x.message;$('lerr').classList.remove('hidden')}};
 $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});try{showLogin((await api('/api/session')).totp)}catch{showLogin()}};
 (async()=>{try{const s=await api('/api/session');s.admin?showApp():showLogin(s.totp)}catch{showLogin()}})();
