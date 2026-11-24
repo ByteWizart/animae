@@ -144,8 +144,6 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 - Novo objeto de cena **`icon`**: `{"type":"icon","q":"rocket","x":540,"y":800,"s":260}` (use `q` com 1–2 palavras em inglês) ou `{"type":"icon","id":"noto:locomotive"}` para um ícone exato. Serve para qualquer coisa que os 98 objetos desenhados em código não cobrem. A IA do Groq passou a usá-lo sozinha quando o catálogo não tem o objeto.
 - Fonte: API pública do **Iconify** (`api.iconify.design`), sem chave de API. A busca prefere o conjunto *Noto* (emojis coloridos do Google, estilo consistente) e cai para Fluent Emoji Flat, Twemoji, OpenMoji e Flat Color Icons.
 - O servidor faz de proxy e guarda cada ícone em `.cache-icones/` (pasta oculta, não é servida): só a primeira vez usa internet, depois funciona offline. O gerador baixa os ícones antes de gravar o vídeo.
-- **Seletor visual no Gerador:** abra `Avançado > História em JSON`, pesquise por palavras como `rocket`, `heart` ou `house` e clique no resultado. Escolha a cena e o tamanho; o ícone será inserido no JSON como `type: "icon"`.
-- API interna: `GET /api/icons/search?q=rocket` lista resultados; `GET /api/icon?id=noto:rocket` entrega o SVG. Ambas usam a API pública do Iconify por meio do servidor. A pesquisa tem limite de 120 chamadas por IP/hora; ícones novos têm limite de 400 downloads por IP/hora.
 - Precisa abrir o site pelo servidor (`node server.js`). Se o ícone não carregar, o objeto simplesmente não aparece e o log avisa.
 - Licenças: cada conjunto tem a sua (Noto: Apache 2.0; Twemoji: CC BY 4.0, exige crédito; OpenMoji: CC BY-SA 4.0). Confira antes de publicar de forma comercial.
 
