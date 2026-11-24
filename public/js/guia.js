@@ -14,7 +14,7 @@
     { t: 'Comece pela ideia', x: 'Escreva o assunto em uma ou duas frases e clique em Gerar roteiro. A IA escreve o texto e monta as cenas.', target: '#s1', mark: 'idea' },
     { t: 'Confira o roteiro', x: 'Este é o texto que a voz vai ler. Você pode editar, ou pedir mudanças à IA em Melhorar com a IA.', target: '#script' },
     { t: 'Escolha uma voz', x: 'Selecione a voz e clique em Gerar voz. O roteiro vira narração na hora.', target: '#voz', mood: 'grin' },
-    { t: 'Veja a prévia', x: 'Clique em Ajustar ao áudio e depois em Prévia. O vídeo toca aqui, na tela do celular.', target: '#stage' },
+    { t: 'Veja a prévia', x: 'Clique em Ajustar ao áudio e depois em Prévia. O vídeo toca aqui, na prévia.', target: '#stage' },
     { t: 'Grave o vídeo', x: 'Gostou? Clique em Gerar vídeo. Ele é gravado em tempo real, então deixe esta aba aberta até o arquivo baixar.', target: '#s3' },
     { t: 'Avançado', x: 'Quer usar a sua própria gravação ou editar o JSON da história? Fica tudo em Avançado, aqui embaixo.', target: '#advanced', open: true, pose: 'think', mood: 'deadpan' },
     { t: 'Pronto!', x: 'É isso. Para rever o tutorial, toque em Tutorial no topo da página. Bom vídeo!', pose: 'cheer', mood: 'laugh', mark: 'heart', top: true }

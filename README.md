@@ -42,6 +42,10 @@ public/              tudo o que o navegador recebe
 | public/exemplos/historia-demo-16x9.json | Exemplo de 18 s no formato horizontal 16:9 (tela de 1920×1080). Carregue em Avançado > Carregar história |
 | .dados/dados.json | Criado automaticamente numa pasta escondida que o servidor nunca serve: configurações, chaves de IA, histórico, senha (com hash) e endereço do painel. Não compartilhe. Para mudar o lugar, use DATA_DIR |
 
+## Formato da tela (16:9 e 9:16)
+
+Em **Painel > Padrões > Formato da tela** o administrador escolhe quais formatos o gerador oferece: só vertical 9:16, só horizontal 16:9 ou os dois (com o formato que abre selecionado). Com um só liberado, o seletor some do gerador, a IA monta tudo nesse formato e qualquer história enviada em outro formato é ajustada automaticamente. A regra vale também no servidor (`/api/ai/*`), então não dá para burlá-la pelo navegador. Fica salvo em `settings.aspects` e `settings.aspectDefault`.
+
 ## Como usar
 
 1. Instale o Node.js **18 ou mais novo**.

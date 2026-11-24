@@ -6,44 +6,74 @@
 <script src="js/theme.js"></script>
 <link rel="stylesheet" href="css/ui.css">
 <style>
-.app{display:grid;grid-template-columns:300px minmax(0,1fr);gap:52px;max-width:1120px;margin:0 auto;align-items:start}
-/* palco: o canvas dentro de uma moldura de celular */
-.stage{position:sticky;top:84px;scroll-margin-top:90px}
-.phone{position:relative;padding:11px;border-radius:38px;background:linear-gradient(160deg,#2a2640,#0e0c18);box-shadow:0 0 0 1px #ffffff14 inset,0 24px 56px -26px rgba(124,92,255,.45),0 10px 26px -14px #0008}
-.phone::before{content:"";position:absolute;top:19px;left:50%;width:74px;height:20px;border-radius:99px;background:#05040a;transform:translateX(-50%);z-index:2;opacity:.9}
-canvas{display:block;width:100%;aspect-ratio:9/16;height:auto;border-radius:28px;background:#000}
-.stage .muted{text-align:center;margin-top:14px}
-.col{display:flex;flex-direction:column;gap:16px;min-width:0}
-.top{margin:0 0 4px}
-.top h1{font-size:clamp(26px,3.4vw,34px);margin:0 0 6px}
-.lead{margin:0;color:var(--muted);font-size:15.5px;max-width:52ch}
+/* Gerador: três passos, uma ação principal em cada, o resto recolhido */
+.app{display:grid;grid-template-columns:320px minmax(0,1fr);gap:48px;max-width:1120px;margin:0 auto;align-items:start}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.top{margin:0 0 6px}
+.top h1{font-size:clamp(26px,3.2vw,32px);margin:0 0 4px}
+.lead{margin:0;color:var(--muted);font-size:15px;max-width:52ch}
 .muted{font-size:13px}
 
-/* passos: cartões planos, uma ação principal por passo */
-.step{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:14px;scroll-margin-top:90px}
-.sh{display:flex;align-items:center;gap:11px}
-.sh h2{font-size:18px;margin:0;letter-spacing:-.02em}
-.n{width:26px;height:26px;border-radius:50%;background:var(--text);color:var(--bg);font-weight:800;font-size:12.5px;display:grid;place-items:center;flex:none}
+/* prévia: moldura simples, sem pintura de celular */
+.stage{position:sticky;top:84px;scroll-margin-top:90px}
+.phone{padding:8px;border-radius:26px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)}
+canvas{display:block;width:100%;aspect-ratio:9/16;height:auto;border-radius:19px;background:#000}
+.stage .muted{text-align:center;margin-top:12px}
+.app.land{grid-template-columns:minmax(0,500px) minmax(0,1fr);max-width:1320px;gap:44px}
+.app.land canvas{aspect-ratio:16/9;border-radius:13px}
+.app.land .phone{padding:8px;border-radius:20px}
+
+/* passos */
+.step{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px;scroll-margin-top:90px}
+.sh{display:flex;align-items:center;gap:12px;min-height:30px}
+.sh h2{font-size:17px;margin:0;letter-spacing:-.01em}
+.n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line2);color:var(--muted);font-weight:700;font-size:12px;display:grid;place-items:center;flex:none}
+.push{margin-left:auto}
 .page select{width:auto;min-width:0}
 .page textarea{resize:vertical;min-height:84px}
-.page textarea#idea{min-height:96px}
+.page textarea#idea{min-height:92px}
+.page textarea#script{min-height:150px}
 .page textarea#story{min-height:240px;color:var(--code-fg);font:12px var(--mono)}
-.fld{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--muted);font-weight:600}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600}
 .fld.grow{flex:1 1 200px}.fld.grow select{width:100%}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
 .row.start{align-items:center}
-.row .push{margin-left:auto}
 .page input[type=file]{width:auto;max-width:100%;font-size:13px;color:var(--muted);border:0;background:none;padding:0;box-shadow:none}
 .page input[type=file]::file-selector-button{background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:8px 13px;margin-right:10px;font:600 13px var(--font);cursor:pointer}
 .page input[type=file]::file-selector-button:hover{background:var(--panel2)}
 .page button.go{padding:11px 22px}
+.chk{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--text);font-weight:500}
+.page pre{white-space:pre-wrap;margin:0;font-size:12.5px;padding:12px}
+
+/* formato da tela: seletor segmentado (o admin decide quais aparecem) */
+.seg{display:inline-flex;padding:3px;background:var(--panel2);border-radius:12px;gap:2px}
+.page .seg button{background:transparent;color:var(--muted);box-shadow:none;padding:7px 13px;font-weight:600;font-size:13.5px;border-radius:9px;gap:8px}
+.page .seg button:hover{filter:none;transform:none;color:var(--text)}
+.page .seg button[aria-checked=true]{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(20,10,60,.14),inset 0 0 0 1px var(--line)}
+.seg .ar{display:inline-block;border:1.8px solid currentColor;border-radius:2.5px;flex:none}
+.seg .ar.v{width:9px;height:14px}.seg .ar.h{width:15px;height:9px}
+.seg small{font-size:11.5px;font-weight:600;opacity:.7}
+
+/* estilo visual: miniaturas */
+.lookpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+.page .lookpick button{position:relative;display:block;padding:0;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line);transition:box-shadow .15s}
+.page .lookpick button:hover{filter:none;transform:none;box-shadow:inset 0 0 0 1px var(--line2)}
+.page .lookpick button[aria-checked=true]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.lookpick img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.lookpick span{position:absolute;left:0;right:0;bottom:0;padding:14px 8px 5px;font-size:11.5px;font-weight:700;color:#fff;text-align:left;background:linear-gradient(transparent,rgba(0,0,0,.68))}
+
+/* progresso e mensagens: só aparecem quando há algo a dizer */
 progress{width:100%;height:6px;border:0;border-radius:99px;overflow:hidden;background:var(--panel2);accent-color:var(--accent);-webkit-appearance:none;appearance:none}
+progress[value="0"]{display:none}
 progress::-webkit-progress-bar{background:var(--panel2);border-radius:99px}
 progress::-webkit-progress-value{background:var(--grad);border-radius:99px;transition:width .2s}
 progress::-moz-progress-bar{background:var(--grad);border-radius:99px}
-.page pre{white-space:pre-wrap;margin:0;font-size:12.5px;padding:12px}
-.page pre#log{color:var(--muted);font-family:var(--font);font-size:13px;background:var(--panel2);border-color:transparent}
-.page .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:-4px}
+.page pre#log{background:none;border:0;padding:0;font:13.5px/1.55 var(--font);color:var(--muted)}
+.page pre#log:empty{display:none}
+#ttsplay:disabled{display:none}
+
+/* o atributo hidden precisa vencer o display dos botões e links */
+.page [hidden]{display:none!important}
 
 /* detalhes: discretos, só aparecem quando você abre */
 details.more>summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:13.5px;font-weight:600;padding:2px 0;border-radius:6px}
@@ -51,52 +81,54 @@ details.more>summary::-webkit-details-marker{display:none}
 details.more>summary::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;margin-right:2px}
 details.more[open]>summary::before{transform:rotate(45deg)}
 details.more>summary:hover{color:var(--text)}
-details.more>.in{display:flex;flex-direction:column;gap:12px;margin-top:12px;padding-left:14px;border-left:2px solid var(--line)}
+details.more>.in{display:flex;flex-direction:column;gap:14px;margin-top:12px;padding-left:14px;border-left:2px solid var(--line)}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px}.grid3 select{width:100%}
 /* seções recolhidas em caixa (biblioteca e avançado) */
-details.box{background:var(--panel);border:1px solid var(--line);border-radius:18px;scroll-margin-top:90px}
-details.box>summary{cursor:pointer;padding:16px 22px;font-weight:700;font-size:15px;list-style:none;display:flex;justify-content:space-between;align-items:center;border-radius:inherit}
+details.box{background:transparent;border:1px solid var(--line);border-radius:16px;scroll-margin-top:90px}
+details.box[open]{background:var(--panel)}
+details.box>summary{cursor:pointer;padding:14px 20px;font-weight:600;font-size:14.5px;list-style:none;display:flex;justify-content:space-between;align-items:center;border-radius:inherit;color:var(--muted)}
+details.box[open]>summary,details.box>summary:hover{color:var(--text)}
 details.box>summary::-webkit-details-marker{display:none}
 details.box>summary::after{content:"+";color:var(--accent);font-size:20px;font-weight:500;line-height:1}
 details.box[open]>summary::after{content:"–"}
-details.box>.in{padding:0 22px 22px;display:flex;flex-direction:column;gap:14px}
+details.box>.in{padding:0 20px 20px;display:flex;flex-direction:column;gap:14px}
 .advblock{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
 .advblock:first-child{border-top:0;padding-top:0}
 .advblock h3{margin:0;font-size:15px}
 .advblock p{margin:0}
-
 .lib-item{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-top:1px solid var(--line);padding:10px 0;font-size:14px}
 .lib-item small{color:var(--muted);display:block}
 .lib-item button{padding:5px 11px;font-size:12.5px}
-footer{max-width:1120px;margin:40px auto 0;color:var(--muted);font-size:12.5px;text-align:center}
+footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;text-align:center}
+
+/* dados de publicação e avaliação da IA */
 .pubbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.55}.pubbox h3{margin:12px 0 4px;font-size:12px;color:var(--muted);font-weight:700}.pubbox h3:first-child{margin-top:0}.pubbox .tg{display:inline-block;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px 11px;margin:2px 4px 2px 0;font-size:12.5px;cursor:pointer}.pubbox .tg:hover{border-color:var(--accent);color:var(--accent)}.pubbox button{padding:4px 11px;font-size:12px;margin:2px 4px 2px 0}.warnb{border-left:3px solid var(--hl);padding-left:10px;color:var(--muted)}#ideas .lib-item b{font-size:14px}.score{font-size:32px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-.app.land{grid-template-columns:minmax(0,500px) minmax(0,1fr);max-width:1320px;gap:44px}.app.land canvas{aspect-ratio:16/9;border-radius:14px}.app.land .phone{padding:9px;border-radius:22px}.app.land .phone::before{display:none}
-.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px}.grid3 select{width:100%}@media(max-width:560px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:900px){.app{grid-template-columns:1fr;gap:26px}.stage{position:static;max-width:260px;margin:0 auto}.app.land{grid-template-columns:1fr}.app.land .stage{max-width:100%}}
-@media(max-width:560px){body.page{padding:0 14px 120px}.step{padding:18px}details.box>summary{padding:14px 18px}details.box>.in{padding:0 18px 18px}}
+
+@media(max-width:900px){.app{grid-template-columns:1fr;gap:22px}.stage{position:static;max-width:240px;margin:0 auto}.app.land{grid-template-columns:1fr}.app.land .stage{max-width:100%}}
+@media(max-width:560px){body.page{padding:0 14px 120px}.step{padding:18px;border-radius:18px}details.box>summary{padding:14px 16px}details.box>.in{padding:0 16px 16px}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}.row .push{margin-left:0;width:100%}.page button.go.push{width:100%}}
 </style></head><body class="page">
 <nav class="topnav"><a class="brand" href="/"><i></i>Animaê</a><a class="nl" href="/">Início</a><a class="nl" href="/gerar" aria-current="page">Gerador</a><a class="nl" href="/docs">Docs</a><a class="nl" href="#tutorial" id="tourlink">Tutorial</a></nav>
 <main class="app">
 <aside class="stage" id="stage" aria-label="Prévia do vídeo"><div class="phone"><canvas id="cv"></canvas></div><div class="muted" id="prevlbl">Prévia 9:16</div></aside>
 <div class="col">
-<header class="top"><h1>Criar um short</h1><p class="lead">Conte a ideia, confira o roteiro, escolha a voz e grave o vídeo.</p></header>
+<header class="top"><h1>Criar um vídeo</h1><p class="lead">Conte a ideia, confira o roteiro e grave o vídeo.</p></header>
 
 <section class="step" id="s1"><div class="sh"><span class="n">1</span><h2>Ideia</h2></div>
 <textarea id="idea" maxlength="6000" placeholder="Ex.: por que esquecemos o que íamos fazer quando passamos por uma porta, em tom bem-humorado."></textarea>
 <div class="muted" id="aist">Descreva o tema, o tom e o público.</div>
-<div class="row"><label class="fld">Proporção da tela<select id="aspect"><option value="9:16">Vertical 9:16 (Shorts, Reels, TikTok)</option><option value="16:9">Horizontal 16:9 (YouTube)</option></select></label>
+<div class="row"><div class="fld" id="aspfld">Formato<div class="seg" id="aspseg" role="radiogroup" aria-label="Formato da tela"><button type="button" role="radio" data-a="9:16" aria-checked="true"><i class="ar v"></i>Vertical <small>9:16</small></button><button type="button" role="radio" data-a="16:9" aria-checked="false"><i class="ar h"></i>Horizontal <small>16:9</small></button></div><select id="aspect" hidden aria-hidden="true" tabindex="-1"><option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select></div>
 <label class="fld">Duração<select id="aisec"><option value="20">~20 s</option><option value="30" selected>~30 s</option><option value="45">~45 s</option><option value="60">~60 s</option></select></label>
 <button class="go push" id="aigo">Gerar roteiro</button></div>
 <details class="more" id="aiopt"><summary>Mais opções</summary><div class="in">
 <div class="grid3"><label class="fld">Tipo de conteúdo<select id="aifmt"></select></label><label class="fld">Tom<select id="aitone"></select></label><label class="fld">Idioma<select id="ailang"></select></label>
 <label class="fld">Estilo visual<select id="ailook"><option value="">A IA escolhe</option></select></label><label class="fld">Trilha<select id="aimusic"><option value="">A IA escolhe</option></select></label><label class="fld">Personagens<select id="aicast"><option value="0">A IA escolhe</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></div>
 <div class="row"><button class="sec sm" id="aiideas">Sugerir ideias</button><button class="sec sm" id="aiprompt">Copiar prompt para outra IA</button></div>
-<div class="muted">Dica: cole um texto longo (notícia, artigo) no campo da ideia e a IA resume e transforma em short.</div></div></details>
+<div class="muted">Dica: cole um texto longo (notícia, artigo) no campo da ideia e a IA resume e transforma em vídeo.</div></div></details>
 <div id="ideas"></div></section>
 
-<section class="step" id="s2"><div class="sh"><span class="n">2</span><h2>Roteiro e voz</h2></div>
+<section class="step" id="s2"><div class="sh"><span class="n">2</span><h2>Roteiro e voz</h2><button class="sec sm push" id="cpscript">Copiar roteiro</button></div>
 <textarea id="script" placeholder="O roteiro aparece aqui. É o texto que a voz vai ler. Você também pode escrever ou editar."></textarea>
-<div class="tools"><button class="sec sm" id="cpscript">Copiar roteiro</button></div>
-<div id="pub" class="pubbox" hidden></div>
+<details class="more" id="pubd" hidden><summary>Título, descrição e hashtags para publicar</summary><div class="in"><div id="pub" class="pubbox" hidden></div></div></details>
 <div id="voz" style="display:flex;flex-direction:column;gap:12px">
 <div class="row"><label class="fld grow">Voz<select id="ttsvoice"><option value="">Carregando vozes...</option></select></label>
 <button class="go" id="ttsgo">Gerar voz</button><button class="sec" id="ttsplay" disabled>Ouvir</button><a id="ttsdl" class="btn sec" download="narracao.mp3" hidden>Baixar MP3</a></div>
@@ -114,15 +146,16 @@ footer{max-width:1120px;margin:40px auto 0;color:var(--muted);font-size:12.5px;t
 </section>
 
 <section class="step" id="s3"><div class="sh"><span class="n">3</span><h2>Vídeo</h2></div>
-<div class="row"><label class="fld">Estilo visual<select id="look"><option value="cartoon">Cartoon</option><option value="sketch">Desenho a lápis</option><option value="comic">Quadrinhos</option><option value="noir">Preto e branco</option><option value="neon">Neon</option><option value="retro">Retrô VHS</option><option value="pixel">Pixel art</option><option value="blueprint">Planta azul</option><option value="pastel">Pastel</option><option value="vintage">Filme antigo</option></select></label></div>
-<label class="fld" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:6px"><input type="checkbox" id="usetc" checked>Seguir à risca a minutagem escrita no roteiro (ex.: 0:05 – 0:12)</label>
 <div class="row start"><button class="sec" id="fit">Ajustar ao áudio</button><button class="sec" id="prev">Prévia</button><button class="go push" id="gen">Gerar vídeo</button></div>
-<progress id="bar" value="0" max="100"></progress><pre id="log">Gere a voz (passo 2) e clique em Gerar vídeo. Deixe a aba aberta e visível (Chrome ou Edge).</pre>
+<progress id="bar" value="0" max="100"></progress><pre id="log">Gere a voz e clique em Gerar vídeo. Deixe esta aba aberta e visível (Chrome ou Edge).</pre>
 <details class="more"><summary>Ajustes do vídeo</summary><div class="in">
+<div class="fld">Estilo visual<div class="lookpick" id="lookpick" role="radiogroup" aria-label="Estilo visual"></div>
+<select id="look" hidden aria-hidden="true" tabindex="-1"><option value="cartoon">Cartoon</option><option value="sketch">Desenho a lápis</option><option value="comic">Quadrinhos</option><option value="noir">Preto e branco</option><option value="neon">Neon</option><option value="retro">Retrô VHS</option><option value="pixel">Pixel art</option><option value="blueprint">Planta azul</option><option value="pastel">Pastel</option><option value="vintage">Filme antigo</option></select></div>
 <div class="row"><label class="fld">Resolução<select id="res"><option value="720">720p (rápido)</option><option value="1080">1080p Full HD</option></select></label>
 <label class="fld">Quadros/s<select id="fps"><option>30</option><option>60</option></select></label>
 <label class="fld">Trilha<select id="music"></select></label></div>
-<label class="fld" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="autotalk" checked>Boca do 1º personagem acompanha a fala</label></div></details></section>
+<label class="chk"><input type="checkbox" id="usetc" checked>Seguir à risca a minutagem escrita no roteiro (ex.: 0:05 – 0:12)</label>
+<label class="chk"><input type="checkbox" id="autotalk" checked>Boca do 1º personagem acompanha a fala</label></div></details></section>
 
 <details class="box" id="libp"><summary>Minha biblioteca <span class="muted" id="libn"></span></summary><div class="in">
 <div class="muted" id="libnote">Fica só neste navegador. Entre na sua conta para guardá-la na nuvem, ou exporte um backup.</div>
@@ -176,7 +209,11 @@ const cv=$('cv');cv.width=720;cv.height=1280;let S=720/W;let c=cv.getContext('2d
 /* ---- formato do vídeo: vertical 9:16 (tela de 1080x1920) ou horizontal 16:9 (tela de 1920x1080). W e H são o tamanho da tela de desenho; os pixels do canvas seguem a resolução escolhida. ---- */
 function sizeCanvas(){const R=+(($('res')||{}).value)||720;if(ASP==='16:9'){cv.height=R;cv.width=Math.round(R*16/9);S=cv.width/W}else{cv.width=R;cv.height=Math.round(R*16/9);S=R/W}}
 function setAspect(a){ASP=a==='16:9'?'16:9':'9:16';if(ASP==='16:9'){W=1920;H=1080;GY0=850;HY0=500}else{W=1080;H=1920;GY0=1480;HY0=900}WK=W/1080;sizeCanvas();
-  const ap=document.querySelector('.app');if(ap)ap.classList.toggle('land',ASP==='16:9');const pl=$('prevlbl');if(pl)pl.textContent='Prévia '+ASP;const sel=$('aspect');if(sel)sel.value=ASP}
+  const ap=document.querySelector('.app');if(ap)ap.classList.toggle('land',ASP==='16:9');const pl=$('prevlbl');if(pl)pl.textContent='Prévia '+ASP;const sel=$('aspect');if(sel)sel.value=ASP;syncAspUI()}
+/* formatos liberados pelo administrador (Painel > Padrões); sem servidor, os dois */
+let ALLOW=['9:16','16:9'];
+const allowedAsp=a=>ALLOW.includes(a)?a:ALLOW[0];
+function syncAspUI(){document.querySelectorAll('#aspseg button').forEach(b=>{b.setAttribute('aria-checked',b.dataset.a===ASP?'true':'false');b.hidden=!ALLOW.includes(b.dataset.a)});const f=document.getElementById('aspfld');if(f)f.hidden=ALLOW.length<2}
 const aspectOf=o=>((o&&o.style&&o.style.aspect)==='16:9'?'16:9':'9:16'); /* let: o boneco-guia (guia.js) desenha com este mesmo motor num canvas próprio */
 /* ---- ícones online: biblioteca grande (Iconify) buscada pelo servidor, com cache. Precisa ser carregada antes de gravar. ---- */
 const ICONS=new Map(),iconKey=p=>p.id?'id='+encodeURIComponent(p.id):'q='+encodeURIComponent(String(p.q||p.t||'').trim().toLowerCase());
@@ -241,7 +278,7 @@ function caption2(s,tt,dur){
   const a=s.capStart??0,b=dur-(s.capEnd??.15),tot=gs.reduce((q,g)=>q+g.length+1,0);let acc=a,pick=null,gi=0;
   if(Array.isArray(s.capT)&&s.capT.length===gs.length){let j=-1;for(let k=0;k<gs.length;k++)if(tt>=s.capT[k])j=k;if(j>=0)pick=[gs[j],tt-s.capT[j],j]}
   else for(const g of gs){const w=(b-a)*(g.length+1)/tot;if(tt>=acc&&tt<acc+w){pick=[g,tt-acc,gi];break}acc+=w;gi++;pick=tt>=b?[g,9,gi-1]:null}
-  if(!pick)return;const cs={...DEFCAP,...((story.style||{}).caption||{}),...(s.cs||{})};if(cs.upper)pick[0]=pick[0].toUpperCase();let sz=cs.size||(ASP==='16:9'?92:130);const f=z=>`900 ${z}px "Arial Black",Impact,sans-serif`;c.font=f(sz);
+  if(!pick)return;const dc={...DEFCAP};if(ASP==='16:9'){delete dc.y;delete dc.size}const cs={...dc,...((story.style||{}).caption||{}),...(s.cs||{})};if(cs.upper)pick[0]=pick[0].toUpperCase();let sz=cs.size||(ASP==='16:9'?92:130);const f=z=>`900 ${z}px "Arial Black",Impact,sans-serif`;c.font=f(sz);
   while(c.measureText(pick[0]).width>W-140&&sz>50){sz-=6;c.font=f(sz)}
   const sc=back(pick[1]/.18);c.save();c.translate(W/2,H*(cs.y??(ASP==='16:9'?.86:.69)));c.scale(sc,sc);c.textAlign='center';c.textBaseline='middle';c.lineJoin='round';
   c.lineWidth=sz*.2;c.strokeStyle=cs.stroke||'#000';c.strokeText(pick[0],0,0);c.fillStyle=(cs.alt&&pick[2]%2)?cs.alt:(cs.color||'#fff');c.fillText(pick[0],0,0);c.restore();
@@ -999,14 +1036,15 @@ function autoFrame(o){let n=0;arr(o.scenes).forEach(sc=>{if(!sc||typeof sc!=='ob
   for(let i=1;i<srt.length;i++){const need=srt[i-1].x+GAP;if(srt[i].x<need){const nx=Math.min(need,R(srt[i]));if(nx>srt[i].x){srt[i].x=Math.round(nx);n++}}}
   for(let i=srt.length-2;i>=0;i--){const need=srt[i+1].x-GAP;if(srt[i].x>need){const nx=Math.max(need,L(srt[i]));if(nx<srt[i].x){srt[i].x=Math.round(nx);n++}}}
 });return n}
-const readStory=()=>{try{let o=JSON.parse($('story').value);
+let aNote='';
+const readStory=()=>{try{aNote='';let o=JSON.parse($('story').value);
   if(o&&!Array.isArray(o.scenes)&&o.story&&Array.isArray(o.story.scenes)){ // colaram o JSON completo da IA: usa só a história e aproveita o roteiro
     if(typeof o.roteiro==='string'&&o.roteiro.trim()&&!$('script').value.trim())$('script').value=o.roteiro;o=o.story;$('story').value=JSON.stringify(o,null,1)}
   if(!o||!Array.isArray(o.scenes)||!o.scenes.length){log('Este JSON não tem a lista \"scenes\". Carregue o arquivo da história (só o objeto com total, style, scenes e sfx).');return false}
   if(!(+o.total>0)){const m=Math.max(0,...o.scenes.map(sc=>+(sc&&sc.t1)||0));if(!(m>0)){log('Este JSON não tem \"total\" nem tempos t0/t1 nas cenas.');return false}o.total=+m.toFixed(2);$('story').value=JSON.stringify(o,null,1)}
-  if(aspectOf(o)!==ASP)setAspect(aspectOf(o));
+  {const a0=aspectOf(o),a1=allowedAsp(a0);if(a1!==a0){o.style=o.style||{};if(a1==='16:9')o.style.aspect='16:9';else delete o.style.aspect;$('story').value=JSON.stringify(o,null,1);aNote='\nO formato '+a0+' está desativado neste site. A história foi ajustada para '+a1+'; confira o enquadramento.'}if(a1!==ASP)setAspect(a1)}
   {const nf=autoFrame(o);if(nf){$('story').value=JSON.stringify(o,null,1);log('Enquadramento ajustado: '+nf+' correção(ões) de posição (personagens cortados ou colados).')}}
-  story=o;WARN=validate(story);{const ms=$('music');if(ms){const m=story&&story.style&&story.style.music;ms.value=(m&&typeof m==='object'?m.type:m)||''}}return true}catch(e){log('JSON inválido: '+e.message);return false}};
+  story=o;WARN=validate(story)+aNote;{const ms=$('music');if(ms){const m=story&&story.style&&story.style.music;ms.value=(m&&typeof m==='object'?m.type:m)||''}}return true}catch(e){log('JSON inválido: '+e.message);return false}};
 show();drawFrame(story,2.5);
 $('look').onchange=()=>{if(!readStory())return;story.style=story.style||{};story.style.look=$('look').value;show();drawFrame(story,Math.min(2.5,story.total-.1))};
 $('jf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('story').value=await f.text();if(readStory()){drawFrame(story,.5);log('História carregada.'+WARN)}};
@@ -1076,8 +1114,12 @@ const jpost=(u,d)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/j
 function registerHistory(h){jpost('/api/history',h).catch(()=>{})}
 async function applyDefaults(){
   try{const r=await fetch('/api/settings');if(!r.ok)return;const s=await r.json();
-    $('look').value=s.look;$('res').value=s.res;$('fps').value=s.fps;
-    DEFCAP=s.caption;DEFLOOK=s.look;drawFrame(story,Math.min(2.5,story.total-.1))}catch{}}
+    $('look').value=s.look;$('res').value=s.res;$('fps').value=s.fps;syncLookUI();
+    DEFCAP=s.caption;DEFLOOK=s.look;
+    if(Array.isArray(s.aspects)&&s.aspects.length)ALLOW=s.aspects.filter(a=>a==='9:16'||a==='16:9');if(!ALLOW.length)ALLOW=['9:16'];
+    const want=allowedAsp(ALLOW.includes(s.aspectDefault)?s.aspectDefault:ALLOW[0]);
+    if(want!==ASP)changeAspect(want,true);else syncAspUI();
+    drawFrame(story,Math.min(2.5,story.total-.1))}catch{}}
 $('jf').addEventListener('change',e=>{const f=e.target.files[0];if(f){storyName=f.name.replace(/\.json$/i,'');openId=null}});
 
 /* ---- biblioteca do usuário (localStorage) ---- */
@@ -1108,7 +1150,7 @@ function libRender(){const a=libGet();$('libn').textContent=a.length?`(${a.lengt
   $('libl').innerHTML=a.length?a.map(i=>{const sm=(window.SCHEMA?SCHEMA.summarize(i.story):{total:i.story.total,scenes:(i.story.scenes||[]).length});
     const id=esc(i.id);return `<div class="lib-item"><div><b>${esc(i.name)}</b><small>${esc(Math.round(+sm.total||0))} s · ${esc(+sm.scenes||0)} cenas · ${esc(fmtD(i.updatedAt))}${i.script?' · com roteiro':''}</small></div><div class="row"><button data-o="${id}">Abrir</button><button class="sec" data-d="${id}">Baixar JSON</button><button class="sec" data-r="${id}">Renomear</button><button class="danger" data-x="${id}">Excluir</button></div></div>`}).join(''):'<div class="muted">Vazia. Clique em "Salvar na biblioteca" para guardar a história atual.</div>'}
 function loadItem(i){if(busy)return;$('story').value=JSON.stringify(i.story,null,1);$('script').value=i.script||'';storyName=i.name;openId=i.id;
-  if(readStory()){if(story.style&&story.style.look)$('look').value=story.style.look;drawFrame(story,.5);log('Aberta: "'+i.name+'".'+WARN)}}
+  if(readStory()){if(story.style&&story.style.look){$('look').value=story.style.look;syncLookUI()}drawFrame(story,.5);log('Aberta: "'+i.name+'".'+WARN)}}
 $('libl').onclick=e=>{const b=e.target.closest('button');if(!b)return;const a=libGet();
   if(b.dataset.o){const i=a.find(x=>x.id===b.dataset.o);if(i)loadItem(i)}
   if(b.dataset.d){const i=a.find(x=>x.id===b.dataset.d);if(i){const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([JSON.stringify(i.story,null,1)],{type:'application/json'}));l.download=(i.name.replace(/[^\w\-]+/g,'_')||'historia')+'.json';l.click()}}
@@ -1156,7 +1198,15 @@ $('aimusic').insertAdjacentHTML('beforeend',Object.entries(MUSL).map(([k,v])=>`<
 $('music').innerHTML='<option value="">Padrão da história</option>'+Object.entries(MUSL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
 $('aipre').insertAdjacentHTML('beforeend',Object.keys(PRESETS).map(k=>`<option>${k}</option>`).join(''));
 $('aipre').onchange=()=>{if(PRESETS[$('aipre').value])$('aiins').value=PRESETS[$('aipre').value]};
-$('aspect').onchange=()=>{const v=$('aspect').value;if(!readStory()){$('aspect').value=ASP;return}story.style=story.style||{};if(v==='16:9')story.style.aspect='16:9';else delete story.style.aspect;if(story.style.caption&&story.style.caption.y!=null)delete story.style.caption.y;setAspect(v);show();drawFrame(story,Math.min(2.5,story.total-.1));log('Proporção: '+(v==='16:9'?'horizontal 16:9 (tela de 1920×1080)':'vertical 9:16 (tela de 1080×1920)')+'. As posições do JSON atual foram feitas para o outro formato: gere o roteiro de novo ou use "Melhorar com a IA" para reorganizar as cenas.')};
+function changeAspect(v0,quiet){const v=allowedAsp(v0);if(!readStory()){$('aspect').value=ASP;return}story.style=story.style||{};if(v==='16:9')story.style.aspect='16:9';else delete story.style.aspect;if(story.style.caption&&story.style.caption.y!=null)delete story.style.caption.y;setAspect(v);show();drawFrame(story,Math.min(2.5,story.total-.1));
+  if(!quiet)log('Formato: '+(v==='16:9'?'horizontal 16:9 (1920×1080)':'vertical 9:16 (1080×1920)')+'. As posições do JSON atual eram do outro formato: gere o roteiro de novo ou use "Melhorar com a IA" para reorganizar as cenas.')}
+$('aspect').onchange=()=>changeAspect($('aspect').value);
+document.querySelectorAll('#aspseg button').forEach(b=>b.onclick=()=>{if(b.dataset.a===ASP)return;$('aspect').value=b.dataset.a;changeAspect(b.dataset.a)});
+/* estilo visual: miniaturas (o select #look continua sendo a fonte da verdade) */
+function syncLookUI(){document.querySelectorAll('#lookpick button').forEach(b=>b.setAttribute('aria-checked',b.dataset.l===$('look').value?'true':'false'))}
+$('lookpick').innerHTML=[...$('look').options].map(o=>`<button type="button" class="sec" role="radio" data-l="${o.value}" aria-checked="false"><img src="looks/${o.value}.jpg" alt="" loading="lazy" width="640" height="360"><span>${o.textContent}</span></button>`).join('');
+document.querySelectorAll('#lookpick button').forEach(b=>b.onclick=()=>{$('look').value=b.dataset.l;syncLookUI();$('look').onchange()});
+syncLookUI();
 $('music').onchange=()=>{const v=$('music').value;if(!readStory())return;story.style=story.style||{};if(v)story.style.music=v;else delete story.style.music;$('story').value=JSON.stringify(story,null,1);$('music').value=v;log('Trilha: '+(v?MUSL[v]:'padrão')+'.')};
 const aiOpts=()=>({aspect:ASP,seconds:+$('aisec').value,look:$('ailook').value,format:$('aifmt').value,tone:$('aitone').value,lang:$('ailang').value,music:$('aimusic').value,cast:+$('aicast').value});
 const esc2=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1170,7 +1220,7 @@ function showPub(j){const p=j.publish||{},pl=j.plan||{};PUBCOPY=[];const reg=t=>
   if(p.thumb)o+=`<h3>Texto da miniatura</h3><div><span class="tg" data-c="${reg(p.thumb)}">${esc2(p.thumb)}</span></div>`;
   if(p.facts)o+=`<h3>Confira antes de postar</h3><div class="warnb">${esc2(p.facts)}</div>`;
   if(pl.concept||pl.beats&&pl.beats.length)o+=`<details><summary class="muted" style="cursor:pointer;margin-top:8px">Plano de direção da IA</summary><div class="muted" style="line-height:1.5">${esc2(pl.concept)}${pl.hook?'<br><b>Gancho:</b> '+esc2(pl.hook):''}${pl.motif?'<br><b>Motivo visual:</b> '+esc2(pl.motif):''}${pl.palette&&pl.palette.length?'<br><b>Paleta:</b> '+pl.palette.map(c=>`<span style="background:${esc2(c)};padding:0 10px;border:1px solid #555;margin-right:3px">&nbsp;</span>`).join(''):''}${pl.cast&&pl.cast.length?'<br><b>Elenco:</b> '+pl.cast.map(c=>esc2(c.name+' ('+c.look+')')).join('; '):''}${pl.beats&&pl.beats.length?'<br>'+pl.beats.map(esc2).join('<br>'):''}</div></details>`;
-  const bx=$('pub');bx.innerHTML=o;bx.hidden=!o;bx.querySelectorAll('[data-c]').forEach(e=>e.onclick=()=>copyTxt(PUBCOPY[+e.dataset.c]))}
+  const bx=$('pub');bx.innerHTML=o;bx.hidden=!o;{const pd=$('pubd');if(pd)pd.hidden=!o}bx.querySelectorAll('[data-c]').forEach(e=>e.onclick=()=>copyTxt(PUBCOPY[+e.dataset.c]))}
 function applyAI(j,opts){if(j.script!=null)$('script').value=j.script;if(j.story){$('story').value=JSON.stringify(j.story,null,1);if(j.title){storyName=j.title}openId=opts&&opts.keepOpen?openId:null;if(readStory()){if(story.style&&story.style.look)$('look').value=story.style.look;drawFrame(story,.5)}}}
 async function aiCall(btn,label,path,data){if(busy)return null;btn.disabled=true;const t0=Date.now(),tm=setInterval(()=>log(label+'… '+Math.round((Date.now()-t0)/1000)+' s'),500);log(label+'…');
   try{const r=await jpost(path,data),j=await r.json();if(!r.ok)throw new Error(j.error||('Erro '+r.status));return j}catch(e){log('IA: '+e.message);return null}finally{clearInterval(tm);btn.disabled=!aiOk}}

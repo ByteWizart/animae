@@ -37,6 +37,7 @@ const DEFAULTS = () => ({
   version: 1,
   settings: {
     look: 'cartoon', res: '720', fps: '30', historyLimit: 200,
+    aspects: ['9:16', '16:9'], aspectDefault: '9:16', // formatos de tela liberados no gerador (o admin escolhe) e o formato que abre selecionado
     caption: { size: 110, color: '#ffffff', alt: '#ffd93b', y: 0.69, stroke: '#000000', upper: false },
   },
   auth: null,
@@ -202,9 +203,27 @@ const clampN = (v, a, b, d) => (typeof v === 'number' && isFinite(v) ? Math.max(
 const str = (v, max) => String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').slice(0, max).trim();
 const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(v) ? v : d);
 
+const ASPECTS = ['9:16', '16:9'];
+function cleanAspects(s, cur) {
+  // pelo menos um formato precisa ficar liberado; o inicial tem de estar entre os liberados
+  const base = Array.isArray(cur.aspects) && cur.aspects.length ? cur.aspects : ASPECTS;
+  let list = Array.isArray(s.aspects) ? ASPECTS.filter(a => s.aspects.includes(a)) : base;
+  if (!list.length) list = base;
+  const want = ASPECTS.includes(s.aspectDefault) ? s.aspectDefault : cur.aspectDefault;
+  return { aspects: list, aspectDefault: list.includes(want) ? want : list[0] };
+}
+// formato permitido mais próximo do pedido (usado ao falar com a IA)
+const aspectFor = a => { const al = db.settings.aspects || ASPECTS; return al.includes(a) ? a : (al.includes(db.settings.aspectDefault) ? db.settings.aspectDefault : al[0]); };
+const forceStoryAspect = st => { // a história enviada pelo navegador não pode usar um formato desativado
+  if (!st || typeof st !== 'object') return st;
+  const cur = st.style && st.style.aspect === '16:9' ? '16:9' : '9:16', ok = aspectFor(cur);
+  if (ok !== cur) { st.style = st.style || {}; if (ok === '16:9') st.style.aspect = '16:9'; else delete st.style.aspect; }
+  return st;
+};
 function cleanSettings(s, cur) {
   const c = s.caption || {}, cc = cur.caption;
   return {
+    ...cleanAspects(s, cur),
     look: SCHEMA.SET.look.has(s.look) ? s.look : cur.look,
     res: ['720', '1080'].includes(String(s.res)) ? String(s.res) : cur.res,
     fps: ['30', '60'].includes(String(s.fps)) ? String(s.fps) : cur.fps,
@@ -537,7 +556,7 @@ async function api(req, res, p) {
     // Prompt pronto para copiar e usar em outra IA (ChatGPT, Claude...): as mesmas regras que o site usa.
     if (p === '/api/ai/prompt' && m === 'GET') {
       const q = new URL(req.url, 'http://x').searchParams, seconds = [20, 30, 45, 60].includes(+q.get('seconds')) ? +q.get('seconds') : 30;
-      return send(res, 200, { prompt: AI.systemPrompt({ aspect: q.get('aspect') === '16:9' ? '16:9' : '9:16', seconds, look: SCHEMA.SET.look.has(q.get('look')) ? q.get('look') : '', format: q.get('format') || 'auto', tone: q.get('tone') || 'auto', lang: q.get('lang') || '', music: q.get('music') || '', cast: +q.get('cast') || 0, extra: '' }) }); // as instruções da casa (db.ai.extra) são privadas: não saem neste endpoint público
+      return send(res, 200, { prompt: AI.systemPrompt({ aspect: aspectFor(q.get('aspect') === '16:9' ? '16:9' : '9:16'), seconds, look: SCHEMA.SET.look.has(q.get('look')) ? q.get('look') : '', format: q.get('format') || 'auto', tone: q.get('tone') || 'auto', lang: q.get('lang') || '', music: q.get('music') || '', cast: +q.get('cast') || 0, extra: '' }) }); // as instruções da casa (db.ai.extra) são privadas: não saem neste endpoint público
     }
 
 
@@ -592,7 +611,7 @@ async function api(req, res, p) {
       try {
       const b = await body(req, aiOp === 'generate' || aiOp === 'ideas' ? 2e4 : 5e5);
       const llm = { chain: aiChain() }, common = { llm, maxTokens: db.ai.maxTokens, extra: db.ai.extra || '', tpm: llm.chain[0].tpm };
-      const opt = { aspect: b.aspect === '16:9' ? '16:9' : '9:16', seconds: +b.seconds, look: SCHEMA.SET.look.has(b.look) ? b.look : '', format: str(b.format, 20), tone: str(b.tone, 20), lang: str(b.lang, 8), music: str(b.music, 20), cast: +b.cast };
+      const opt = { aspect: aspectFor(b.aspect === '16:9' ? '16:9' : '9:16'), seconds: +b.seconds, look: SCHEMA.SET.look.has(b.look) ? b.look : '', format: str(b.format, 20), tone: str(b.tone, 20), lang: str(b.lang, 8), music: str(b.music, 20), cast: +b.cast };
       const storyOk = v => v && typeof v === 'object' && Array.isArray(v.scenes) && v.scenes.length > 0 && v.scenes.length <= 40;
       let job;
       if (aiOp === 'generate') {
@@ -603,6 +622,7 @@ async function api(req, res, p) {
         job = () => AI.ideas({ llm, topic: str(b.topic, 300), count: +b.count, format: opt.format, tone: opt.tone, seconds: opt.seconds });
       } else {
         if (!storyOk(b.story)) return send(res, 400, { error: 'Não há uma história válida para enviar à IA.' });
+        forceStoryAspect(b.story);
         const script = str(b.script, 6000);
         if (aiOp === 'refine') {
           const instruction = str(b.instruction, 1200);

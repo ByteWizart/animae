@@ -31,6 +31,7 @@
 .sw .tk{width:42px;height:24px;border-radius:99px;background:var(--line2);position:relative;transition:background .2s;flex:none}
 .sw .tk::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0004;transition:transform .2s}
 .sw input:checked+.tk{background:var(--grad)}.sw input:checked+.tk::after{transform:translateX(18px)}
+.sw input:disabled+.tk{opacity:.5}.sw:has(input:disabled){cursor:not-allowed}
 .sw input:focus-visible+.tk{outline:2px solid var(--accent);outline-offset:2px}
 .chart{display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:8px}
 .chart .c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;height:100%;min-width:0}
@@ -230,6 +231,14 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
       <form id="setf">
         <h3 style="margin-top:0">Padrões do gerador</h3>
         <p class="muted">Valem para quem abrir o gerador. A legenda é aplicada quando a história não define <code>style.caption</code>.</p>
+        <h3 style="margin-top:0">Formato da tela</h3>
+        <p class="muted" style="margin-bottom:12px">Escolha quais formatos quem usa o gerador pode criar. Com um só liberado, o seletor some do gerador e a IA passa a montar tudo nesse formato.</p>
+        <div class="row" style="margin-bottom:12px;gap:26px">
+          <label class="sw"><input type="checkbox" id="s-asp-v" checked><span class="tk"></span>Vertical 9:16 <span class="muted" style="font-weight:400">(Shorts, Reels, TikTok)</span></label>
+          <label class="sw"><input type="checkbox" id="s-asp-h" checked><span class="tk"></span>Horizontal 16:9 <span class="muted" style="font-weight:400">(YouTube)</span></label>
+        </div>
+        <label class="f" id="s-asp-deff" style="max-width:320px">Formato que abre selecionado<select id="s-asp-def"><option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select></label>
+        <h3>Vídeo</h3>
         <div class="grid g3">
           <label class="f">Estilo inicial<select id="s-look"></select></label>
           <label class="f">Resolução<select id="s-res"><option value="720">720p (rápido)</option><option value="1080">1080p Full HD</option></select></label>
@@ -519,11 +528,19 @@ function pv(){const c=$('c-color').value,a=$('c-alt').value,k=$('c-stroke').valu
   el.style.webkitTextStroke='5px '+k;el.style.paintOrder='stroke fill';
   el.innerHTML=t.split(' ').map((w,i)=>`<span style="position:static;transform:none;display:inline;font-size:inherit;-webkit-text-stroke:inherit;paint-order:stroke fill;color:${i%2?a:c}">${esc(w)} </span>`).join('')}
 ['c-size','c-y','c-color','c-alt','c-stroke','c-upper'].forEach(i=>$(i).addEventListener('input',pv));
+/* formatos liberados: pelo menos um fica ligado; o "formato inicial" só aparece (e só aceita) o que está liberado */
+function aspList(){const a=[];if($('s-asp-v').checked)a.push('9:16');if($('s-asp-h').checked)a.push('16:9');return a}
+function aspUI(){const a=aspList(),d=$('s-asp-def');
+  [...d.options].forEach(o=>{o.disabled=!a.includes(o.value)});if(!a.includes(d.value)&&a.length)d.value=a[0];
+  $('s-asp-deff').classList.toggle('hidden',a.length<2);
+  $('s-asp-v').disabled=a.length===1&&a[0]==='9:16';$('s-asp-h').disabled=a.length===1&&a[0]==='16:9'}
+['s-asp-v','s-asp-h'].forEach(i=>$(i).addEventListener('change',aspUI));
 async function loadSettings(){const s=await api('/api/admin/settings');
   $('s-look').value=s.look;$('s-res').value=s.res;$('s-fps').value=s.fps;$('s-hl').value=s.historyLimit;
+  {const al=Array.isArray(s.aspects)&&s.aspects.length?s.aspects:['9:16','16:9'];$('s-asp-v').checked=al.includes('9:16');$('s-asp-h').checked=al.includes('16:9');$('s-asp-def').value=s.aspectDefault||al[0];aspUI()}
   $('c-size').value=s.caption.size;$('c-y').value=s.caption.y;$('c-color').value=s.caption.color;$('c-alt').value=s.caption.alt;$('c-stroke').value=s.caption.stroke;$('c-upper').checked=s.caption.upper;pv()}
 $('setf').onsubmit=e=>{e.preventDefault();run(async()=>{
-  await api('/api/admin/settings','PUT',{look:$('s-look').value,res:$('s-res').value,fps:$('s-fps').value,historyLimit:+$('s-hl').value,caption:{size:+$('c-size').value,y:+$('c-y').value,color:$('c-color').value,alt:$('c-alt').value,stroke:$('c-stroke').value,upper:$('c-upper').checked}});
+  await api('/api/admin/settings','PUT',{look:$('s-look').value,res:$('s-res').value,fps:$('s-fps').value,historyLimit:+$('s-hl').value,aspects:aspList(),aspectDefault:$('s-asp-def').value,caption:{size:+$('c-size').value,y:+$('c-y').value,color:$('c-color').value,alt:$('c-alt').value,stroke:$('c-stroke').value,upper:$('c-upper').checked}});
   toast('Padrões salvos.');await loadSettings()})};
 
 /* ---- segurança: backup e endereço ---- */
