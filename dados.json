@@ -1,0 +1,51 @@
+{
+ "version": 1,
+ "settings": {
+  "look": "cartoon",
+  "res": "720",
+  "fps": "30",
+  "historyLimit": 200,
+  "caption": {
+   "size": 110,
+   "color": "#ffffff",
+   "alt": "#ffd93b",
+   "y": 0.69,
+   "stroke": "#000000",
+   "upper": false
+  }
+ },
+ "auth": {
+  "salt": "b4cd6a1c39aa0369b15b9bd8061ebeec",
+  "hash": "3a87adba6252a9f39c76440e872fb7f430e24afe6098fd5b83a43ad4ec0f0738"
+ },
+ "adminPath": "painel-70700a05dd",
+ "ai": {
+  "enabled": true,
+  "provider": "gemini",
+  "fallback": [],
+  "providers": {},
+  "perHour": 20,
+  "maxTokens": 12000,
+  "extra": ""
+ },
+ "tts": {
+  "enabled": true,
+  "perHour": 60,
+  "voice": "pt-BR-FranciscaNeural"
+ },
+ "supabase": {
+  "url": "",
+  "anonKey": "",
+  "serviceKey": "",
+  "required": true,
+  "google": false
+ },
+ "history": [],
+ "aiLog": [],
+ "aiStats": {
+  "total": 0,
+  "ok": 0,
+  "fail": 0,
+  "ms": 0
+ }
+}

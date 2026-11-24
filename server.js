@@ -425,6 +425,20 @@ async function api(req, res, p) {
     }
 
 
+    // Pesquisa de ícones Iconify para o seletor visual do gerador.
+    if (p === '/api/icons/search' && m === 'GET') {
+      const qs = new URL(req.url, 'http://x').searchParams;
+      const q = str(qs.get('q'), 60).toLowerCase().replace(/[^a-z0-9 -]/g, '').trim();
+      if (q.length < 2) return send(res, 400, { error: 'Digite pelo menos 2 caracteres.' });
+      const ip = ipOf(req), now = Date.now(), hits = (iconHits.get('search:' + ip) || []).filter(x => now - x < 3600e3);
+      if (hits.length >= 120) return send(res, 429, { error: 'Limite de pesquisas de ícones atingido. Tente mais tarde.' });
+      hits.push(now); iconHits.set('search:' + ip, hits);
+      const prefixes = ICON_SETS.join(',');
+      const data = await (await iconFetch(`${ICON_API}/search?query=${encodeURIComponent(q)}&prefixes=${prefixes}&limit=48`)).json();
+      const icons = (data.icons || []).filter(i => /^[a-z0-9-]+:[a-z0-9-]+$/.test(i)).slice(0, 48);
+      return send(res, 200, { icons, total: Number(data.total) || icons.length });
+    }
+
     // Ícone da biblioteca online (SVG). Só pedidos que vão à internet contam no limite por IP.
     if (p === '/api/icon' && m === 'GET') {
       const qs = new URL(req.url, 'http://x').searchParams;
