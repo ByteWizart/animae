@@ -9,13 +9,26 @@ const TTS = require('./tts.js');
 
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
-const DATA_FILE = path.join(dir, 'dados.json');
+// Os dados (chaves de IA, hash da senha, histórico) ficam numa pasta escondida, fora da lista de arquivos públicos.
+// Para mudar o lugar (ex.: um disco persistente na hospedagem), defina DATA_DIR.
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(dir, '.dados');
+const DATA_FILE = path.join(DATA_DIR, 'dados.json');
+try {
+  fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+  const OLD = path.join(dir, 'dados.json'); // migração: versões antigas guardavam o arquivo na raiz do site
+  if (!fs.existsSync(DATA_FILE) && fs.existsSync(OLD)) { fs.copyFileSync(OLD, DATA_FILE); try { fs.chmodSync(DATA_FILE, 0o600); } catch {} }
+  for (const f of ['dados.json', 'dados.json.tmp']) try { fs.unlinkSync(path.join(dir, f)); } catch {}
+} catch (e) { console.warn('Aviso: não consegui preparar a pasta de dados (' + e.message + ')'); }
 const BUILD = 16;
 const STARTED = Date.now();
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.sql': 'text/plain; charset=utf-8' };
-// Arquivos que nunca são servidos pela web.
-const PRIVATE = new Set(['dados.json', 'dados.json.tmp', 'server.js', 'ai.js', 'providers.js', 'tts.js', 'supabase.js', 'admin.html']);
+// Só estes arquivos são servidos pela web (lista permitida, sem diferenciar maiúsculas de minúsculas).
+// Tudo o mais (server.js, ai.js, dados, .dados/...) nunca sai daqui, mesmo em Windows e macOS.
+const PUBLIC_NAMES = ['home.html', 'index.html', 'docs.html', 'audio.js', 'auth.js', 'schema.js', 'guia.js', 'motor-extra.js', 'motor-extra2.js', 'theme.js', 'ui.css', 'favicon.svg', 'historia-teste.json', 'historia-demo-v9.json', 'historia-demo-16x9.json'];
+const PUBLIC_MAP = new Map(); // nome em minúsculas -> caminho real
+for (const n of PUBLIC_NAMES) PUBLIC_MAP.set(n, path.join(dir, n));
+try { for (const n of fs.readdirSync(path.join(dir, 'looks'))) if (/^[a-z0-9-]+\.jpg$/i.test(n)) PUBLIC_MAP.set('looks/' + n.toLowerCase(), path.join(dir, 'looks', n)); } catch {}
 
 /* ---------- dados ---------- */
 const DEFAULTS = () => ({
@@ -55,7 +68,7 @@ function load() {
 }
 function save() {
   const tmp = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db, null, 1));
+  fs.writeFileSync(tmp, JSON.stringify(db, null, 1), { mode: 0o600 });
   fs.renameSync(tmp, DATA_FILE);
 }
 load();
@@ -87,7 +100,38 @@ function isAdmin(req) {
   return true;
 }
 const fails = new Map(); // ip -> {n, until}
-const ipOf = req => req.socket.remoteAddress || '?';
+// Atrás de um proxy/hospedagem (Render, Railway, Nginx...), defina TRUST_PROXY=1 (quantos proxies confiáveis existem na frente).
+// Sem isso, todos os visitantes pareceriam ter o mesmo IP. Com isso ligado, o IP vem do X-Forwarded-For.
+const TRUST_PROXY = /^(true|yes|sim)$/i.test(process.env.TRUST_PROXY || '') ? 1 : Math.max(0, parseInt(process.env.TRUST_PROXY, 10) || 0);
+let warnedProxy = false;
+const ipOf = req => {
+  const xff = String(req.headers['x-forwarded-for'] || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (TRUST_PROXY && xff.length) return xff[Math.max(0, xff.length - TRUST_PROXY)];
+  if (!TRUST_PROXY && xff.length && !warnedProxy) { warnedProxy = true; console.warn('AVISO: chegou X-Forwarded-For, mas TRUST_PROXY não está definido. Se o site roda atrás de proxy, defina TRUST_PROXY=1 para os limites por IP funcionarem.'); }
+  return req.socket.remoteAddress || '?';
+};
+const isHttps = req => !!req.socket.encrypted || (TRUST_PROXY > 0 && String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https');
+const ALLOWED_ORIGINS = String(process.env.ALLOWED_ORIGINS || '').split(',').map(x => x.trim()).filter(Boolean);
+function sameOrigin(req) { // pedidos que mudam algo só valem se vierem do próprio site
+  const o = req.headers.origin; if (!o) return true;
+  if (ALLOWED_ORIGINS.includes(o)) return true;
+  try { const h = new URL(o).host; return h === req.headers.host || (TRUST_PROXY > 0 && h === String(req.headers['x-forwarded-host'] || '').split(',')[0].trim()); } catch { return false; }
+}
+function csp() {
+  let sb = ''; try { const u = sbCfg().url; if (u) sb = ' ' + new URL(u).origin; } catch {}
+  return ["default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob:", "media-src 'self' blob: data:", "font-src 'self' data:",
+    "connect-src 'self' blob: data:" + sb, "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join('; ');
+}
+function secHeaders(req, res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY'); res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'); res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  if (isHttps(req)) res.setHeader('Strict-Transport-Security', 'max-age=15552000');
+}
+// Limite global (todos os visitantes sem conta somados): protege a cota das suas chaves mesmo com muitos IPs.
+const globalHits = { ai: [], tts: [] };
+const GLOBAL_MAX = { ai: +process.env.AI_ANON_PER_HOUR || 150, tts: +process.env.TTS_ANON_PER_HOUR || 400 };
+function gTake(k) { const now = Date.now(), a = globalHits[k] = globalHits[k].filter(t => now - t < 3600e3); if (a.length >= GLOBAL_MAX[k]) return false; a.push(now); return true; }
+const gRefund = k => globalHits[k].pop();
 
 /* ---------- utilidades HTTP ---------- */
 const send = (res, code, obj, headers) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...(headers || {}) }); res.end(JSON.stringify(obj)); };
@@ -315,6 +359,7 @@ function logAi(op, who, ok, ms, err) {
   const t = db.aiStats; t.total++; if (ok) { t.ok++; t.ms += ms; } else t.fail++;
 }
 const aiHits = new Map(); // ip -> [timestamps]
+const histHits = new Map();
 const ttsHits = new Map(); // ip -> [timestamps]
 let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
 const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
@@ -380,6 +425,7 @@ async function iconGet(q, id) {
 async function api(req, res, p) {
   const m = req.method;
   try {
+    if (m !== 'GET' && m !== 'HEAD' && !sameOrigin(req)) return send(res, 403, { error: 'Origem não permitida.' });
     if (p === '/api/settings' && m === 'GET') return send(res, 200, publicSettings());
     if (p === '/api/session' && m === 'GET') return send(res, 200, { admin: isAdmin(req), build: BUILD });
 
@@ -388,17 +434,18 @@ async function api(req, res, p) {
       if (f && f.until > Date.now()) return send(res, 429, { error: `Muitas tentativas. Aguarde ${Math.ceil((f.until - Date.now()) / 1000)} s.` });
       const b = await body(req, 1e4);
       if (!checkPassword(b.password || '')) {
-        const n = (f ? f.n : 0) + 1; fails.set(ip, n >= 5 ? { n: 0, until: Date.now() + 60e3 } : { n, until: 0 });
+        const n = (f ? f.n : 0) + 1, lvl = f ? f.lvl || 0 : 0; fails.set(ip, n >= 5 ? { n: 0, lvl: lvl + 1, until: Date.now() + Math.min(900e3, 60e3 * 2 ** lvl), at: Date.now() } : { n, lvl, until: 0, at: Date.now() });
         return send(res, 401, { error: 'Senha incorreta.' });
       }
       fails.delete(ip);
-      return send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${newSession()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MS / 1000}` });
+      return send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${newSession()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MS / 1000}${isHttps(req) ? '; Secure' : ''}` });
     }
-    if (p === '/api/logout' && m === 'POST') { sessions.delete(cookieOf(req).sid); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' }); }
+    if (p === '/api/logout' && m === 'POST') { sessions.delete(cookieOf(req).sid); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' + (isHttps(req) ? '; Secure' : '') }); }
 
     // Histórico: o gerador registra cada vídeo pronto (sem login; só guarda metadados).
     if (p === '/api/history' && m === 'POST') {
       const lg = await needLogin(req, res); if (!lg) return;
+      { const hk = lg.user ? 'u:' + lg.user.id : ipOf(req), now = Date.now(), hh = (histHits.get(hk) || []).filter(x => now - x < 3600e3); if (hh.length >= 40) return send(res, 429, { error: 'Muitos registros por hora.' }); hh.push(now); histHits.set(hk, hh); }
       const b = await body(req, 1e4);
       const h = {
         id: crypto.randomBytes(5).toString('hex'), at: new Date().toISOString(), name: str(b.name, 80) || 'Sem título',
@@ -454,12 +501,13 @@ async function api(req, res, p) {
       if (hits.length >= db.tts.perHour) return send(res, 429, { error: `Limite de ${db.tts.perHour} vozes por hora atingido. Tente mais tarde.` });
       if (ttsBusy >= TTS_MAX_PARALLEL) return send(res, 429, { error: 'O servidor de voz está ocupado. Tente de novo em alguns segundos.' });
       const b = await body(req, 3e4);
+      const gt = !lg.user; if (gt && !gTake('tts')) return send(res, 429, { error: 'O site atingiu o limite de vozes desta hora. Tente mais tarde ou entre na sua conta.' });
       hits.push(now); ttsHits.set(ip, hits); ttsBusy++;
       try {
         const mp3 = await TTS.synth({ text: b.text, voice: str(b.voice, 60) || db.tts.voice, rate: +b.rate, pitch: +b.pitch });
         res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': mp3.length, 'Cache-Control': 'no-store' });
         return res.end(mp3);
-      } catch (e) { hits.pop(); throw e; } finally { ttsBusy--; }
+      } catch (e) { hits.pop(); if (gt) gRefund('tts'); throw e; } finally { ttsBusy--; }
     }
     const aiOp = p.startsWith('/api/ai/') ? p.slice(8) : '';
     if (m === 'POST' && { generate: 1, refine: 1, ideas: 1, review: 1, translate: 1 }[aiOp]) {
@@ -490,6 +538,7 @@ async function api(req, res, p) {
         } else if (aiOp === 'review') job = () => AI.review({ llm, story: b.story, script, tpm: common.tpm });
         else job = () => AI.translate({ ...common, story: b.story, script, lang: str(b.lang, 8) });
       }
+      const ga = !lg.user; if (ga && !gTake('ai')) return send(res, 429, { error: 'O site atingiu o limite de usos da IA desta hora. Tente mais tarde ou entre na sua conta.' });
       hits.push(now); aiHits.set(ip, hits);
       const t0 = Date.now();
       try {
@@ -497,7 +546,7 @@ async function api(req, res, p) {
         if (out && typeof out === 'object') out.provider = llm.lastUsed || ''; // qual IA respondeu (útil quando há reserva)
         db.aiCount = (db.aiCount || 0) + 1; logAi(aiOp, llm.lastUsed, true, Date.now() - t0); save();
         return send(res, 200, out);
-      } catch (e) { hits.pop(); logAi(aiOp, llm.lastUsed, false, Date.now() - t0, e && (e.msg || e.message)); save(); throw e; }
+      } catch (e) { hits.pop(); if (ga) gRefund('ai'); logAi(aiOp, llm.lastUsed, false, Date.now() - t0, e && (e.msg || e.message)); save(); throw e; }
     }
 
     // ---- daqui para baixo exige login ----
@@ -589,7 +638,7 @@ async function api(req, res, p) {
       if (process.env.ADMIN_PASSWORD) return send(res, 409, { error: 'A senha vem da variável ADMIN_PASSWORD. Altere-a no ambiente.' });
       const b = await body(req, 1e4);
       if (!checkPassword(b.current || '')) return send(res, 403, { error: 'Senha atual incorreta.' });
-      if (String(b.next || '').length < 8) return send(res, 400, { error: 'A nova senha precisa ter pelo menos 8 caracteres.' });
+      if (String(b.next || '').length < 10) return send(res, 400, { error: 'A nova senha precisa ter pelo menos 10 caracteres.' });
       setPassword(b.next); const keep = cookieOf(req).sid; for (const t of sessions.keys()) if (t !== keep) sessions.delete(t);
       return send(res, 200, { ok: true });
     }
@@ -602,6 +651,7 @@ async function api(req, res, p) {
 
 /* ---------- estáticos ---------- */
 http.createServer((req, res) => {
+  secHeaders(req, res);
   let p;
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end(); }
   if (p.startsWith('/api/')) return api(req, res, p);
@@ -610,12 +660,15 @@ http.createServer((req, res) => {
   if (p === '/gerar') p = '/index.html';     // o gerador
   if (p === '/ajuda' || p === '/ajuda.html') { res.writeHead(301, { Location: '/docs' }); return res.end(); } // endereço antigo
   if (p === '/docs') p = '/docs.html';
-  if (p === '/' + adminPath()) { res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' }); return res.end(fs.readFileSync(path.join(dir, 'admin.html'))); }
-  const f = path.normalize(path.join(dir, p)), rel = path.relative(dir, f);
-  if (rel.startsWith('..') || path.isAbsolute(rel) || rel.split(path.sep).some(s => s.startsWith('.')) || PRIVATE.has(rel)) { res.writeHead(403); return res.end('acesso negado'); }
+  if (p === '/' + adminPath()) { res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp() }); return res.end(fs.readFileSync(path.join(dir, 'admin.html'))); }
+  const key = p.slice(1).toLowerCase();
+  const f = !/[\\:\u0000]/.test(key) && !key.split('/').some(x => !x || x.startsWith('.') || /[. ]$/.test(x)) ? PUBLIC_MAP.get(key) : null;
+  if (!f) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('não encontrado'); }
   fs.readFile(f, (e, d) => {
     if (e) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('não encontrado'); }
-    res.writeHead(200, { 'Content-Type': types[path.extname(f)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' });
+    const ext = path.extname(f).toLowerCase(), h = { 'Content-Type': types[ext] || 'application/octet-stream' };
+    if (ext === '.html') h['Content-Security-Policy'] = csp();
+    res.writeHead(200, h);
     res.end(req.method === 'HEAD' ? undefined : d);
   });
 }).listen(PORT, async () => {
@@ -627,6 +680,24 @@ http.createServer((req, res) => {
   console.log('  Docs:    http://localhost:' + PORT + '/docs');
   console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
   { const c = aiChain(); console.log('  IA: ' + (c.length ? c.map(p => p.label + ' (' + p.model + ')').join(' → ') : 'nenhum provedor configurado (use uma variável como GEMINI_API_KEY / GROQ_API_KEY ou o Admin > IA)')); }
-  if (firstRunPassword) console.log('\n  >>> Senha inicial do admin: ' + firstRunPassword + '\n  >>> (aparece só desta vez; troque em Admin > Segurança)\n');
+  if (firstRunPassword) {
+    if (process.stdout.isTTY) console.log('\n  >>> Senha inicial do admin: ' + firstRunPassword + '\n  >>> (aparece só desta vez; troque em Admin > Segurança)\n');
+    else { // logs de hospedagem são guardados: a senha vai para um arquivo protegido, não para o log
+      const f = path.join(DATA_DIR, 'senha-inicial.txt');
+      try { fs.writeFileSync(f, firstRunPassword + '\n', { mode: 0o600 }); console.log('\n  >>> Senha inicial do admin salva em ' + f + ' (leia, troque em Admin > Segurança e apague o arquivo).\n'); }
+      catch { console.log('\n  >>> Defina ADMIN_PASSWORD no ambiente: não consegui gravar a senha inicial.\n'); }
+    }
+  }
   else if (process.env.ADMIN_PASSWORD) console.log('  Senha do admin vem de ADMIN_PASSWORD.');
+  if (!sbCfg().enabled) console.log('  AVISO: sem login, qualquer visitante usa a IA e a voz (limite global: ' + GLOBAL_MAX.ai + ' IA e ' + GLOBAL_MAX.tts + ' vozes por hora, ajustável por AI_ANON_PER_HOUR e TTS_ANON_PER_HOUR). Para abrir ao público, configure o login com Supabase.');
 });
+
+/* ---------- limpeza periódica da memória ---------- */
+setInterval(() => {
+  const now = Date.now(), old = a => a.filter(t => now - t < 3600e3);
+  for (const m of [aiHits, ttsHits, iconHits, histHits]) { for (const [k, v] of m) { const n = old(v); if (n.length) m.set(k, n); else m.delete(k); } if (m.size > 20000) m.clear(); }
+  for (const [k, v] of fails) if (v.until < now && now - (v.at || 0) > 3600e3) fails.delete(k);
+  for (const [k, v] of iconMiss) if (v < now) iconMiss.delete(k);
+  for (const [k, v] of sessions) if (v < now) sessions.delete(k);
+  if (fails.size > 20000) fails.clear(); if (iconMiss.size > 20000) iconMiss.clear();
+}, 600e3).unref();

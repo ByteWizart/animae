@@ -64,7 +64,7 @@ html{scroll-behavior:smooth}
 /* ---- estilos ---- */
 .looks{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 .look{border-radius:16px;overflow:hidden;border:2px solid var(--ink);background:var(--panel)}
-.look svg{display:block;width:100%;height:auto}
+.look img{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:cover}
 .look span{display:block;padding:8px 12px 10px;font-size:13.5px;font-weight:700;border-top:2px solid var(--ink)}
 
 /* ---- avançado ---- */
@@ -121,7 +121,7 @@ footer.f a{color:var(--muted)}
     <h1>Do texto ao short animado, no seu navegador.</h1>
     <p class="lead">Descreva a ideia. A IA escreve o roteiro e monta as cenas, uma voz lê o texto e o vídeo sai pronto para baixar, com bonecos, trilha e legendas.</p>
     <div class="cta"><a class="btn" href="/gerar">Criar meu short</a><a class="btn sec" href="#como">Ver como funciona</a></div>
-    <small>Funciona no Chrome e no Edge, sem instalar nada.</small>
+    <small>Vertical 9:16 ou horizontal 16:9. Funciona no Chrome e no Edge, sem instalar nada.</small>
   </div>
   <div class="phone" aria-label="Exemplo de short feito no Animaê">
     <svg viewBox="0 0 360 640" role="img" aria-label="Dois bonecos conversando em um cenário de colinas, com legenda animada">
@@ -326,13 +326,11 @@ if(!RM)requestAnimationFrame(loop);
 const cap=$('#cap'),LINES=['Já entrou','na cozinha','e esqueceu','por quê?','Calma,','acontece','com todos.','A ciência','explica!'];
 if(RM){cap.textContent='Seu short animado'}else{let i=0;const tick=()=>{cap.textContent=LINES[i++%LINES.length];cap.classList.remove('pop');void cap.getBoundingClientRect();cap.classList.add('pop')};tick();setInterval(tick,1100)}
 
-/* amostras dos 10 estilos */
-const LOOKS=[['Cartoon','#7ec8ff','#5fb46a','#181622','#7c5cff'],['Desenho a lápis','#f4f1ea','#e0dccf','#4a4a52','#cfcad8'],['Quadrinhos','#ffd84d','#ff6b6b','#181622','#2b59ff'],['Preto e branco','#d9d9d9','#8e8e8e','#0c0c0c','#f2f2f2'],['Neon','#0b0a2a','#1b1250','#35f2ff','#ff2fb9'],['Retrô VHS','#3b2a6b','#ff6fae','#f5e9ff','#2fe0d0'],['Pixel art','#6ad0ff','#4fb04f','#1a1a2e','#ff5555'],['Planta azul','#12408f','#0f356f','#d8ecff','#12408f'],['Pastel','#ffe3ec','#cfeedd','#6b5b7b','#ffc8dd'],['Filme antigo','#d8c49a','#a68a58','#3a2c1a','#8a6a3c']];
+/* amostras dos 10 estilos: imagens renderizadas pelo próprio motor (pasta looks/) */
+const LOOKS=[['cartoon','Cartoon'],['sketch','Lápis'],['comic','Quadrinhos'],['noir','Noir'],['neon','Neon'],['retro','Retrô VHS'],['pixel','Pixel art'],['blueprint','Planta azul'],['pastel','Pastel'],['vintage','Filme antigo']];
 const lk=$('#looks');
-LOOKS.forEach(([n,sky,gr,ink,shirt])=>{const d=document.createElement('div');d.className='look';
-  d.innerHTML=`<svg viewBox="0 0 200 150" aria-hidden="true"><rect width="200" height="150" fill="${sky}"/><rect y="112" width="200" height="38" fill="${gr}"/></svg><span>${n}</span>`;
-  const s=d.querySelector('svg');fig(s,{x:100,y:118,u:9.5,pose:'idle',shirt,ink,skin:n==='Pixel art'?'#ffd7b0':undefined,hair:'swept',hairc:ink,mood:'smile'});
-  if(n==='Planta azul'||n==='Neon'){s.insertAdjacentHTML('afterbegin',`<g stroke="${ink}" stroke-opacity=".25">${Array.from({length:10},(_,i)=>`<path d="M${i*20} 0V150M0 ${i*15}H200"/>`).join('')}</g>`)}
+LOOKS.forEach(([id,n])=>{const d=document.createElement('div');d.className='look';
+  d.innerHTML=`<img src="looks/${id}.jpg" width="640" height="360" loading="lazy" alt="Exemplo do estilo ${n}"><span>${n}</span>`;
   lk.appendChild(d)});
 })();
 </script>

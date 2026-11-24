@@ -70,6 +70,7 @@ details.box>.in{padding:0 22px 22px;display:flex;flex-direction:column;gap:14px}
 footer{max-width:1120px;margin:40px auto 0;color:var(--muted);font-size:12.5px;text-align:center}
 .pubbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.55}.pubbox h3{margin:12px 0 4px;font-size:12px;color:var(--muted);font-weight:700}.pubbox h3:first-child{margin-top:0}.pubbox .tg{display:inline-block;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px 11px;margin:2px 4px 2px 0;font-size:12.5px;cursor:pointer}.pubbox .tg:hover{border-color:var(--accent);color:var(--accent)}.pubbox button{padding:4px 11px;font-size:12px;margin:2px 4px 2px 0}.warnb{border-left:3px solid var(--hl);padding-left:10px;color:var(--muted)}#ideas .lib-item b{font-size:14px}.score{font-size:32px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 .app.land{grid-template-columns:minmax(0,500px) minmax(0,1fr);max-width:1320px;gap:44px}.app.land canvas{aspect-ratio:16/9;border-radius:14px}.app.land .phone{padding:9px;border-radius:22px}.app.land .phone::before{display:none}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px}.grid3 select{width:100%}@media(max-width:560px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.app{grid-template-columns:1fr;gap:26px}.stage{position:static;max-width:260px;margin:0 auto}.app.land{grid-template-columns:1fr}.app.land .stage{max-width:100%}}
 @media(max-width:560px){body.page{padding:0 14px 120px}.step{padding:18px}details.box>summary{padding:14px 18px}details.box>.in{padding:0 18px 18px}}
 </style></head><body class="page">
@@ -84,11 +85,10 @@ footer{max-width:1120px;margin:40px auto 0;color:var(--muted);font-size:12.5px;t
 <div class="muted" id="aist">Descreva o tema, o tom e o público.</div>
 <div class="row"><label class="fld">Proporção da tela<select id="aspect"><option value="9:16">Vertical 9:16 (Shorts, Reels, TikTok)</option><option value="16:9">Horizontal 16:9 (YouTube)</option></select></label>
 <label class="fld">Duração<select id="aisec"><option value="20">~20 s</option><option value="30" selected>~30 s</option><option value="45">~45 s</option><option value="60">~60 s</option></select></label>
-<label class="fld">Estilo<select id="ailook"><option value="">A IA escolhe</option></select></label>
 <button class="go push" id="aigo">Gerar roteiro</button></div>
 <details class="more" id="aiopt"><summary>Mais opções</summary><div class="in">
-<div class="row"><label class="fld">Formato<select id="aifmt"></select></label><label class="fld">Tom<select id="aitone"></select></label><label class="fld">Idioma<select id="ailang"></select></label></div>
-<div class="row"><label class="fld">Trilha<select id="aimusic"><option value="">A IA escolhe</option></select></label><label class="fld">Personagens<select id="aicast"><option value="0">A IA escolhe</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></div>
+<div class="grid3"><label class="fld">Tipo de conteúdo<select id="aifmt"></select></label><label class="fld">Tom<select id="aitone"></select></label><label class="fld">Idioma<select id="ailang"></select></label>
+<label class="fld">Estilo visual<select id="ailook"><option value="">A IA escolhe</option></select></label><label class="fld">Trilha<select id="aimusic"><option value="">A IA escolhe</option></select></label><label class="fld">Personagens<select id="aicast"><option value="0">A IA escolhe</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></div>
 <div class="row"><button class="sec sm" id="aiideas">Sugerir ideias</button><button class="sec sm" id="aiprompt">Copiar prompt para outra IA</button></div>
 <div class="muted">Dica: cole um texto longo (notícia, artigo) no campo da ideia e a IA resume e transforma em short.</div></div></details>
 <div id="ideas"></div></section>

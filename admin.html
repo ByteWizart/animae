@@ -271,7 +271,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
         <div id="envnote" class="notice warn hidden">A senha vem da variável de ambiente <code>ADMIN_PASSWORD</code>. Para trocar, altere-a e reinicie o servidor.</div>
         <form id="pwf">
           <label class="f">Senha atual<input id="p-cur" type="password" autocomplete="current-password" required></label>
-          <label class="f">Nova senha (mín. 8 caracteres)<input id="p-new" type="password" autocomplete="new-password" minlength="8" required></label>
+          <label class="f">Nova senha (mín. 10 caracteres)<input id="p-new" type="password" autocomplete="new-password" minlength="10" required></label>
           <label class="f">Repita a nova senha<input id="p-new2" type="password" autocomplete="new-password" minlength="8" required></label>
           <button type="submit">Trocar senha</button>
         </form>
@@ -294,9 +294,9 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
         <h3 style="margin-top:0">Boas práticas</h3>
         <ul style="padding-left:18px;margin:0">
           <li>A sessão expira em 8 horas e é cancelada ao sair.</li>
-          <li>Após 5 senhas erradas, o login trava por 1 minuto.</li>
+          <li>Após 5 senhas erradas, o login trava por 1 minuto (e dobra a cada nova rodada de erros, até 15 minutos).</li>
           <li>Trocar a senha encerra as outras sessões.</li>
-          <li>Se expuser o servidor na rede, use uma senha forte e não compartilhe o <code>dados.json</code>.</li>
+          <li>Se expuser o servidor na rede, use uma senha forte e não compartilhe a pasta <code>.dados</code> (onde fica o <code>dados.json</code>, fora dos arquivos públicos). Atrás de proxy ou hospedagem, defina <code>TRUST_PROXY=1</code>.</li>
         </ul>
       </div>
     </div>

@@ -25,7 +25,7 @@ Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (v
 | historia-teste.json | História de exemplo simples |
 | historia-demo-v9.json | História de 30 s que mostra os recursos novos (rua em movimento, gráfico, chat, glitch, holofote, palco...). Carregue em Avançado > Carregar história |
 | historia-demo-16x9.json | Exemplo de 18 s no formato horizontal 16:9 (tela de 1920×1080). Carregue em Avançado > Carregar história |
-| dados.json | Criado automaticamente: configurações, chaves de IA, histórico, senha (com hash) e endereço do painel. Não compartilhe |
+| .dados/dados.json | Criado automaticamente numa pasta escondida que o servidor nunca serve: configurações, chaves de IA, histórico, senha (com hash) e endereço do painel. Não compartilhe. Para mudar o lugar, use DATA_DIR |
 
 ## Como usar
 
@@ -97,7 +97,7 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 
 - Na primeira execução, uma senha aleatória aparece **uma vez** no terminal. Troque em Segurança.
 - Alternativa: `ADMIN_PASSWORD=minhasenha node server.js` (prioridade).
-- Esqueceu? Apague `dados.json` (apaga as chaves de IA, histórico e senha) e reinicie.
+- Esqueceu? Apague `.dados/dados.json` (apaga as chaves de IA, histórico e senha) e reinicie.
 - Sessão de 8 h; trava de 1 min após 5 erros.
 
 ## Outras observações
@@ -192,3 +192,17 @@ O "Ajustar ao áudio" foi refeito para casar o vídeo com a fala real, não só 
 - **Motor:** chão, horizonte, legenda e título têm padrões próprios no horizontal; cenários, clima e efeitos preenchem toda a largura.
 - **Atenção:** trocar o formato de uma história pronta não converte as posições. Gere de novo ou use "Melhorar com a IA".
 - **Limpeza:** removidos `ajuda.html` (o endereço `/ajuda` continua redirecionando para `/docs`), `PROMPT-MOVIMENTOS.md` (substituído por "Copiar prompt para outra IA") e as histórias de teste `historia-demo-v12.json` e `historia-teste-build13.json`.
+- **Visual do gerador:** o passo 1 ficou só com Proporção da tela, Duração e Gerar roteiro. Tipo de conteúdo, Tom, Idioma, Estilo visual, Trilha e Personagens ficam em "Mais opções", em grade de 3 colunas.
+- **Home:** a seção "Dez estilos visuais" agora usa imagens renderizadas pelo próprio motor (pasta `looks/`, uma por estilo), com os mesmos nomes do gerador.
+
+
+## Segurança (build 16)
+
+- **Arquivos públicos por lista permitida:** o servidor só entrega os arquivos da lista `PUBLIC_NAMES` e a pasta `looks/`, sem diferenciar maiúsculas de minúsculas. Os dados ficam em `.dados/` (modo 700, arquivo 600), fora dessa lista. Versões antigas migram o `dados.json` da raiz sozinhas.
+- **Atrás de proxy ou hospedagem** (Render, Railway, Nginx...): defina `TRUST_PROXY=1` (número de proxies confiáveis). Sem isso todos os visitantes parecem ter o mesmo IP e os limites por IP se misturam.
+- **Sem login do Supabase**, visitantes usam IA e voz com limites por IP e um limite global por hora (`AI_ANON_PER_HOUR`, padrão 150; `TTS_ANON_PER_HOUR`, padrão 400). Para abrir ao público de verdade, configure o login.
+- **Pedidos que mudam algo** (POST/PUT/DELETE) só valem se a origem for o próprio site. Para liberar outro endereço, use `ALLOWED_ORIGINS=https://um.com,https://outro.com`.
+- **Cabeçalhos:** CSP restritiva (só o próprio site e o endereço do seu Supabase), `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, HSTS e cookie `Secure` quando o acesso é por HTTPS.
+- **Login do admin:** 5 erros travam por 1 minuto, dobrando a cada nova rodada (máx. 15 min). A senha nova exige 10 caracteres. Sem terminal interativo, a senha inicial vai para `.dados/senha-inicial.txt` em vez do log.
+- **IA:** o texto e o JSON do usuário são tratados como dados; o prompt manda ignorar instruções escondidos neles.
+- Prefira definir as chaves por variável de ambiente (`GEMINI_API_KEY` etc.): assim nem chegam ao arquivo de dados.
