@@ -1020,7 +1020,7 @@ let ttsUrl=null,ttsOk=false;
   try{const s=await (await fetch('/api/tts/status')).json();
     if(!s.available){st.textContent=s.installed?'A voz com IA está desativada neste site. Envie sua gravação em Avançado.':'A voz com IA não está instalada no servidor (rode \"npm install\" e reinicie). Envie sua gravação em Avançado.';$('ttsgo').disabled=true;return}
     ttsOk=true;const v=await (await fetch('/api/tts/voices')).json();
-    $('ttsvoice').innerHTML=v.voices.map(x=>`<option value=\"${x.id}\">${x.lang} · ${x.label}</option>`).join('');
+    $('ttsvoice').innerHTML=v.voices.map(x=>`<option value=\"${esc(x.id)}\">${esc(x.lang)} · ${esc(x.label)}</option>`).join('');
     if(v.voices.some(x=>x.id===v.default))$('ttsvoice').value=v.default}
   catch{st.textContent='Voz com IA indisponível (abra pelo servidor: node server.js). Envie sua gravação em Avançado.';$('ttsgo').disabled=true}})();
 $('ttsrate').oninput=()=>{$('ttsratev').textContent=($('ttsrate').value>0?'+':'')+$('ttsrate').value+'%'};
@@ -1106,7 +1106,7 @@ if(window.Auth)Auth.onChange(async u=>{try{if(u)await cloudLoad();else LIBC=null
 const fmtD=d=>new Date(d).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
 function libRender(){const a=libGet();$('libn').textContent=a.length?`(${a.length})`:'';
   $('libl').innerHTML=a.length?a.map(i=>{const sm=(window.SCHEMA?SCHEMA.summarize(i.story):{total:i.story.total,scenes:(i.story.scenes||[]).length});
-    return `<div class="lib-item"><div><b>${esc(i.name)}</b><small>${Math.round(sm.total)} s · ${sm.scenes} cenas · ${fmtD(i.updatedAt)}${i.script?' · com roteiro':''}</small></div><div class="row"><button data-o="${i.id}">Abrir</button><button class="sec" data-d="${i.id}">Baixar JSON</button><button class="sec" data-r="${i.id}">Renomear</button><button class="danger" data-x="${i.id}">Excluir</button></div></div>`}).join(''):'<div class="muted">Vazia. Clique em "Salvar na biblioteca" para guardar a história atual.</div>'}
+    const id=esc(i.id);return `<div class="lib-item"><div><b>${esc(i.name)}</b><small>${esc(Math.round(+sm.total||0))} s · ${esc(+sm.scenes||0)} cenas · ${esc(fmtD(i.updatedAt))}${i.script?' · com roteiro':''}</small></div><div class="row"><button data-o="${id}">Abrir</button><button class="sec" data-d="${id}">Baixar JSON</button><button class="sec" data-r="${id}">Renomear</button><button class="danger" data-x="${id}">Excluir</button></div></div>`}).join(''):'<div class="muted">Vazia. Clique em "Salvar na biblioteca" para guardar a história atual.</div>'}
 function loadItem(i){if(busy)return;$('story').value=JSON.stringify(i.story,null,1);$('script').value=i.script||'';storyName=i.name;openId=i.id;
   if(readStory()){if(story.style&&story.style.look)$('look').value=story.style.look;drawFrame(story,.5);log('Aberta: "'+i.name+'".'+WARN)}}
 $('libl').onclick=e=>{const b=e.target.closest('button');if(!b)return;const a=libGet();
@@ -1122,8 +1122,9 @@ $('lib').onclick=()=>{if(!readStory())return;const a=libGet(),cur=a.find(x=>x.id
   if(libSet(a)){storyName=name;openId=it.id;libRender();log('Salva na sua biblioteca.')}};
 $('libexp').onclick=()=>{const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([JSON.stringify({app:'shorts-animados',version:1,items:libGet()},null,1)],{type:'application/json'}));l.download='biblioteca-shorts.json';l.click()};
 $('libimp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
-  try{const d=JSON.parse(await f.text()),inc=(d.items||[]).filter(i=>i&&i.story&&Array.isArray(i.story.scenes)&&i.name),a=libGet(),ids=new Set(a.map(x=>x.id));
-    inc.forEach(i=>{if(!ids.has(i.id))a.push({id:i.id||Date.now().toString(36),name:String(i.name).slice(0,80),createdAt:i.createdAt||Date.now(),updatedAt:i.updatedAt||Date.now(),story:i.story,script:i.script||''})});
+  try{if(f.size>20e6)throw 0;const d=JSON.parse(await f.text()),inc=(Array.isArray(d.items)?d.items:[]).slice(0,500).filter(i=>i&&i.story&&typeof i.story==='object'&&Array.isArray(i.story.scenes)&&i.name),a=libGet(),ids=new Set(a.map(x=>x.id));
+    const num=v=>Number.isFinite(+v)&&+v>0?+v:Date.now(),sid=v=>/^[\w-]{1,40}$/.test(String(v==null?'':v))?String(v):Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    inc.forEach(i=>{const id=sid(i.id);if(!ids.has(id)){ids.add(id);a.push({id,name:String(i.name).slice(0,80),createdAt:num(i.createdAt),updatedAt:num(i.updatedAt),story:i.story,script:String(i.script||'').slice(0,20000)})}});
     if(libSet(a)){libRender();log(inc.length+' item(ns) lido(s) do backup.')}}catch{log('Arquivo de backup inválido.')}};
 libRender();
 
@@ -1179,7 +1180,7 @@ $('aigo').onclick=async()=>{const idea=$('idea').value.trim();if(idea.length<8)r
   log(`Pronto: "${j.title}" (${Math.round(j.story.total)} s, ${j.story.scenes.length} cenas).\nAgora gere a voz no passo 2 (ou envie a sua em Avançado), clique em "Ajustar ao áudio" e depois em "Prévia".`+(j.issues&&j.issues.length?`\n(${j.issues.length} aviso(s) leve(s) no JSON)`:'')+(j.notice?'\n'+j.notice:''))};
 $('aiideas').onclick=async()=>{const topic=$('idea').value.trim().slice(0,300)||'curiosidades do dia a dia';
   const j=await aiCall($('aiideas'),'Pensando em ideias','/api/ai/ideas',{topic,count:6,...aiOpts()});if(!j)return;
-  $('ideas').innerHTML='<div class="muted" style="margin-top:8px">Clique em "Usar" para preencher a ideia e as opções.</div>'+j.ideas.map((i,n)=>`<div class="lib-item"><div><b>${esc2(i.title)}</b><small>${esc2(i.hook)}</small><small>${esc2(FMTL[i.format]||'')} · ${i.seconds} s</small></div><button class="sec" data-n="${n}">Usar</button></div>`).join('');
+  $('ideas').innerHTML='<div class="muted" style="margin-top:8px">Clique em "Usar" para preencher a ideia e as opções.</div>'+j.ideas.map((i,n)=>`<div class="lib-item"><div><b>${esc2(i.title)}</b><small>${esc2(i.hook)}</small><small>${esc2(FMTL[i.format]||'')} · ${esc2(+i.seconds||30)} s</small></div><button class="sec" data-n="${n}">Usar</button></div>`).join('');
   $('ideas').querySelectorAll('button[data-n]').forEach(bt=>bt.onclick=()=>{const i=j.ideas[+bt.dataset.n];$('idea').value=i.idea;$('aisec').value=String(i.seconds);if(i.look)$('ailook').value=i.look;$('aifmt').value=i.format;$('idea').scrollIntoView({behavior:'smooth',block:'center'});log('Ideia aplicada. Clique em "Gerar roteiro".')});
   log(j.ideas.length+' ideias prontas.')};
 $('aiprompt').onclick=async()=>{try{const q=new URLSearchParams({aspect:ASP,seconds:$('aisec').value,look:$('ailook').value,format:$('aifmt').value,tone:$('aitone').value,lang:$('ailang').value,music:$('aimusic').value,cast:$('aicast').value}),r=await fetch('/api/ai/prompt?'+q),j=await r.json();
@@ -1188,8 +1189,8 @@ $('airefine').onclick=async()=>{if(!readStory())return;const instruction=$('aiin
   const j=await aiCall($('airefine'),'Aplicando a mudança com a IA','/api/ai/refine',{story,script:$('script').value,instruction,...aiOpts(),look:(story.style&&story.style.look)||''});if(!j)return;
   applyAI(j,{keepOpen:true});log('Pronto'+(j.summary?': '+j.summary:'.')+'\nSe o áudio já estava gravado, clique em "Ajustar ao áudio" de novo.')};
 $('aireview').onclick=async()=>{if(!readStory())return;const j=await aiCall($('aireview'),'Avaliando a direção','/api/ai/review',{story,script:$('script').value});if(!j)return;
-  $('aireviewout').innerHTML=`<div class="pubbox"><span class="score">${j.score.toFixed(1)}</span><span class="muted"> / 10</span><div>${esc2(j.summary)}</div>`+(j.strengths.length?'<h3>Pontos fortes</h3>'+j.strengths.map(x=>'• '+esc2(x)).join('<br>'):'')+(j.problems.length?'<h3>O que melhorar</h3>'+j.problems.map(p=>`• ${p.scene?'Cena '+p.scene+': ':''}${esc2(p.problem)}<br><span class="muted">→ ${esc2(p.fix)}</span>`).join('<br>'):'')+(j.instruction?`<div class="row" style="margin-top:8px"><button id="aiapply">Aplicar as melhorias</button></div>`:'')+'</div>';
-  if(j.instruction)$('aiapply').onclick=()=>{$('aiins').value=j.instruction;$('airefine').click()};log('Avaliação pronta: nota '+j.score.toFixed(1)+'.')};
+  $('aireviewout').innerHTML=`<div class="pubbox"><span class="score">${esc2((+j.score||0).toFixed(1))}</span><span class="muted"> / 10</span><div>${esc2(j.summary)}</div>`+(j.strengths.length?'<h3>Pontos fortes</h3>'+j.strengths.map(x=>'• '+esc2(x)).join('<br>'):'')+(j.problems.length?'<h3>O que melhorar</h3>'+j.problems.map(p=>`• ${p.scene?'Cena '+p.scene+': ':''}${esc2(p.problem)}<br><span class="muted">→ ${esc2(p.fix)}</span>`).join('<br>'):'')+(j.instruction?`<div class="row" style="margin-top:8px"><button id="aiapply">Aplicar as melhorias</button></div>`:'')+'</div>';
+  if(j.instruction)$('aiapply').onclick=()=>{$('aiins').value=j.instruction;$('airefine').click()};log('Avaliação pronta: nota '+(+j.score||0).toFixed(1)+'.')};
 $('aitrgo').onclick=async()=>{if(!readStory())return;const lang=$('aitr').value;const j=await aiCall($('aitrgo'),'Traduzindo','/api/ai/translate',{story,script:$('script').value,lang});if(!j)return;
   applyAI({script:j.script,story:j.story,title:storyName},{keepOpen:true});log('Tradução pronta ('+LANGL[lang]+'). Grave a narração no novo idioma e use "Ajustar ao áudio".')};
 applyDefaults();

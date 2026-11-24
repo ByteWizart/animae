@@ -77,11 +77,14 @@ load();
 
 /* ---------- senha e sessões ---------- */
 const hashPw = (pw, salt) => crypto.scryptSync(String(pw), salt, 32).toString('hex');
-const safeEq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
-function setPassword(pw) { const salt = crypto.randomBytes(16).toString('hex'); db.auth = { salt, hash: hashPw(pw, salt) }; save(); }
-function checkPassword(pw) {
+const hashPwAsync = (pw, salt) => new Promise((ok, no) => crypto.scrypt(String(pw).slice(0, 1024), salt, 32, (e, k) => e ? no(e) : ok(k.toString('hex'))));
+// Compara os SHA-256 dos dois textos: tempo constante e sem revelar o tamanho da senha.
+const safeEq = (a, b) => { const h = v => crypto.createHash('sha256').update(String(v)).digest(); return crypto.timingSafeEqual(h(a), h(b)); };
+function setPassword(pw) { pw = String(pw).slice(0, 1024); const salt = crypto.randomBytes(16).toString('hex'); db.auth = { salt, hash: hashPw(pw, salt) }; save(); }
+async function checkPassword(pw) {
+  pw = String(pw == null ? '' : pw).slice(0, 1024);
   if (process.env.ADMIN_PASSWORD) return safeEq(pw, process.env.ADMIN_PASSWORD);
-  return !!db.auth && safeEq(hashPw(pw, db.auth.salt), db.auth.hash);
+  return !!db.auth && safeEq(await hashPwAsync(pw, db.auth.salt), db.auth.hash);
 }
 let firstRunPassword = null;
 if (!process.env.ADMIN_PASSWORD && !db.auth) {
@@ -119,14 +122,15 @@ function sameOrigin(req) { // pedidos que mudam algo só valem se vierem do pró
   if (ALLOWED_ORIGINS.includes(o)) return true;
   try { const h = new URL(o).host; return h === req.headers.host || (TRUST_PROXY > 0 && h === String(req.headers['x-forwarded-host'] || '').split(',')[0].trim()); } catch { return false; }
 }
-function csp() {
+// Scripts inline só rodam com o nonce de cada resposta (sem 'unsafe-inline'): um XSS não consegue executar código.
+function csp(nonce) {
   let sb = ''; try { const u = sbCfg().url; if (u) sb = ' ' + new URL(u).origin; } catch {}
-  return ["default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob:", "media-src 'self' blob: data:", "font-src 'self' data:",
+  return ["default-src 'self'", "script-src 'self'" + (nonce ? " 'nonce-" + nonce + "'" : ''), "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob:", "media-src 'self' blob: data:", "font-src 'self' data:",
     "connect-src 'self' blob: data:" + sb, "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join('; ');
 }
 function secHeaders(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY'); res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'); res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'); res.setHeader('Cross-Origin-Opener-Policy', 'same-origin'); res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   if (isHttps(req)) res.setHeader('Strict-Transport-Security', 'max-age=15552000');
 }
 // Limite global (todos os visitantes sem conta somados): protege a cota das suas chaves mesmo com muitos IPs.
@@ -134,6 +138,14 @@ const globalHits = { ai: [], tts: [] };
 const GLOBAL_MAX = { ai: +process.env.AI_ANON_PER_HOUR || 150, tts: +process.env.TTS_ANON_PER_HOUR || 400 };
 function gTake(k) { const now = Date.now(), a = globalHits[k] = globalHits[k].filter(t => now - t < 3600e3); if (a.length >= GLOBAL_MAX[k]) return false; a.push(now); return true; }
 const gRefund = k => globalHits[k].pop();
+// Reserva uma vaga no limite por hora ANTES de qualquer await: sem isso, pedidos simultâneos passariam todos pela checagem.
+// Devolve uma função que cancela a reserva (para pedidos inválidos ou que falharam), ou null se o limite estourou.
+function take(map, key, limit) {
+  const now = Date.now(), a = (map.get(key) || []).filter(t => now - t < 3600e3);
+  if (a.length >= limit) { map.set(key, a); return null; }
+  a.push(now); map.set(key, a);
+  return () => { const b = map.get(key), i = b ? b.lastIndexOf(now) : -1; if (i >= 0) b.splice(i, 1); };
+}
 
 /* ---------- utilidades HTTP ---------- */
 const send = (res, code, obj, headers) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...(headers || {}) }); res.end(JSON.stringify(obj)); };
@@ -142,7 +154,9 @@ function body(req, limit = 2e6) {
     if (!/application\/json/i.test(req.headers['content-type'] || '')) return no({ code: 415, msg: 'Envie JSON (Content-Type: application/json).' });
     let n = 0; const ch = [];
     req.on('data', c => { n += c.length; if (n > limit) { no({ code: 413, msg: 'Corpo grande demais.' }); req.destroy(); } else ch.push(c); });
-    req.on('end', () => { try { ok(JSON.parse(Buffer.concat(ch).toString('utf8') || '{}')); } catch { no({ code: 400, msg: 'JSON inválido.' }); } });
+    req.on('end', () => { let j; try { j = JSON.parse(Buffer.concat(ch).toString('utf8') || '{}'); } catch { return no({ code: 400, msg: 'JSON inválido.' }); }
+      if (!j || typeof j !== 'object' || Array.isArray(j)) return no({ code: 400, msg: 'Envie um objeto JSON.' });
+      ok(j); });
     req.on('error', () => no({ code: 400, msg: 'Falha ao ler.' }));
   });
 }
@@ -389,6 +403,7 @@ function status() {
 // então o desenho no canvas não "contamina" a gravação do vídeo, e cada ícone só é baixado uma vez.
 const ICON_DIR = path.join(dir, '.cache-icones');
 const ICON_API = 'https://api.iconify.design';
+const ICON_MAX = 3000; // máximo de ícones guardados em disco
 const ICON_SETS = ['noto', 'fluent-emoji-flat', 'twemoji', 'openmoji', 'flat-color-icons']; // 1º conjunto = estilo principal
 const iconMiss = new Map(); // chave -> expira (cache negativo curto)
 const iconHits = new Map(); // ip -> [timestamps] (só pedidos que vão à internet)
@@ -414,7 +429,10 @@ async function iconGet(q, id) {
     const [pre, name] = rid.split(':');
     const svg = Buffer.from(await (await iconFetch(`${ICON_API}/${pre}/${name}.svg?height=256`)).arrayBuffer());
     if (!/<svg/i.test(svg.slice(0, 400).toString()) || svg.length > 300e3) throw new Error('SVG inválido');
-    fs.mkdirSync(ICON_DIR, { recursive: true }); fs.writeFileSync(file, svg);
+    if (/<script|<foreignObject|<iframe|<object|<embed|\son[a-z]+\s*=|javascript:/i.test(svg.toString())) throw new Error('SVG com conteúdo ativo'); // defesa extra: o SVG vem de terceiros
+    fs.mkdirSync(ICON_DIR, { recursive: true });
+    let nFiles = ICON_MAX; try { nFiles = fs.readdirSync(ICON_DIR).length; } catch {}
+    if (nFiles < ICON_MAX) fs.writeFileSync(file, svg); // teto de arquivos no cache: ninguém enche o disco pedindo ícones sem fim
     return svg;
   } catch (e) {
     if (e && e.code) { iconMiss.set(key, Date.now() + 600e3); throw e; }
@@ -434,11 +452,10 @@ async function api(req, res, p) {
     if (p === '/api/login' && m === 'POST') {
       const ip = ipOf(req), f = fails.get(ip);
       if (f && f.until > Date.now()) return send(res, 429, { error: `Muitas tentativas. Aguarde ${Math.ceil((f.until - Date.now()) / 1000)} s.` });
+      // A tentativa é contada ANTES de conferir a senha: chutes simultâneos não furam o limite.
+      { const n = (f ? f.n : 0) + 1, lvl = f ? f.lvl || 0 : 0; fails.set(ip, n >= 5 ? { n: 0, lvl: lvl + 1, until: Date.now() + Math.min(900e3, 60e3 * 2 ** lvl), at: Date.now() } : { n, lvl, until: 0, at: Date.now() }); }
       const b = await body(req, 1e4);
-      if (!checkPassword(b.password || '')) {
-        const n = (f ? f.n : 0) + 1, lvl = f ? f.lvl || 0 : 0; fails.set(ip, n >= 5 ? { n: 0, lvl: lvl + 1, until: Date.now() + Math.min(900e3, 60e3 * 2 ** lvl), at: Date.now() } : { n, lvl, until: 0, at: Date.now() });
-        return send(res, 401, { error: 'Senha incorreta.' });
-      }
+      if (!(await checkPassword(b.password))) return send(res, 401, { error: 'Senha incorreta.' });
       fails.delete(ip);
       return send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${newSession()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MS / 1000}${isHttps(req) ? '; Secure' : ''}` });
     }
@@ -447,7 +464,7 @@ async function api(req, res, p) {
     // Histórico: o gerador registra cada vídeo pronto (sem login; só guarda metadados).
     if (p === '/api/history' && m === 'POST') {
       const lg = await needLogin(req, res); if (!lg) return;
-      { const hk = lg.user ? 'u:' + lg.user.id : ipOf(req), now = Date.now(), hh = (histHits.get(hk) || []).filter(x => now - x < 3600e3); if (hh.length >= 40) return send(res, 429, { error: 'Muitos registros por hora.' }); hh.push(now); histHits.set(hk, hh); }
+      if (!take(histHits, lg.user ? 'u:' + lg.user.id : ipOf(req), 40)) return send(res, 429, { error: 'Muitos registros por hora.' });
       const b = await body(req, 1e4);
       const h = {
         id: crypto.randomBytes(5).toString('hex'), at: new Date().toISOString(), name: str(b.name, 80) || 'Sem título',
@@ -470,7 +487,7 @@ async function api(req, res, p) {
     // Prompt pronto para copiar e usar em outra IA (ChatGPT, Claude...): as mesmas regras que o site usa.
     if (p === '/api/ai/prompt' && m === 'GET') {
       const q = new URL(req.url, 'http://x').searchParams, seconds = [20, 30, 45, 60].includes(+q.get('seconds')) ? +q.get('seconds') : 30;
-      return send(res, 200, { prompt: AI.systemPrompt({ aspect: q.get('aspect') === '16:9' ? '16:9' : '9:16', seconds, look: SCHEMA.SET.look.has(q.get('look')) ? q.get('look') : '', format: q.get('format') || 'auto', tone: q.get('tone') || 'auto', lang: q.get('lang') || '', music: q.get('music') || '', cast: +q.get('cast') || 0, extra: db.ai.extra || '' }) });
+      return send(res, 200, { prompt: AI.systemPrompt({ aspect: q.get('aspect') === '16:9' ? '16:9' : '9:16', seconds, look: SCHEMA.SET.look.has(q.get('look')) ? q.get('look') : '', format: q.get('format') || 'auto', tone: q.get('tone') || 'auto', lang: q.get('lang') || '', music: q.get('music') || '', cast: +q.get('cast') || 0, extra: '' }) }); // as instruções da casa (db.ai.extra) são privadas: não saem neste endpoint público
     }
 
 
@@ -499,26 +516,30 @@ async function api(req, res, p) {
       const t = ttsInfo();
       if (!t.enabled) return send(res, 503, { error: 'A voz com IA está desativada neste site.' });
       if (!t.installed) return send(res, 503, { error: 'A voz com IA não está instalada no servidor (rode "npm install" e reinicie).' });
-      const ip = lg.user ? 'u:' + lg.user.id : ipOf(req), now = Date.now(), hits = (ttsHits.get(ip) || []).filter(x => now - x < 3600e3);
-      if (hits.length >= db.tts.perHour) return send(res, 429, { error: `Limite de ${db.tts.perHour} vozes por hora atingido. Tente mais tarde.` });
-      if (ttsBusy >= TTS_MAX_PARALLEL) return send(res, 429, { error: 'O servidor de voz está ocupado. Tente de novo em alguns segundos.' });
-      const b = await body(req, 3e4);
-      const gt = !lg.user; if (gt && !gTake('tts')) return send(res, 429, { error: 'O site atingiu o limite de vozes desta hora. Tente mais tarde ou entre na sua conta.' });
-      hits.push(now); ttsHits.set(ip, hits); ttsBusy++;
+      const refund = take(ttsHits, lg.user ? 'u:' + lg.user.id : ipOf(req), db.tts.perHour);
+      if (!refund) return send(res, 429, { error: `Limite de ${db.tts.perHour} vozes por hora atingido. Tente mais tarde.` });
+      let done = false, gt = false, busy = false;
       try {
+        const b = await body(req, 3e4);
+        gt = !lg.user; if (gt && !gTake('tts')) { gt = false; return send(res, 429, { error: 'O site atingiu o limite de vozes desta hora. Tente mais tarde ou entre na sua conta.' }); }
+        if (ttsBusy >= TTS_MAX_PARALLEL) { if (gt) gRefund('tts'); return send(res, 429, { error: 'O servidor de voz está ocupado. Tente de novo em alguns segundos.' }); }
+        ttsBusy++; busy = true; // checagem e incremento juntos, sem await no meio
         const mp3 = await TTS.synth({ text: b.text, voice: str(b.voice, 60) || db.tts.voice, rate: +b.rate, pitch: +b.pitch });
+        done = true;
         res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': mp3.length, 'Cache-Control': 'no-store' });
         return res.end(mp3);
-      } catch (e) { hits.pop(); if (gt) gRefund('tts'); throw e; } finally { ttsBusy--; }
+      } catch (e) { if (gt) gRefund('tts'); throw e; } finally { if (busy) ttsBusy--; if (!done) refund(); }
     }
     const aiOp = p.startsWith('/api/ai/') ? p.slice(8) : '';
-    if (m === 'POST' && { generate: 1, refine: 1, ideas: 1, review: 1, translate: 1 }[aiOp]) {
+    if (m === 'POST' && ['generate', 'refine', 'ideas', 'review', 'translate'].includes(aiOp)) {
       const lg = await needLogin(req, res); if (!lg) return;
       await aiDbLoad();
       const i = aiInfo();
       if (!i.enabled || !i.hasKey) return send(res, 503, { error: 'A criação com IA não está configurada neste site.' });
-      const ip = lg.user ? 'u:' + lg.user.id : ipOf(req), now = Date.now(), hits = (aiHits.get(ip) || []).filter(t => now - t < 3600e3);
-      if (hits.length >= db.ai.perHour) return send(res, 429, { error: `Limite de ${db.ai.perHour} usos da IA por hora atingido. Tente mais tarde.` });
+      const refund = take(aiHits, lg.user ? 'u:' + lg.user.id : ipOf(req), db.ai.perHour);
+      if (!refund) return send(res, 429, { error: `Limite de ${db.ai.perHour} usos da IA por hora atingido. Tente mais tarde.` });
+      let counted = false;
+      try {
       const b = await body(req, aiOp === 'generate' || aiOp === 'ideas' ? 2e4 : 5e5);
       const llm = { chain: aiChain() }, common = { llm, maxTokens: db.ai.maxTokens, extra: db.ai.extra || '', tpm: llm.chain[0].tpm };
       const opt = { aspect: b.aspect === '16:9' ? '16:9' : '9:16', seconds: +b.seconds, look: SCHEMA.SET.look.has(b.look) ? b.look : '', format: str(b.format, 20), tone: str(b.tone, 20), lang: str(b.lang, 8), music: str(b.music, 20), cast: +b.cast };
@@ -541,14 +562,15 @@ async function api(req, res, p) {
         else job = () => AI.translate({ ...common, story: b.story, script, lang: str(b.lang, 8) });
       }
       const ga = !lg.user; if (ga && !gTake('ai')) return send(res, 429, { error: 'O site atingiu o limite de usos da IA desta hora. Tente mais tarde ou entre na sua conta.' });
-      hits.push(now); aiHits.set(ip, hits);
+      counted = true;
       const t0 = Date.now();
       try {
         const out = await job();
         if (out && typeof out === 'object') out.provider = llm.lastUsed || ''; // qual IA respondeu (útil quando há reserva)
         db.aiCount = (db.aiCount || 0) + 1; logAi(aiOp, llm.lastUsed, true, Date.now() - t0); save();
         return send(res, 200, out);
-      } catch (e) { hits.pop(); if (ga) gRefund('ai'); logAi(aiOp, llm.lastUsed, false, Date.now() - t0, e && (e.msg || e.message)); save(); throw e; }
+      } catch (e) { counted = false; if (ga) gRefund('ai'); logAi(aiOp, llm.lastUsed, false, Date.now() - t0, e && (e.msg || e.message)); save(); throw e; }
+      } finally { if (!counted) refund(); }
     }
 
     // ---- daqui para baixo exige login ----
@@ -639,7 +661,7 @@ async function api(req, res, p) {
     if (r[0] === 'password' && m === 'POST') {
       if (process.env.ADMIN_PASSWORD) return send(res, 409, { error: 'A senha vem da variável ADMIN_PASSWORD. Altere-a no ambiente.' });
       const b = await body(req, 1e4);
-      if (!checkPassword(b.current || '')) return send(res, 403, { error: 'Senha atual incorreta.' });
+      if (!(await checkPassword(b.current))) return send(res, 403, { error: 'Senha atual incorreta.' });
       if (String(b.next || '').length < 10) return send(res, 400, { error: 'A nova senha precisa ter pelo menos 10 caracteres.' });
       setPassword(b.next); const keep = cookieOf(req).sid; for (const t of sessions.keys()) if (t !== keep) sessions.delete(t);
       return send(res, 200, { ok: true });
@@ -652,7 +674,9 @@ async function api(req, res, p) {
 }
 
 /* ---------- estáticos ---------- */
-http.createServer((req, res) => {
+// Coloca o nonce do CSP em cada <script> da página (as páginas não usam handlers inline como onclick=).
+const withNonce = (html, n) => html.replace(/<script(?![^>]*\bnonce=)/gi, '<script nonce="' + n + '"');
+const server = http.createServer((req, res) => {
   secHeaders(req, res);
   let p;
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end(); }
@@ -662,18 +686,26 @@ http.createServer((req, res) => {
   if (p === '/gerar') p = '/index.html';     // o gerador
   if (p === '/ajuda' || p === '/ajuda.html') { res.writeHead(301, { Location: '/docs' }); return res.end(); } // endereço antigo
   if (p === '/docs') p = '/docs.html';
-  if (p === '/' + adminPath()) { res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp() }); return res.end(fs.readFileSync(path.join(dir, 'admin', 'admin.html'))); }
+  if (p === '/' + adminPath()) {
+    let d; try { d = fs.readFileSync(path.join(dir, 'admin', 'admin.html'), 'utf8'); } catch { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('não encontrado'); }
+    const n = crypto.randomBytes(16).toString('base64');
+    res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp(n) });
+    return res.end(req.method === 'HEAD' ? undefined : withNonce(d, n));
+  }
   const key = p.slice(1).toLowerCase();
   const f = !/[\\:\u0000]/.test(key) && !key.split('/').some(x => !x || x.startsWith('.') || /[. ]$/.test(x)) ? PUBLIC_MAP.get(key) : null;
   if (!f) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('não encontrado'); }
   fs.readFile(f, (e, d) => {
     if (e) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('não encontrado'); }
     const ext = path.extname(f).toLowerCase(), h = { 'Content-Type': types[ext] || 'application/octet-stream' };
-    if (ext === '.html') h['Content-Security-Policy'] = csp();
+    if (ext === '.html') { const n = crypto.randomBytes(16).toString('base64'); h['Content-Security-Policy'] = csp(n); h['Cache-Control'] = 'no-store'; d = withNonce(d.toString('utf8'), n); }
     res.writeHead(200, h);
     res.end(req.method === 'HEAD' ? undefined : d);
   });
-}).listen(PORT, async () => {
+});
+server.headersTimeout = 20e3; server.requestTimeout = 60e3; server.keepAliveTimeout = 5e3; server.maxHeadersCount = 60; // contra conexões lentas (slowloris)
+process.on('unhandledRejection', e => console.error('Erro não tratado:', e));
+server.listen(PORT, async () => {
   console.log('Animaê · build ' + BUILD);
   if (aiDbReady()) { await aiDbLoad(true); console.log('  Config da IA: ' + (aiDb.ok ? 'sincronizada com o Supabase (tabela ai_config)' : 'Supabase com erro: ' + aiDb.error)); }
   { const c = sbCfg(); console.log('  Login: ' + (c.enabled ? 'Supabase ' + c.url + (c.required ? ' (obrigatório para gerar vídeos)' : ' (opcional)') : 'desligado (configure o Supabase em Admin > Conta e banco ou com SUPABASE_URL e SUPABASE_ANON_KEY)')); }

@@ -44,11 +44,22 @@ const IDS = Object.keys(PROVIDERS);
 const isId = id => Object.prototype.hasOwnProperty.call(PROVIDERS, id);
 
 // Aceita só http(s); http apenas para o próprio computador/rede local (evita chave em texto puro pela internet).
+// Precisa ser um IP literal (ou "localhost"): um nome como "10.evil.com" ou "localhost.evil.com" NÃO é rede local.
+const net = require('net');
+function isLocalHost(h) {
+  h = String(h || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (h === 'localhost' || h.endsWith('.localhost')) return true;
+  const v = net.isIP(h);
+  if (v === 4) { const [a, b] = h.split('.').map(Number); return a === 127 || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31); }
+  if (v === 6) return h === '::1' || /^f[cd][0-9a-f]{2}:/.test(h);
+  return false;
+}
 function validUrl(u) {
   try {
     const x = new URL(String(u).trim());
+    if (x.username || x.password) return ''; // sem usuário:senha embutido no endereço
     if (x.protocol === 'https:') return x.toString();
-    if (x.protocol === 'http:' && /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])/i.test(x.hostname)) return x.toString();
+    if (x.protocol === 'http:' && isLocalHost(x.hostname)) return x.toString();
   } catch {}
   return '';
 }

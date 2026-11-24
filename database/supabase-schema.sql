@@ -72,3 +72,36 @@ grant usage on schema public to service_role, authenticated;
 grant all on public.ai_config, public.videos, public.stories to service_role;
 grant select, insert, update, delete on public.videos, public.stories to authenticated;
 grant usage, select on all sequences in schema public to service_role, authenticated;
+
+-- ---------------------------------------------------------------------------------------------------------------
+-- Endurecimento (segurança): limites de tamanho e de quantidade por usuário, e nenhum acesso para visitantes (anon).
+-- Sem isso, qualquer conta gratuita poderia gravar linhas gigantes ou milhões de linhas e estourar o plano do Supabase.
+-- "not valid" = vale para as linhas novas; as que já existem não são verificadas (e não quebram a execução do script).
+-- ---------------------------------------------------------------------------------------------------------------
+revoke all on public.videos, public.stories from anon;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'videos_limits') then
+    alter table public.videos add constraint videos_limits check (
+      char_length(name) <= 200 and duration between 0 and 36000 and bytes between 0 and 5000000000 and scenes between 0 and 999
+      and look ~ '^[a-z0-9-]{1,30}$' and res in ('720', '1080') and fps in (30, 60) and format in ('webm', 'mp4')
+    ) not valid;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'stories_limits') then
+    alter table public.stories add constraint stories_limits check (
+      char_length(id) <= 40 and char_length(name) <= 200 and char_length(script) <= 20000 and octet_length(story::text) <= 2000000
+    ) not valid;
+  end if;
+end $$;
+
+create or replace function public.limit_rows_per_user() returns trigger language plpgsql as $f$
+declare n bigint;
+begin
+  execute format('select count(*) from %I.%I where user_id = $1', tg_table_schema, tg_table_name) into n using new.user_id;
+  if n >= tg_argv[0]::bigint then raise exception 'Limite de % linhas por usuário atingido.', tg_argv[0] using errcode = '54000'; end if;
+  return new;
+end $f$;
+drop trigger if exists stories_row_limit on public.stories;
+create trigger stories_row_limit before insert on public.stories for each row execute function public.limit_rows_per_user(1000);
+drop trigger if exists videos_row_limit on public.videos;
+create trigger videos_row_limit before insert on public.videos for each row execute function public.limit_rows_per_user(20000);

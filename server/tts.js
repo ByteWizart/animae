@@ -96,9 +96,13 @@ async function synth({ text, voice, rate, pitch }) {
 }
 
 // Lista de vozes: tenta a lista ao vivo (pt, en, es), com cache de 6 h; senão usa a de reserva.
-let liveCache = null, liveAt = 0;
-async function voices() {
-  if (liveCache && Date.now() - liveAt < 6 * 3600e3) return liveCache;
+let liveCache = null, liveAt = 0, liveBusy = null, failAt = 0;
+function voices() { // pedidos simultâneos dividem a mesma consulta; depois de uma falha, não tenta de novo por 5 min
+  if (liveCache && Date.now() - liveAt < 6 * 3600e3) return Promise.resolve(liveCache);
+  if (Date.now() - failAt < 300e3) return Promise.resolve(liveCache || VOICES);
+  return liveBusy || (liveBusy = voicesLive().finally(() => { liveBusy = null; }));
+}
+async function voicesLive() {
   if (Lib) {
     const tts = new Lib.MsEdgeTTS({ connectionTimeoutMs: 8000 });
     try {
@@ -107,9 +111,10 @@ async function voices() {
         .map(v => ({ id: v.ShortName, label: v.ShortName.split('-').slice(2).join('-').replace(/Neural$/, '').replace(/Multilingual/, ' (multilíngue)') + ' (' + (v.Gender === 'Male' ? 'masculina' : 'feminina') + ')', lang: v.Locale }))
         .sort((a, b) => (a.lang === 'pt-BR' ? 0 : 1) - (b.lang === 'pt-BR' ? 0 : 1) || a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
       if (l.length) { liveCache = l; liveAt = Date.now(); return l; }
-    } catch {}
+    } catch {} finally { try { tts.close(); } catch {} }
   }
-  return VOICES;
+  failAt = Date.now();
+  return liveCache || VOICES;
 }
 
 module.exports = { available, reason, synth, voices, VOICES, MAX_CHARS, clean, split };

@@ -32,6 +32,8 @@ const TONES = {
   sarcastico: { label: 'Sarcástico', guide: 'Seco, com ironia e comentários maliciosos.', music: 'chill' },
 };
 const LANGS = { 'pt-BR': 'português do Brasil', en: 'inglês', es: 'espanhol', fr: 'francês', de: 'alemão', it: 'italiano' };
+// Sem protótipo: FORMATS['constructor'] / LANGS['__proto__'] vindos do cliente não acham nada.
+for (const o of [FORMATS, TONES, LANGS]) Object.setPrototypeOf(o, null);
 const LOOK_MUSIC = { noir: 'mystery', neon: 'retro', retro: 'retro', pixel: 'retro', blueprint: 'chill', pastel: 'calm', vintage: 'sad', comic: 'happy', sketch: 'calm', cartoon: 'calm' };
 
 /* ------------------------------------------------------------------ prompt ------------------------------------------------------------------ */
@@ -292,7 +294,8 @@ async function callOne(p, { messages, maxTokens, temperature, json, canFailover 
       const txt = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
       return String(txt).replace(/<think>[\s\S]*?<\/think>/gi, ''); // alguns modelos devolvem o raciocínio dentro do texto
     }
-    const msg = (j.error && (j.error.message || (typeof j.error === 'string' ? j.error : ''))) || j.message || '';
+    // A mensagem do provedor chega a visitantes: tira trechos que parecem chaves/tokens e limita o tamanho.
+    const msg = String((j.error && (j.error.message || (typeof j.error === 'string' ? j.error : ''))) || j.message || '').replace(/[A-Za-z0-9_\-.]{24,}/g, '…').slice(0, 240);
     if (r.status === 400 && /response_format|json/i.test(msg) && body.response_format) { delete body.response_format; continue; } // modelo sem modo JSON
     if (r.status === 400 && extras.some(k => k in body) && /reasoning|thinking|unknown|unrecognized|unsupported|extra|not permitted/i.test(msg)) { extras.forEach(k => delete body[k]); continue; }
     if (r.status === 401 || r.status === 403) throw { ...failErr(502, 'A chave de ' + p.label + ' foi recusada. Peça ao administrador para conferir a chave.', 600e3), wide: true };
