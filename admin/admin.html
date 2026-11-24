@@ -4,8 +4,8 @@
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#7c5cff">
-<script src="theme.js"></script>
-<link rel="stylesheet" href="ui.css">
+<script src="js/theme.js"></script>
+<link rel="stylesheet" href="css/ui.css">
 <style>
 .login{max-width:380px;margin:8vh auto 0}
 .login h1{font-size:22px}
@@ -306,7 +306,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 <div id="toasts" aria-live="polite"></div>
 </div>
 
-<script src="schema.js"></script>
+<script src="js/schema.js"></script>
 <script>
 const $=i=>document.getElementById(i),S=SCHEMA;
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

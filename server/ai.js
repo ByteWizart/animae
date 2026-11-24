@@ -1,7 +1,7 @@
 // Integração com IAs gratuitas (Gemini, Groq, LLM7 ou outro serviço compatível com a OpenAI): ideia -> roteiro + direção + JSON de história.
 // Roda só no servidor, para a chave nunca chegar ao navegador. Requer Node 18+ (fetch embutido). build 9
 // Recebe `llm = { chain: [provedores] }`: tenta o primeiro e, se ele falhar (limite, chave, queda), passa para o próximo.
-const SCHEMA = require('./schema.js');
+const SCHEMA = require('../public/js/schema.js');
 
 /* ------------------------------------------------------------------ opções de criação ------------------------------------------------------------------ */
 const FORMATS = {

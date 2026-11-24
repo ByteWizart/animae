@@ -1,30 +1,45 @@
 # Animaê: gerador de vídeos animados, verticais 9:16 ou horizontais 16:9 (no navegador, sem API paga)
 
-Pasta única, sem subpastas. A única dependência é a opcional `msedge-tts` (voz com IA): rode `npm install` uma vez. Sem ela, tudo funciona, menos a voz com IA.
+Organizado em pastas (veja a estrutura abaixo). A única dependência é a opcional `msedge-tts` (voz com IA): rode `npm install` uma vez. Sem ela, tudo funciona, menos a voz com IA.
+
+```
+server.js            servidor (ponto de entrada: node server.js)
+package.json         dependências
+server/              código só do servidor: ai.js, providers.js, supabase.js, tts.js
+admin/               painel administrativo (admin.html, servido no endereço secreto)
+database/            supabase-schema.sql
+public/              tudo o que o navegador recebe
+  home.html, index.html, docs.html, favicon.svg
+  css/               ui.css
+  js/                theme, schema, audio, auth, guia, motor-extra, motor-extra2
+  looks/             amostras dos 10 estilos
+  exemplos/          histórias de exemplo (.json)
+.dados/              criado ao rodar o servidor (configurações e chaves; não compartilhe)
+```
 
 | Arquivo | Para que serve |
 |---|---|
-| home.html | Página inicial (`/`): explica o site, os passos, recursos, estilos e perguntas frequentes |
-| index.html | O gerador de vídeo, em `/gerar` |
-| motor-extra.js | Motor extra (build 12): 29 animações de personagem, 80 objetos, 6 efeitos, 4 transições e 6 cenários. Carregado depois do script do index.html; para acrescentar algo, edite aqui e descreva no schema.js |
-| motor-extra2.js | Motor extra 2 (build 13): objetos `bigtext`, `highlight` e `steps` e pós-efeitos de cinema (vinheta, grão, linhas de monitor, correção de cor, fade e barra de progresso). Carregado depois do motor-extra.js |
-| guia.js | Graveto, o boneco-guia do tutorial (desenhado pelo motor dos vídeos; abre na primeira visita ao gerador) |
-| docs.html | Documentação (guia, referência do JSON, solução de problemas), em `/docs` |
-| admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
-| ai.js | Integração com a IA (roteiro + JSON a partir da ideia do usuário), com troca automática de provedor |
-| providers.js | Catálogo dos provedores de IA grátis e sem recarga (Gemini, Groq, LLM7 e Outro) |
+| public/home.html | Página inicial (`/`): explica o site, os passos, recursos, estilos e perguntas frequentes |
+| public/index.html | O gerador de vídeo, em `/gerar` |
+| public/js/motor-extra.js | Motor extra (build 12): 29 animações de personagem, 80 objetos, 6 efeitos, 4 transições e 6 cenários. Carregado depois do script do index.html; para acrescentar algo, edite aqui e descreva no schema.js |
+| public/js/motor-extra2.js | Motor extra 2 (build 13): objetos `bigtext`, `highlight` e `steps` e pós-efeitos de cinema (vinheta, grão, linhas de monitor, correção de cor, fade e barra de progresso). Carregado depois do motor-extra.js |
+| public/js/guia.js | Graveto, o boneco-guia do tutorial (desenhado pelo motor dos vídeos; abre na primeira visita ao gerador) |
+| public/docs.html | Documentação (guia, referência do JSON, solução de problemas), em `/docs` |
+| admin/admin.html | Painel administrativo, em endereço secreto (IA, padrões, histórico, segurança) |
+| server/ai.js | Integração com a IA (roteiro + JSON a partir da ideia do usuário), com troca automática de provedor |
+| server/providers.js | Catálogo dos provedores de IA grátis e sem recarga (Gemini, Groq, LLM7 e Outro) |
 | server.js | Servidor local + API do Admin |
-| schema.js | Catálogo do formato de história e validador (usado por Docs, Admin e servidor) |
-| tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
-| audio.js | Trilha e efeitos sonoros gerados por código + análise da voz (`analyzeVoice`: onde há fala e onde há pausa, com limiar adaptativo) |
-| auth.js | Login no navegador (Supabase): janela de entrar/criar conta, sessão e biblioteca na nuvem |
-| supabase.js | Ponte do servidor com o Supabase (confere o login, grava vídeos, lista usuários) |
-| supabase-schema.sql | **Único SQL do projeto**: tabelas `videos`, `stories` (RLS por usuário) e `ai_config` (provedor padrão e modelos, só o servidor acessa). Rode uma vez no SQL Editor do Supabase |
-| theme.js | Botão de tema claro/escuro (lua/sol na barra); a escolha fica salva no navegador |
-| ui.css | Estilos compartilhados (visual novo: degradê violeta/rosa/âmbar, claro e escuro automático) |
-| historia-teste.json | História de exemplo simples |
-| historia-demo-v9.json | História de 30 s que mostra os recursos novos (rua em movimento, gráfico, chat, glitch, holofote, palco...). Carregue em Avançado > Carregar história |
-| historia-demo-16x9.json | Exemplo de 18 s no formato horizontal 16:9 (tela de 1920×1080). Carregue em Avançado > Carregar história |
+| public/js/schema.js | Catálogo do formato de história e validador (usado por Docs, Admin e servidor) |
+| server/tts.js | Voz com IA (texto do roteiro vira narração em MP3) |
+| public/js/audio.js | Trilha e efeitos sonoros gerados por código + análise da voz (`analyzeVoice`: onde há fala e onde há pausa, com limiar adaptativo) |
+| public/js/auth.js | Login no navegador (Supabase): janela de entrar/criar conta, sessão e biblioteca na nuvem |
+| server/supabase.js | Ponte do servidor com o Supabase (confere o login, grava vídeos, lista usuários) |
+| database/supabase-schema.sql | **Único SQL do projeto**: tabelas `videos`, `stories` (RLS por usuário) e `ai_config` (provedor padrão e modelos, só o servidor acessa). Rode uma vez no SQL Editor do Supabase |
+| public/js/theme.js | Botão de tema claro/escuro (lua/sol na barra); a escolha fica salva no navegador |
+| public/css/ui.css | Estilos compartilhados (visual novo: degradê violeta/rosa/âmbar, claro e escuro automático) |
+| public/exemplos/historia-teste.json | História de exemplo simples |
+| public/exemplos/historia-demo-v9.json | História de 30 s que mostra os recursos novos (rua em movimento, gráfico, chat, glitch, holofote, palco...). Carregue em Avançado > Carregar história |
+| public/exemplos/historia-demo-16x9.json | Exemplo de 18 s no formato horizontal 16:9 (tela de 1920×1080). Carregue em Avançado > Carregar história |
 | .dados/dados.json | Criado automaticamente numa pasta escondida que o servidor nunca serve: configurações, chaves de IA, histórico, senha (com hash) e endereço do painel. Não compartilhe. Para mudar o lugar, use DATA_DIR |
 
 ## Como usar
@@ -105,7 +120,7 @@ Fica no **localStorage do navegador de cada pessoa** (não existe no servidor). 
 - Porta diferente: `PORT=4000 node server.js`.
 - O seletor de estilo grava "style.look" no JSON. Dá para trocar o estilo de uma cena só com "look" dentro da cena.
 - "Ajustar ao áudio" reescala os tempos das cenas para a duração da voz. "Detectar pausas" lista os silêncios da voz.
-- Se o gerador for aberto sem o servidor (só o arquivo index.html), ele funciona igual, mas sem IA, painel e histórico.
+- Se o gerador for aberto sem o servidor (só o arquivo public/index.html), ele funciona igual, mas sem IA, painel e histórico.
 
 
 ## Novidades do build 9

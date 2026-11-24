@@ -1,11 +1,11 @@
 // Servidor mínimo, sem dependências. Uso: node server.js  ->  http://localhost:3000
 // Serve os arquivos estáticos e uma pequena API para o painel Admin (dados em dados.json).
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
-const SCHEMA = require('./schema.js');
-const AI = require('./ai.js');
-const PROV = require('./providers.js');
-const SB = require('./supabase.js');
-const TTS = require('./tts.js');
+const SCHEMA = require('./public/js/schema.js');
+const AI = require('./server/ai.js');
+const PROV = require('./server/providers.js');
+const SB = require('./server/supabase.js');
+const TTS = require('./server/tts.js');
 
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
@@ -25,10 +25,12 @@ const STARTED = Date.now();
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.sql': 'text/plain; charset=utf-8' };
 // Só estes arquivos são servidos pela web (lista permitida, sem diferenciar maiúsculas de minúsculas).
 // Tudo o mais (server.js, ai.js, dados, .dados/...) nunca sai daqui, mesmo em Windows e macOS.
-const PUBLIC_NAMES = ['home.html', 'index.html', 'docs.html', 'audio.js', 'auth.js', 'schema.js', 'guia.js', 'motor-extra.js', 'motor-extra2.js', 'theme.js', 'ui.css', 'favicon.svg', 'historia-teste.json', 'historia-demo-v9.json', 'historia-demo-16x9.json'];
+const PUBLIC_NAMES = ['home.html', 'index.html', 'docs.html', 'favicon.svg', 'css/ui.css', 'js/audio.js', 'js/auth.js', 'js/schema.js', 'js/guia.js', 'js/motor-extra.js', 'js/motor-extra2.js', 'js/theme.js', 'exemplos/historia-teste.json', 'exemplos/historia-demo-v9.json', 'exemplos/historia-demo-16x9.json'];
+const PUB = path.join(dir, 'public'); // tudo o que é servido pela web fica em public/
 const PUBLIC_MAP = new Map(); // nome em minúsculas -> caminho real
-for (const n of PUBLIC_NAMES) PUBLIC_MAP.set(n, path.join(dir, n));
-try { for (const n of fs.readdirSync(path.join(dir, 'looks'))) if (/^[a-z0-9-]+\.jpg$/i.test(n)) PUBLIC_MAP.set('looks/' + n.toLowerCase(), path.join(dir, 'looks', n)); } catch {}
+for (const n of PUBLIC_NAMES) PUBLIC_MAP.set(n, path.join(PUB, n));
+PUBLIC_MAP.set('supabase-schema.sql', path.join(dir, 'database', 'supabase-schema.sql')); // o painel Admin copia este SQL
+try { for (const n of fs.readdirSync(path.join(PUB, 'looks'))) if (/^[a-z0-9-]+\.jpg$/i.test(n)) PUBLIC_MAP.set('looks/' + n.toLowerCase(), path.join(PUB, 'looks', n)); } catch {}
 
 /* ---------- dados ---------- */
 const DEFAULTS = () => ({
@@ -365,7 +367,7 @@ let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
 const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
 
 function status() {
-  const expected = ['index.html', 'docs.html', 'admin.html', 'audio.js', 'schema.js', 'ai.js', 'providers.js', 'tts.js', 'ui.css', 'theme.js', 'favicon.svg', 'supabase.js', 'supabase-schema.sql', 'server.js', 'package.json', 'README.md', 'historia-teste.json', 'historia-demo-v9.json', 'historia-demo-16x9.json', 'motor-extra.js', 'motor-extra2.js'];
+  const expected = ['server.js', 'package.json', 'README.md', 'admin/admin.html', 'database/supabase-schema.sql', 'server/ai.js', 'server/providers.js', 'server/supabase.js', 'server/tts.js', 'public/index.html', 'public/home.html', 'public/docs.html', 'public/favicon.svg', 'public/css/ui.css', 'public/js/audio.js', 'public/js/auth.js', 'public/js/schema.js', 'public/js/guia.js', 'public/js/theme.js', 'public/js/motor-extra.js', 'public/js/motor-extra2.js', 'public/exemplos/historia-teste.json', 'public/exemplos/historia-demo-v9.json', 'public/exemplos/historia-demo-16x9.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
@@ -660,7 +662,7 @@ http.createServer((req, res) => {
   if (p === '/gerar') p = '/index.html';     // o gerador
   if (p === '/ajuda' || p === '/ajuda.html') { res.writeHead(301, { Location: '/docs' }); return res.end(); } // endereço antigo
   if (p === '/docs') p = '/docs.html';
-  if (p === '/' + adminPath()) { res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp() }); return res.end(fs.readFileSync(path.join(dir, 'admin.html'))); }
+  if (p === '/' + adminPath()) { res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp() }); return res.end(fs.readFileSync(path.join(dir, 'admin', 'admin.html'))); }
   const key = p.slice(1).toLowerCase();
   const f = !/[\\:\u0000]/.test(key) && !key.split('/').some(x => !x || x.startsWith('.') || /[. ]$/.test(x)) ? PUBLIC_MAP.get(key) : null;
   if (!f) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('não encontrado'); }

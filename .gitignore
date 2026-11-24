@@ -1,0 +1,5 @@
+.dados/
+.cache-icones/
+dados.json
+dados.json.tmp
+node_modules/

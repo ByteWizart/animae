@@ -3,8 +3,8 @@
 <title>Gerador · Animaê</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#7c5cff">
-<script src="theme.js"></script>
-<link rel="stylesheet" href="ui.css">
+<script src="js/theme.js"></script>
+<link rel="stylesheet" href="css/ui.css">
 <style>
 .app{display:grid;grid-template-columns:300px minmax(0,1fr);gap:52px;max-width:1120px;margin:0 auto;align-items:start}
 /* palco: o canvas dentro de uma moldura de celular */
@@ -159,9 +159,9 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
 </pre></div></details></div></div></details>
 </div></main>
 <footer>Animaê · build 16</footer>
-<script src="audio.js"></script>
-<script src="schema.js"></script>
-<script src="auth.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/schema.js"></script>
+<script src="js/auth.js"></script>
 <script>
 let W=1080,H=1920,ASP='9:16',GY0=1480,HY0=900,WK=1;const $=i=>document.getElementById(i);let K='#181622';
 const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t,eio=t=>(t=clamp(t))*t*(3-2*t);
@@ -1194,7 +1194,7 @@ $('aitrgo').onclick=async()=>{if(!readStory())return;const lang=$('aitr').value;
   applyAI({script:j.script,story:j.story,title:storyName},{keepOpen:true});log('Tradução pronta ('+LANGL[lang]+'). Grave a narração no novo idioma e use "Ajustar ao áudio".')};
 applyDefaults();
 </script>
-<script src="motor-extra.js"></script>
-<script src="motor-extra2.js"></script>
-<script src="guia.js"></script>
+<script src="js/motor-extra.js"></script>
+<script src="js/motor-extra2.js"></script>
+<script src="js/guia.js"></script>
 </body></html>

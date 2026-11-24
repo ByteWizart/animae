@@ -3,8 +3,8 @@
 <title>Docs · Animaê</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#7c5cff">
-<script src="theme.js"></script>
-<link rel="stylesheet" href="ui.css">
+<script src="js/theme.js"></script>
+<link rel="stylesheet" href="css/ui.css">
 <style>
 .layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:28px;align-items:start}
 .side{position:sticky;top:84px;max-height:calc(100vh - 100px);overflow:auto;padding-right:6px}
@@ -252,7 +252,7 @@ details.faq .a{padding:0 14px 12px;color:var(--muted)}
 
 <footer class="muted" style="max-width:1100px;margin:30px auto 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px">Animaê · build 16 · <a href="/gerar">voltar ao gerador</a></footer>
 </div>
-<script src="schema.js"></script>
+<script src="js/schema.js"></script>
 <script>
 const $=i=>document.getElementById(i),S=SCHEMA;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
