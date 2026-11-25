@@ -7,6 +7,8 @@ const PROV = require('./server/providers.js');
 const SB = require('./server/supabase.js');
 const TTS = require('./server/tts.js');
 const CRED = require('./server/credits.js');
+const CUPON = require('./server/cupons.js');
+const SUPORTE = require('./server/suporte.js');
 
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
@@ -26,7 +28,7 @@ const STARTED = Date.now();
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.sql': 'text/plain; charset=utf-8' };
 // Só estes arquivos são servidos pela web (lista permitida, sem diferenciar maiúsculas de minúsculas).
 // Tudo o mais (server.js, ai.js, dados, .dados/...) nunca sai daqui, mesmo em Windows e macOS.
-const PUBLIC_NAMES = ['home.html', 'index.html', 'docs.html', 'favicon.svg', 'css/ui.css', 'js/audio.js', 'js/auth.js', 'js/schema.js', 'js/guia.js', 'js/motor-extra.js', 'js/motor-extra2.js', 'js/theme.js', 'exemplos/historia-teste.json', 'exemplos/historia-demo-v9.json', 'exemplos/historia-demo-16x9.json'];
+const PUBLIC_NAMES = ['home.html', 'index.html', 'docs.html', 'favicon.svg', 'css/ui.css', 'js/audio.js', 'js/auth.js', 'js/suporte.js', 'js/cupom.js', 'js/schema.js', 'js/guia.js', 'js/motor-extra.js', 'js/motor-extra2.js', 'js/theme.js', 'exemplos/historia-teste.json', 'exemplos/historia-demo-v9.json', 'exemplos/historia-demo-16x9.json'];
 const PUB = path.join(dir, 'public'); // tudo o que é servido pela web fica em public/
 const PUBLIC_MAP = new Map(); // nome em minúsculas -> caminho real
 for (const n of PUBLIC_NAMES) PUBLIC_MAP.set(n, path.join(PUB, n));
@@ -46,6 +48,7 @@ const DEFAULTS = () => ({
   ai: { enabled: true, provider: 'gemini', fallback: [], providers: {}, perHour: 20, maxTokens: 12000, extra: '' },
   tts: { enabled: true, perHour: 60, voice: 'pt-BR-FranciscaNeural' },
   credits: CRED.normalize(null), // créditos diários por pessoa (config + saldos); veja server/credits.js
+  coupons: CUPON.normalize(null), // cupons (códigos que dão créditos e vantagens); veja server/cupons.js
   supabase: { url: '', anonKey: '', serviceKey: '', required: true, google: false },
   history: [], aiLog: [], aiStats: { total: 0, ok: 0, fail: 0, ms: 0 },
 });
@@ -80,6 +83,7 @@ function load() {
     db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } }, ai: { ...base.ai, ...(d.ai || {}) }, tts: { ...base.tts, ...(d.tts || {}) }, supabase: { ...base.supabase, ...(d.supabase || {}) } };
     delete db.stories; // a biblioteca agora fica no navegador de cada usuário
     db.credits = CRED.normalize(db.credits);
+    db.coupons = CUPON.normalize(db.coupons);
     // migração: o formato antigo (uma única chave, da Groq) vira o provedor "groq" do novo formato
     const a = db.ai;
     a.providers = a.providers && typeof a.providers === 'object' ? a.providers : {};
@@ -109,7 +113,9 @@ let saveTimer = null;
 const saveSoon = () => { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; try { save(); } catch (e) { console.warn('Aviso: não consegui gravar os créditos (' + e.message + ')'); } }, 1500); saveTimer.unref && saveTimer.unref(); };
 const balHook = { fn: null }; // saldos de créditos no Supabase (definido mais abaixo)
 const CR = CRED.create(() => db.credits, () => { saveSoon(); if (balHook.fn) balHook.fn(); });
-for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { try { save(); await Promise.race([Promise.all([cfgDbSave(), balFlush()]), new Promise(r => setTimeout(r, 2500))]); } catch {} process.exit(0); });
+const CP = CUPON.create(() => db.coupons, CR, () => saveSoon()); // cupons (usa o CR para dar créditos e vantagens)
+const SP = SUPORTE.create(path.join(DATA_DIR, 'suporte.json')); // chat de suporte: qualquer um escreve, só o admin responde
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { try { save(); SP.flush(); await Promise.race([Promise.all([cfgDbSave(), balFlush()]), new Promise(r => setTimeout(r, 2500))]); } catch {} process.exit(0); });
 
 /* ---------- senha e sessões ---------- */
 const hashPw = (pw, salt) => crypto.scryptSync(String(pw), salt, 32).toString('hex');
@@ -404,7 +410,7 @@ function cfgPlain() {
   return JSON.parse(JSON.stringify({
     v: 1, settings: db.settings,
     ai: { enabled: a.enabled, provider: a.provider, fallback: a.fallback, providers: a.providers, perHour: a.perHour, maxTokens: a.maxTokens, extra: a.extra },
-    tts: db.tts, credits: db.credits.cfg, creditsSalt: db.credits.salt, auth: db.auth, adminPath: db.adminPath,
+    tts: db.tts, credits: db.credits.cfg, coupons: db.coupons, creditsSalt: db.credits.salt, auth: db.auth, adminPath: db.adminPath,
     supabase: { required: db.supabase.required, google: db.supabase.google },
   }));
 }
@@ -425,6 +431,7 @@ function cfgApply(d) {
     if (typeof t.voice === 'string' && /^[a-z]{2,3}-[A-Z]{2}-[A-Za-z]{2,40}Neural$/.test(t.voice)) a.voice = t.voice;
   }
   if (d.credits && typeof d.credits === 'object') db.credits.cfg = CR.cleanCfg(d.credits, db.credits.cfg);
+  if (d.coupons && typeof d.coupons === 'object') db.coupons = CUPON.normalize(d.coupons);
   // O sal do código dos visitantes (hash do IP) precisa ser sempre o mesmo, senão o mesmo visitante vira "outra pessoa" a cada reinício.
   if (typeof d.creditsSalt === 'string' && /^[0-9a-f]{16,64}$/.test(d.creditsSalt)) db.credits.salt = d.creditsSalt;
   if (d.auth && typeof d.auth === 'object' && /^[0-9a-f]{32}$/.test(d.auth.salt || '') && /^[0-9a-f]{64}$/.test(d.auth.hash || '')) {
@@ -500,10 +507,13 @@ if (!cfgDbReady()) ensureAdminDefaults(); // sem Supabase, tudo como antes (com 
 // a porta; depois, cada uso é enviado em ~1,5 s (só as linhas que mudaram). Uma linha por pessoa (chave u:<id> ou ip:<hash>).
 // Pensado para UM servidor ativo por vez (o saldo é contado na memória do servidor).
 const BAL = '/rest/v1/credit_balances';
-const bal = { ok: null, error: '', loaded: false, loading: null, tried: 0, synced: new Map(), timer: null, busy: null };
-const balRow = (k, e) => ({ key: k, d: String(e.d || ''), u: e.u | 0, b: e.b | 0, w: String(e.w || '').slice(0, 120), t: Math.round(e.t || 0), s: Math.round(e.s || 0) });
-const balSig = e => [e.d, e.u | 0, e.b | 0, e.w || '', e.s | 0].join('|');
-const balErr = r => (r.status === 404 || (r.json && /PGRST205|42P01/.test(String(r.json.code || '')))) ? 'A tabela credit_balances não existe: rode o supabase-schema.sql no SQL Editor do Supabase.' : cfgDbErr(r);
+const bal = { ok: null, error: '', note: '', noX: false, loaded: false, loading: null, tried: 0, synced: new Map(), timer: null, busy: null };
+const balRow = (k, e) => { const r = { key: k, d: String(e.d || ''), u: e.u | 0, b: e.b | 0, w: String(e.w || '').slice(0, 120), t: Math.round(e.t || 0), s: Math.round(e.s || 0) }; if (!bal.noX) r.x = balX(e) || {}; return r; }; // x vai sempre (num lote misto, o que falta viraria null); só some em banco antigo, sem a coluna
+const balX = e => (e.p && e.p.length) || (e.c && Object.keys(e.c).length) ? { p: e.p || [], c: e.c || {} } : null; // vantagens de cupom + cupons já usados
+const balSig = e => [e.d, e.u | 0, e.b | 0, e.w || '', e.s | 0, JSON.stringify(balX(e))].join('|');
+const balOldDb = () => { bal.noX = true; bal.note = 'O Supabase ainda não tem a coluna x em credit_balances: cupons de vantagem e limites por pessoa só valem até reiniciar o servidor. Rode o supabase-schema.sql de novo no SQL Editor.'; };
+const balMissingX = r => !!(r && !r.ok && r.json && /42703|PGRST204/.test(String(r.json.code || '')) && /\bx\b/.test(JSON.stringify(r.json))); // a coluna x ainda não existe (SQL antigo)
+const balErr = r => balMissingX(r) ? 'Falta a coluna x em credit_balances (cupons): rode o supabase-schema.sql de novo no SQL Editor do Supabase.' : (r.status === 404 || (r.json && /PGRST205|42P01/.test(String(r.json.code || '')))) ? 'A tabela credit_balances não existe: rode o supabase-schema.sql no SQL Editor do Supabase.' : cfgDbErr(r);
 // Lê tudo do banco e junta com o que já existe na memória: vale a linha mais recente (campo t) de cada pessoa.
 function balLoad() {
   if (!cfgDbReady()) { bal.ok = null; bal.error = ''; return Promise.resolve(false); }
@@ -511,9 +521,10 @@ function balLoad() {
   bal.tried = Date.now();
   bal.loading = (async () => {
     try {
-      const us = db.credits.users, remote = new Map();
+      const us = db.credits.users, remote = new Map(); bal.noX = false; bal.note = '';
       for (let from = 0; from < 200000; from += 1000) { // PostgREST entrega até 1000 linhas por vez
-        const r = await SB.call(sbCfg(), 'GET', BAL + '?select=key,d,u,b,w,t,s&order=key.asc&limit=1000&offset=' + from);
+        let r = await SB.call(sbCfg(), 'GET', BAL + '?select=key,d,u,b,w,t,s,x&order=key.asc&limit=1000&offset=' + from);
+        if (balMissingX(r)) { balOldDb(); r = await SB.call(sbCfg(), 'GET', BAL + '?select=key,d,u,b,w,t,s&order=key.asc&limit=1000&offset=' + from); } // banco antigo, sem a coluna x
         if (!r.ok) { bal.ok = false; bal.error = balErr(r); return false; }
         const rows = Array.isArray(r.json) ? r.json : []; for (const x of rows) remote.set(x.key, x);
         if (rows.length < 1000) break;
@@ -522,7 +533,8 @@ function balLoad() {
       for (const [k, x] of remote) {
         if (!/^(u:[\w-]{1,64}|ip:[0-9a-f]{8,64})$/.test(k)) continue;
         const e = { d: String(x.d || ''), u: Math.max(0, x.u | 0), b: Math.max(0, x.b | 0), w: String(x.w || '').slice(0, 120), t: +x.t || 0, s: +x.s || 0 }, cur = us[k];
-        if (!CR.isCur(e) && !(e.b > 0)) { stale.push(k); continue; } // período antigo e sem presente: não precisa mais
+        if (x.x && typeof x.x === 'object') { const pk = CRED.cleanPerks(x.x.p), cp = CRED.cleanUsedCoupons(x.x.c); if (pk.length) e.p = pk; if (Object.keys(cp).length) e.c = cp; }
+        if (!CR.isCur(e) && !(e.b > 0) && !e.c && !CRED.perkInfo(e, Date.now()).until) { stale.push(k); continue; } // período antigo e sem presente: não precisa mais
         if (!cur || (+cur.t || 0) <= e.t) us[k] = e;
         bal.synced.set(k, balSig(e));
       }
@@ -553,7 +565,9 @@ function balFlush() {
       for (const [k, e] of Object.entries(us)) if (bal.synced.get(k) !== balSig(e)) up.push([k, e]);
       for (const k of bal.synced.keys()) if (!us[k]) gone.push(k);
       for (let i = 0; i < up.length; i += 500) {
-        const chunk = up.slice(i, i + 500), r = await SB.call(sbCfg(), 'POST', BAL + '?on_conflict=key', { body: chunk.map(([k, e]) => balRow(k, e)), extra: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+        const chunk = up.slice(i, i + 500), send1 = () => SB.call(sbCfg(), 'POST', BAL + '?on_conflict=key', { body: chunk.map(([k, e]) => balRow(k, e)), extra: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+        let r = await send1();
+        if (balMissingX(r)) { balOldDb(); r = await send1(); } // banco antigo: reenvia sem a coluna x
         if (!r.ok) { bal.ok = false; bal.error = balErr(r); return false; }
         chunk.forEach(([k, e]) => bal.synced.set(k, balSig(e)));
       }
@@ -580,12 +594,16 @@ function logAi(op, who, ok, ms, err) {
 const aiHits = new Map(); // ip -> [timestamps]
 const histHits = new Map();
 const creditHits = new Map();
+const couponHits = new Map(); // ip -> tentativas de cupom por hora
+const supportHits = new Map(); // ip -> mensagens de suporte por hora
+const supportNew = new Map(); // ip -> conversas novas por hora
+const supportPoll = new Map(); // token/ip -> consultas por hora
 const ttsHits = new Map(); // ip -> [timestamps]
 let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
 const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
 
 function status() {
-  const expected = ['server.js', 'package.json', 'README.md', 'admin/admin.html', 'database/supabase-schema.sql', 'server/ai.js', 'server/credits.js', 'server/providers.js', 'server/supabase.js', 'server/tts.js', 'public/index.html', 'public/home.html', 'public/docs.html', 'public/favicon.svg', 'public/css/ui.css', 'public/js/audio.js', 'public/js/auth.js', 'public/js/schema.js', 'public/js/guia.js', 'public/js/theme.js', 'public/js/motor-extra.js', 'public/js/motor-extra2.js', 'public/exemplos/historia-teste.json', 'public/exemplos/historia-demo-v9.json', 'public/exemplos/historia-demo-16x9.json'];
+  const expected = ['server.js', 'package.json', 'README.md', 'admin/admin.html', 'database/supabase-schema.sql', 'server/ai.js', 'server/credits.js', 'server/cupons.js', 'server/suporte.js', 'server/providers.js', 'server/supabase.js', 'server/tts.js', 'public/index.html', 'public/home.html', 'public/docs.html', 'public/favicon.svg', 'public/css/ui.css', 'public/js/audio.js', 'public/js/auth.js', 'public/js/suporte.js', 'public/js/cupom.js', 'public/js/schema.js', 'public/js/guia.js', 'public/js/theme.js', 'public/js/motor-extra.js', 'public/js/motor-extra2.js', 'public/exemplos/historia-teste.json', 'public/exemplos/historia-demo-v9.json', 'public/exemplos/historia-demo-16x9.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
@@ -706,8 +724,50 @@ async function api(req, res, p) {
       const w = credWho(req, { user });
       if (!take(creditHits, w.key, 240)) return send(res, 429, { error: 'Muitas consultas.' });
       const v = CR.view(w.key);
-      return send(res, 200, { enabled: v.enabled, daily: v.daily, used: v.used, bonus: v.bonus, left: v.left, resetIn: v.resetIn, every: v.every, costs: v.costs, anon: !user }, { 'Cache-Control': 'no-store', ...credHeaders(v) });
+      return send(res, 200, { enabled: v.enabled, daily: v.daily, used: v.used, bonus: v.bonus, left: v.left, resetIn: v.resetIn, every: v.every, costs: v.costs, perks: v.perks, anon: !user }, { 'Cache-Control': 'no-store', ...credHeaders(v) });
     }
+
+    /* ---------- cupons ---------- */
+    // Resgatar um cupom. Tudo é conferido aqui: o navegador só manda o código e mostra a resposta.
+    if (p === '/api/coupons/redeem' && m === 'POST') {
+      const lg = await needLogin(req, res); if (!lg) return;
+      const give = take(couponHits, ipOf(req), 15); // tentativas por IP: quem chuta códigos é barrado rápido
+      if (!give) return send(res, 429, { error: 'Muitas tentativas de cupom. Aguarde um pouco e tente de novo.' });
+      const b = await body(req, 1e3);
+      if (!db.credits.cfg.enabled) { give(); return send(res, 409, { error: 'O sistema de créditos está desligado no momento.' }); }
+      const cw = credWho(req, lg), r = CP.redeem(b.code, { key: cw.key, name: cw.name, hasAccount: !!lg.user }, sbCfg().enabled);
+      if (r.error) return send(res, r.login ? 401 : 400, { error: r.error, ...(r.login ? { login: true } : {}) });
+      give(); // deu certo: não conta como tentativa errada
+      save(); const v = CR.view(cw.key);
+      return send(res, 200, { ok: true, message: r.message, gave: r.gave, credits: { enabled: v.enabled, daily: v.daily, used: v.used, bonus: v.bonus, left: v.left, resetIn: v.resetIn, every: v.every, costs: v.costs, perks: v.perks, anon: !lg.user } }, credHeaders(v));
+    }
+
+    /* ---------- chat de suporte (qualquer pessoa escreve; só o admin responde) ---------- */
+    // O visitante guarda um token no navegador; ele só abre a PRÓPRIA conversa.
+    const supTok = () => String(req.headers['x-support-token'] || '');
+    if (p === '/api/support/send' && m === 'POST') {
+      const ip = ipOf(req);
+      const undoMsg = take(supportHits, ip, 20); if (!undoMsg) return send(res, 429, { error: 'Muitas mensagens por hora. Tente de novo mais tarde.' });
+      const b = await body(req, 4e3);
+      if (b.website) { undoMsg(); return send(res, 200, { ok: true }); } // campo-isca: robôs preenchem, pessoas não (não responde erro de propósito)
+      const tok = SUPORTE.validToken(b.token) ? b.token : (SUPORTE.validToken(supTok()) ? supTok() : '');
+      let undoNew = null;
+      if (!tok) { undoNew = take(supportNew, ip, 4); if (!undoNew) { undoMsg(); return send(res, 429, { error: 'Muitas conversas novas por hora. Tente de novo mais tarde.' }); } }
+      const user = await authUser(req).catch(() => null); // se a pessoa estiver logada, o admin vê o e-mail da conta
+      const r = SP.send(tok, b.text, { name: b.name, email: user ? user.email : '' });
+      if (r.error) { undoMsg(); if (undoNew) undoNew(); return send(res, r.code || 400, { error: r.error }); }
+      return send(res, 201, { ok: true, token: r.token, msg: r.msg, closed: r.closed });
+    }
+    if (p === '/api/support/thread' && m === 'GET') {
+      const tok = supTok(), q = new URL(req.url, 'http://x').searchParams;
+      if (!SUPORTE.validToken(tok)) return send(res, 200, { exists: false });
+      if (!take(supportPoll, tok.slice(0, 16), 1500)) return send(res, 429, { error: 'Muitas consultas.' });
+      const r = SP.poll(tok, +q.get('after') || 0);
+      if (!r) return send(res, 200, { exists: false });
+      if (q.get('read') === '1') SP.markReadByUser(tok);
+      return send(res, 200, { exists: true, ...r });
+    }
+
     if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.enabled && i.hasKey, perHour: i.perHour }); }
     // Prompt pronto para copiar e usar em outra IA (ChatGPT, Claude...): as mesmas regras que o site usa.
     if (p === '/api/ai/prompt' && m === 'GET') {
@@ -862,19 +922,20 @@ async function api(req, res, p) {
     if (r[0] === 'export' && m === 'GET') { // backup das configurações (sem as chaves, a menos que se peça ?keys=1)
       const withKeys = new URL(req.url, 'http://x').searchParams.get('keys') === '1';
       const provs = JSON.parse(JSON.stringify(db.ai.providers)); if (!withKeys) for (const v of Object.values(provs)) delete v.key;
-      return send(res, 200, { app: 'shorts-animados', version: 1, exportedAt: new Date().toISOString(), settings: db.settings, credits: db.credits.cfg, ai: { enabled: db.ai.enabled, provider: db.ai.provider, fallback: db.ai.fallback, perHour: db.ai.perHour, extra: db.ai.extra, providers: provs } });
+      return send(res, 200, { app: 'shorts-animados', version: 1, exportedAt: new Date().toISOString(), settings: db.settings, credits: db.credits.cfg, coupons: db.coupons, ai: { enabled: db.ai.enabled, provider: db.ai.provider, fallback: db.ai.fallback, perHour: db.ai.perHour, extra: db.ai.extra, providers: provs } });
     }
     if (r[0] === 'import' && m === 'POST') {
       const b = await body(req, 2e5);
       if (!b || b.app !== 'shorts-animados') return send(res, 400, { error: 'Esse arquivo não é um backup do painel.' });
       if (b.settings) db.settings = cleanSettings(b.settings, db.settings);
       if (b.credits && typeof b.credits === 'object') db.credits.cfg = CR.cleanCfg(b.credits, db.credits.cfg);
+      if (b.coupons && typeof b.coupons === 'object') db.coupons = CUPON.normalize(b.coupons);
       if (b.ai && typeof b.ai === 'object') { const err = applyAi(b.ai); if (err) return send(res, 400, { error: err }); }
       save(); await cfgDbSave(); return send(res, 200, { ok: true });
     }
 
     if (r[0] === 'credits') {
-      if (!id && m === 'GET') return send(res, 200, { cfg: db.credits.cfg, users: CR.list(), totals: CR.totals(), tz: CRED.TZ, ops: CRED.OP_NAMES, store: { enabled: cfgDbReady(), ok: bal.ok, error: bal.error } });
+      if (!id && m === 'GET') return send(res, 200, { cfg: db.credits.cfg, users: CR.list(), totals: CR.totals(), tz: CRED.TZ, ops: CRED.OP_NAMES, store: { enabled: cfgDbReady(), ok: bal.ok, error: bal.error, note: bal.note } });
       if (!id && m === 'PUT') { db.credits.cfg = CR.cleanCfg(await body(req, 5e3), db.credits.cfg); save(); return send(res, 200, { cfg: db.credits.cfg }); }
       if (id === 'all' && m === 'POST') { // em lote, para quem aparece na lista: restaurar a cota ou zerar os créditos
         const b = await body(req, 1e3), act = b.action === 'zero' ? 'zero' : b.action === 'restore' ? 'restore' : '';
@@ -899,6 +960,26 @@ async function api(req, res, p) {
         if (!Number.isFinite(n) || n === 0 || Math.abs(n) > 100000) return send(res, 400, { error: 'Informe uma quantidade de créditos (ex.: 50, ou -10 para tirar).' });
         const v = CR.grant(key, n, label); save(); return send(res, 200, { ok: true, credits: v });
       }
+    }
+    if (r[0] === 'coupons') {
+      if (!id && m === 'GET') return send(res, 200, { coupons: CP.list(), enabled: !!db.credits.cfg.enabled, store: { enabled: cfgDbReady(), note: bal.note }, loginOn: sbCfg().enabled });
+      if (!id && m === 'POST') { // criar um cupom (ou vários códigos únicos de uma vez, com count)
+        const b = await body(req, 4e3), count = Math.round(+b.count) || 1;
+        if (count > 1) { const x = CP.batch(b, count); if (x.error) return send(res, 400, { error: x.error }); save(); return send(res, 201, { coupons: x.made }); }
+        const x = CP.upsert({ ...b, code: b.code ? b.code : CUPON.randomCode(b.prefix) }, true);
+        if (x.error) return send(res, 400, { error: x.error }); save(); return send(res, 201, { coupon: x.coupon });
+      }
+      if (id && m === 'PUT') { const x = CP.upsert({ ...(await body(req, 4e3)), code: id }, false); if (x.error) return send(res, 400, { error: x.error }); save(); return send(res, 200, { coupon: x.coupon }); }
+      if (id && m === 'DELETE') { if (!CP.remove(id)) return send(res, 404, { error: 'Cupom não encontrado.' }); save(); return send(res, 200, { ok: true }); }
+    }
+    if (r[0] === 'support') {
+      if (!id && m === 'GET') return send(res, 200, { threads: SP.list(), unread: SP.unread() });
+      if (id === 'unread' && m === 'GET') return send(res, 200, { unread: SP.unread() });
+      if (id === 'purge' && m === 'POST') { const n = SP.purgeClosed(); return send(res, 200, { ok: true, count: n }); }
+      if (id && !r[2] && m === 'GET') { const t = SP.get(id, true); return t ? send(res, 200, t) : send(res, 404, { error: 'Conversa não encontrada.' }); }
+      if (id && r[2] === 'reply' && m === 'POST') { const x = SP.reply(id, (await body(req, 4e3)).text); return x.error ? send(res, x.code || 400, { error: x.error }) : send(res, 201, x); }
+      if (id && r[2] === 'close' && m === 'POST') { const b = await body(req, 1e3); return SP.setClosed(id, b.closed !== false) ? send(res, 200, { ok: true }) : send(res, 404, { error: 'Conversa não encontrada.' }); }
+      if (id && !r[2] && m === 'DELETE') return SP.remove(id) ? send(res, 200, { ok: true }) : send(res, 404, { error: 'Conversa não encontrada.' });
     }
     if (r[0] === 'tts' && m === 'GET') return send(res, 200, ttsInfo());
     if (r[0] === 'tts' && m === 'PUT') {
@@ -1010,10 +1091,10 @@ process.on('unhandledRejection', e => console.error('Erro não tratado:', e));
 /* ---------- limpeza periódica da memória ---------- */
 setInterval(() => {
   const now = Date.now(), old = a => a.filter(t => now - t < 3600e3);
-  for (const m of [aiHits, ttsHits, iconHits, histHits, creditHits]) { for (const [k, v] of m) { const n = old(v); if (n.length) m.set(k, n); else m.delete(k); } if (m.size > 20000) m.clear(); }
+  for (const m of [aiHits, ttsHits, iconHits, histHits, creditHits, couponHits, supportHits, supportNew, supportPoll]) { for (const [k, v] of m) { const n = old(v); if (n.length) m.set(k, n); else m.delete(k); } if (m.size > 20000) m.clear(); }
   for (const [k, v] of fails) if (v.until < now && now - (v.at || 0) > 3600e3) fails.delete(k);
   for (const [k, v] of iconMiss) if (v < now) iconMiss.delete(k);
-  CR.prune();
+  CR.prune(); SP.prune();
   for (const [k, v] of sessions) if (v < now) sessions.delete(k);
   if (fails.size > 20000) fails.clear(); if (iconMiss.size > 20000) iconMiss.clear();
 }, 600e3).unref();

@@ -80,6 +80,8 @@ create table if not exists public.credit_balances (
 );
 -- s = início da janela de renovação (ms); usado quando o painel renova os créditos "a cada N horas" em vez de à meia-noite.
 alter table public.credit_balances add column if not exists s bigint not null default 0;
+-- x = vantagens de cupons (cota extra, desconto, ilimitado, com a data em que acabam) e cupons já usados pela pessoa: {"p":[...],"c":{"CODIGO":1}}.
+alter table public.credit_balances add column if not exists x jsonb not null default '{}'::jsonb;
 alter table public.credit_balances enable row level security;
 revoke all on public.credit_balances from anon, authenticated;
 

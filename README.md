@@ -5,13 +5,13 @@ Organizado em pastas (veja a estrutura abaixo). A única dependência é a opcio
 ```
 server.js            servidor (ponto de entrada: node server.js)
 package.json         dependências
-server/              código só do servidor: ai.js, providers.js, supabase.js, tts.js
+server/              código só do servidor: ai.js, providers.js, supabase.js, tts.js, credits.js, cupons.js, suporte.js
 admin/               painel administrativo (admin.html, servido no endereço secreto)
 database/            supabase-schema.sql
 public/              tudo o que o navegador recebe
   home.html, index.html, docs.html, favicon.svg
   css/               ui.css
-  js/                theme, schema, audio, auth, guia, motor-extra, motor-extra2
+  js/                theme, schema, audio, auth, guia, motor-extra, motor-extra2, suporte (chat), cupom (resgate)
   looks/             amostras dos 10 estilos
   exemplos/          histórias de exemplo (.json)
 .dados/              criado ao rodar o servidor (configurações e chaves; não compartilhe)
@@ -35,6 +35,10 @@ public/              tudo o que o navegador recebe
 | public/js/auth.js | Login no navegador (Supabase): janela de entrar/criar conta, sessão e biblioteca na nuvem |
 | server/supabase.js | Ponte do servidor com o Supabase (confere o login, grava vídeos, lista usuários) |
 | database/supabase-schema.sql | **Único SQL do projeto**: tabelas `videos`, `stories` (RLS por usuário), `admin_config` (todas as configurações do painel) e `credit_balances` (saldos de créditos); as duas últimas só o servidor acessa. Rode uma vez no SQL Editor do Supabase |
+| server/cupons.js | Cupons: cria, valida e resgata códigos que dão créditos e vantagens (veja "Cupons" abaixo) |
+| server/suporte.js | Chat de suporte: conversas dos visitantes, respostas do admin, limites contra spam (veja "Chat de suporte") |
+| public/js/suporte.js | Botão de chat nas páginas públicas (home, gerador, docs) |
+| public/js/cupom.js | Janela "Resgatar cupom" do gerador (botão **Cupom**, ao lado do saldo) |
 | public/js/theme.js | Botão de tema claro/escuro (lua/sol na barra); a escolha fica salva no navegador |
 | public/css/ui.css | Estilos compartilhados (visual novo: degradê violeta/rosa/âmbar, claro e escuro automático) |
 | public/exemplos/historia-teste.json | História de exemplo simples |
@@ -73,6 +77,38 @@ Como é protegido (tudo no servidor, o navegador só mostra o saldo):
 - Os saldos também ficam em `.dados/dados.json` e só quem usou hoje (ou tem presente) é guardado, então o arquivo não cresce sem parar. Continuam valendo os limites por hora da IA e da voz.
 
 Para uma cota realmente "por usuário", ative o login (Admin > Conta e banco) e, se quiser, exija-o (`REQUIRE_LOGIN=1`): por IP, quem troca de rede ou de VPN ganha uma cota nova, e redes que compartilham o mesmo IP dividem a cota. Com o login obrigatório, e-mail confirmado no Supabase dificulta a criação de várias contas.
+
+## Cupons (créditos e outras vantagens)
+
+Em **Painel > Cupons** o administrador cria códigos que as pessoas resgatam no botão **Cupom** do gerador (ao lado do saldo de créditos). Um cupom pode dar, juntos ou separados:
+
+| Vantagem | O que faz |
+|---|---|
+| **Créditos de presente** | Somam ao saldo, não expiram e só são gastos depois da cota do período. |
+| **Créditos extras por período** | Aumentam a cota (ex.: +10 por dia) durante N dias. |
+| **Desconto nas ações** | X% a menos no custo de IA e voz durante N dias (arredonda o custo para cima; o gerador já mostra o preço com desconto). |
+| **Uso ilimitado** | IA e voz de graça por N horas. |
+
+E tem regras: **limite total de usos**, **usos por pessoa**, **validade**, ligar/desligar, "só quem tem conta" (recomendado) e uma anotação sua. Dá para criar **vários códigos únicos de uma vez** (cada um de 1 uso, com prefixo, ex.: `NATAL-7K2M-QX9P`), copiar o código ou um **link** que já abre o cupom no gerador (`/gerar?cupom=CODIGO`). O resgate ignora maiúsculas, espaços e hífens.
+
+Como é protegido (tudo no servidor):
+
+- O resgate é síncrono (nada de `await` entre conferir e aplicar): dez pessoas resgatando o último uso de um cupom ao mesmo tempo resultam em **um** sucesso.
+- O limite "por pessoa" fica no registro de créditos da pessoa, então sobrevive a reinícios (e ao Supabase). Quem usou cupom não é apagado da limpeza automática.
+- Tentativas por IP são limitadas (15 por hora; resgates que dão certo não contam) e "não existe" e "desligado" dão a mesma mensagem, para não ajudar a adivinhar códigos.
+- Sem conta, a "pessoa" é o IP: quem troca de rede ganharia o cupom de novo. Por isso o padrão é **só com conta** (vale quando o login do Supabase está ligado).
+- **Zerar créditos** de uma pessoa (aba Créditos) também tira as vantagens de cupom dela.
+- Os cupons ficam no `dados.json` e, com o Supabase ligado, também em `admin_config` (junto das outras configurações). As vantagens ativas e os cupons já usados por cada pessoa vão na coluna `x` de `credit_balances`: **rode o `supabase-schema.sql` de novo** para criá-la (sem ela o painel avisa, e esses dados só valem até reiniciar).
+
+## Chat de suporte (qualquer pessoa escreve, só o admin responde)
+
+Um botão de chat aparece nas páginas públicas (início, gerador e docs). **Qualquer visitante pode mandar mensagem, com ou sem conta.** Só o administrador responde, em **Painel > Suporte** (lista de conversas, contador de não lidas no menu, responder, encerrar/reabrir, apagar e "limpar encerradas").
+
+- Cada visitante tem uma conversa própria, ligada a um **token aleatório guardado no navegador dele**; o servidor só guarda o hash. Ele só enxerga a própria conversa, e a resposta aparece quando ele abre o chat (o botão mostra um selo com as respostas novas). Se a pessoa estiver logada, o admin vê o e-mail da conta.
+- Responder, listar, encerrar e apagar são rotas `/api/admin/support/*`, só com a sessão do admin: um visitante não consegue responder nem se passar pelo suporte.
+- Tudo que o visitante escreve é mostrado como **texto** (nunca HTML), no site e no painel.
+- Anti-spam: 20 mensagens por hora e 4 conversas novas por hora por IP, no máximo 8 mensagens seguidas sem resposta, 1000 caracteres por mensagem, campo-isca contra robôs, teto de conversas e de mensagens e limpeza automática de conversas paradas há 90 dias.
+- As conversas ficam em `.dados/suporte.json` (separado das configurações). Em hospedagem que apaga arquivos a cada reinício, defina `DATA_DIR` para um disco persistente, senão as conversas somem.
 
 ## Como usar
 

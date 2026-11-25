@@ -69,6 +69,22 @@
 .issues li{padding:5px 0;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:baseline}
 .issues code{white-space:nowrap}
 .hidden{display:none!important}
+.sup{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:900px){.sup{grid-template-columns:1fr}}
+.sup-list{max-height:620px;overflow:auto;display:grid;gap:2px;padding:6px}
+.sup-it{display:block;width:100%;text-align:left;background:none;color:var(--text);border:0;box-shadow:none;border-radius:11px;padding:10px 12px;cursor:pointer;font-weight:500}
+.sup-it:hover{background:var(--panel2);filter:none;transform:none}.sup-it[aria-current="true"]{background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line2)}
+.sup-it .t{display:flex;gap:8px;align-items:center;justify-content:space-between;font-weight:700;font-size:13.5px}
+.sup-it .p{font-size:12.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sup-it .m{font-size:11px;color:var(--muted);margin-top:2px}
+.sup-it.un .t b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:7px}
+.sup-conv{display:flex;flex-direction:column;min-height:420px}
+.sup-msgs{flex:1;max-height:480px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:6px 2px 12px}
+.sup-b{max-width:80%;padding:8px 12px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.sup-b small{display:block;margin-top:3px;font-size:10.5px;opacity:.65}
+.sup-b.u{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-bottom-left-radius:4px}
+.sup-b.a{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px}
+.cup-code{font-family:var(--mono);font-weight:700;letter-spacing:.04em}
 .fam{display:inline-flex;gap:5px;flex-wrap:wrap}.fam span{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:1px 8px;background:var(--panel2)}
 details.prov{padding:0;overflow:hidden}
 details.prov>summary{cursor:pointer;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 18px;list-style:none}
@@ -118,6 +134,8 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
       <button role="tab" data-t="conta" aria-selected="false"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>Conta e banco<span class="cnt" id="cnt-sb"></span></button>
       <button role="tab" data-t="padroes" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Padrões</button>
       <button role="tab" data-t="creditos" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Créditos</button>
+      <button role="tab" data-t="cupons" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/><path d="M14 5v14" stroke-dasharray="2 3"/></svg>Cupons</button>
+      <button role="tab" data-t="suporte" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.5-4.6A8 8 0 1 1 21 12z"/></svg>Suporte<span class="cnt" id="cnt-sup"></span></button>
       <button role="tab" data-t="historico" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Histórico<span class="cnt" id="cnt-hist"></span></button>
       <button role="tab" data-t="seguranca" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Segurança e backup</button>
     </nav>
@@ -296,6 +314,55 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
     <div class="card" style="margin-top:16px"><div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">Uso neste período</h3><div class="row"><button class="sec sm" id="cr-allrestore" title="Devolve a cota cheia a todos da lista">Restaurar cota de todos</button><button class="sec sm" id="cr-allzero" title="Zera os créditos de todos da lista">Zerar créditos de todos</button></div></div><div class="tbl-wrap" id="crtbl"></div></div>
   </section>
 
+  <!-- CUPONS -->
+  <section id="t-cupons" class="hidden">
+    <div class="pagehead"><div><h1>Cupons</h1><div class="muted">Códigos que as pessoas resgatam no gerador (botão <b>Cupom</b>, ao lado do saldo). Um cupom pode dar créditos de presente, cota extra por período, desconto nas ações e uso ilimitado por um tempo.</div></div>
+      <div class="row"><button class="sec sm" id="cp-reload">Atualizar</button></div></div>
+    <div id="cp-warn"></div>
+    <div class="card">
+      <h3 style="margin-top:0" id="cp-formtitle">Novo cupom</h3>
+      <form id="cpf">
+        <div class="grid g3">
+          <label class="f">Código <span class="muted">(vazio = gerar automático)</span><input id="cp-code" maxlength="32" autocomplete="off" spellcheck="false" placeholder="BEMVINDO25"></label>
+          <label class="f" id="cp-count-w">Quantos códigos únicos<input id="cp-count" type="number" min="1" max="200" value="1"></label>
+          <label class="f" id="cp-prefix-w">Prefixo dos códigos gerados<input id="cp-prefix" maxlength="12" autocomplete="off" placeholder="NATAL"></label>
+        </div>
+        <p class="muted" style="margin:6px 0 0" id="cp-count-help">Com mais de 1, cada código sai único e de <b>1 uso</b> (bom para dar um para cada pessoa).</p>
+        <h3>Vantagens</h3>
+        <div class="grid g3">
+          <label class="f">Créditos de presente<input id="cp-credits" type="number" min="0" max="100000" value="50"></label>
+          <label class="f">Créditos extras por período<input id="cp-extra" type="number" min="0" max="100000" value="0"></label>
+          <label class="f">Desconto nas ações (%)<input id="cp-disc" type="number" min="0" max="100" value="0"></label>
+          <label class="f">Duração dos extras e do desconto (dias)<input id="cp-days" type="number" min="1" max="365" value="7"></label>
+          <label class="f">Uso ilimitado por (horas)<input id="cp-unl" type="number" min="0" max="720" value="0"></label>
+        </div>
+        <p class="muted" style="margin:8px 0 0">Presente não expira e só é gasto depois da cota do período. Extra e desconto valem pelos dias acima (o desconto arredonda o custo para cima). Ilimitado deixa IA e voz de graça pelas horas escolhidas. Deixe em 0 o que não quiser dar.</p>
+        <h3>Regras</h3>
+        <div class="grid g3">
+          <label class="f">Limite total de usos <span class="muted">(0 = sem limite)</span><input id="cp-max" type="number" min="0" value="0"></label>
+          <label class="f">Usos por pessoa<input id="cp-per" type="number" min="1" max="100" value="1"></label>
+          <label class="f">Vale até <span class="muted">(vazio = não vence)</span><input id="cp-exp" type="date"></label>
+          <label class="f" style="grid-column:span 2">Anotação só sua<input id="cp-note" maxlength="120" placeholder="Ex.: sorteio do Instagram"></label>
+        </div>
+        <div style="margin-top:12px"><label class="sw"><input type="checkbox" id="cp-login" checked><span class="tk"></span>Só quem tem conta pode usar</label>
+          <div class="muted" style="margin-top:4px">Recomendado: sem conta o "usuário" é só o IP, e trocar de rede daria direito a usar de novo. Só vale se o login (Supabase) estiver ligado.</div></div>
+        <div class="row" style="margin-top:16px"><button type="submit" id="cp-save">Criar cupom</button><button type="button" class="sec" id="cp-cancel" hidden>Cancelar edição</button></div>
+      </form>
+      <div id="cp-made" class="hidden" style="margin-top:16px"></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h3 style="margin-top:0">Seus cupons <span class="muted" id="cp-n"></span></h3><div class="tbl-wrap" id="cptbl"></div></div>
+  </section>
+
+  <!-- SUPORTE -->
+  <section id="t-suporte" class="hidden">
+    <div class="pagehead"><div><h1>Suporte</h1><div class="muted">Qualquer visitante escreve pelo botão de chat do site; <b>só você responde, aqui</b>. A pessoa vê a resposta no mesmo navegador (a conversa fica ligada a ele).</div></div>
+      <div class="row"><select id="sp-filter" class="srch" aria-label="Filtrar conversas"><option value="open">Abertas</option><option value="closed">Encerradas</option><option value="all">Todas</option></select><button class="sec sm" id="sp-reload">Atualizar</button><button class="sec sm" id="sp-purge" title="Apaga todas as conversas encerradas">Limpar encerradas</button></div></div>
+    <div class="sup">
+      <div class="card" style="padding:0"><div class="sup-list" id="sp-list"></div></div>
+      <div class="card sup-conv" id="sp-conv"><div class="empty">Escolha uma conversa na lista.</div></div>
+    </div>
+  </section>
+
   <!-- HISTÓRICO -->
   <section id="t-historico" class="hidden">
     <div class="card">
@@ -390,15 +457,15 @@ $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST',headers:{
 (async()=>{try{const s=await api('/api/session');s.admin?showApp():showLogin(s.totp)}catch{showLogin()}})();
 
 /* ---- abas ---- */
-const TABS=['painel','ia','atividade','conta','padroes','creditos','historico','seguranca'];
-function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{history.replaceState(null,'','#'+n)}catch{}if(n==='atividade')run(loadLog);if(n==='conta')run(loadSb);if(n==='creditos')run(loadCred);window.scrollTo({top:0})}
+const TABS=['painel','ia','atividade','conta','padroes','creditos','cupons','suporte','historico','seguranca'];
+function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{history.replaceState(null,'','#'+n)}catch{}if(n==='atividade')run(loadLog);if(n==='conta')run(loadSb);if(n==='creditos')run(loadCred);if(n==='cupons')run(loadCup);if(n==='suporte')run(loadSup);window.scrollTo({top:0})}
 $('tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.t)};
 $('tabs').onkeydown=e=>{const bs=[...document.querySelectorAll('#tabs button')],i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true');
   const nx=e.key==='ArrowRight'||e.key==='ArrowDown',pv=e.key==='ArrowLeft'||e.key==='ArrowUp';if(nx||pv){e.preventDefault();const n=bs[(i+(nx?1:bs.length-1))%bs.length];tab(n.dataset.t);n.focus()}};
 if(TABS.includes(location.hash.slice(1)))tab(location.hash.slice(1));
 
 let HIST=[];
-async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadSettings(),loadAi(),loadLog(),loadSb(),loadCred()])})}
+async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadSettings(),loadAi(),loadLog(),loadSb(),loadCred(),loadSupCount()])})}
 
 /* ---- painel ---- */
 const IC={vid:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9l5 3-5 3z"/>',clk:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',ai:'<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/>',up:'<path d="M12 20V10M7 14l5-5 5 5M5 4h14"/>'};
@@ -508,7 +575,7 @@ function fillCred(){const c=CRD.cfg;$('cr-on').checked=!!c.enabled;$('cr-daily')
   $('cr-costs').innerHTML=Object.keys(CRD.ops).map(op=>`<label class="f">${esc(CRD.ops[op])}<input type="number" min="0" max="1000" data-op="${op}" value="${c.costs[op]}"></label>`).join('')}
 function renderCred(){const c=CRD.cfg,t=CRD.totals;
   $('crkpi').innerHTML=[[c.enabled?c.daily:'desligado','créditos por período',c.enabled?'visitante sem conta: '+c.anonDaily:'ninguém gasta nada'],[t.people,'pessoas usaram neste período','só quem gastou crédito'],[t.spent,'créditos gastos neste período','soma de todos']].map(([n,l,sub])=>`<div class="card kpi"><div class="n" style="font-size:${String(n).length>8?22:32}px">${esc(n)}</div><div class="l">${l}</div><div class="sub">${esc(sub)}</div></div>`).join('');
-  $('crtbl').innerHTML=CRD.users.length?`<table class="tbl"><thead><tr><th>Pessoa</th><th>Gasto na cota</th><th>Presente</th><th>Restam</th><th>Último uso</th><th></th></tr></thead><tbody>${CRD.users.map(u=>`<tr><td>${esc(u.who)}${u.anon?' <span class="badge info">sem conta</span>':''}</td><td>${u.used} / ${u.daily}</td><td>${u.bonus||'<span class="muted">—</span>'}</td><td><b>${u.left}</b></td><td>${fmtDate(u.at)}</td><td><div class="acts"><button class="sec sm" data-k="${esc(u.key)}" data-a="plus">+10</button><button class="sec sm" data-k="${esc(u.key)}" data-a="reset" title="Devolve a cota cheia (zera o gasto)">Restaurar cota</button><button class="sec sm" data-k="${esc(u.key)}" data-a="zero" title="Deixa a pessoa com 0 créditos até a próxima renovação">Zerar créditos</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Ninguém gastou créditos neste período ainda.</div>'}
+  $('crtbl').innerHTML=CRD.users.length?`<table class="tbl"><thead><tr><th>Pessoa</th><th>Gasto na cota</th><th>Presente</th><th>Restam</th><th>Último uso</th><th></th></tr></thead><tbody>${CRD.users.map(u=>`<tr><td>${esc(u.who)}${u.anon?' <span class="badge info">sem conta</span>':''}</td><td>${u.used} / ${u.daily}</td><td>${u.bonus||'<span class="muted">—</span>'}</td><td><b>${u.left}</b>${u.perks?` <span class="badge info" title="Vantagem de cupom ativa">cupom</span>`:''}</td><td>${fmtDate(u.at)}</td><td><div class="acts"><button class="sec sm" data-k="${esc(u.key)}" data-a="plus">+10</button><button class="sec sm" data-k="${esc(u.key)}" data-a="reset" title="Devolve a cota cheia (zera o gasto)">Restaurar cota</button><button class="sec sm" data-k="${esc(u.key)}" data-a="zero" title="Deixa a pessoa com 0 créditos até a próxima renovação">Zerar créditos</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Ninguém gastou créditos neste período ainda.</div>'}
 $('crf').onsubmit=e=>{e.preventDefault();run(async()=>{const costs={};document.querySelectorAll('#cr-costs input').forEach(i=>{costs[i.dataset.op]=+i.value});
   await api('/api/admin/credits','PUT',{enabled:$('cr-on').checked,daily:+$('cr-daily').value,anonDaily:+$('cr-anon').value,resetHours:crHours(),costs});toast('Créditos salvos.');await loadCred()})};
 $('crg').onsubmit=e=>{e.preventDefault();run(async()=>{const r=await api('/api/admin/credits/grant','POST',{who:$('cr-who').value.trim(),amount:+$('cr-amt').value});toast('Pronto. Agora essa pessoa tem '+r.credits.left+' crédito(s).');$('cr-who').value='';await loadCred()})};
@@ -519,6 +586,68 @@ $('crtbl').onclick=e=>{const b=e.target.closest('button[data-k]');if(!b)return;r
 $('cr-allrestore').onclick=()=>run(async()=>{if(!confirm('Devolver a cota cheia a todas as pessoas da lista?'))return;const r=await api('/api/admin/credits/all','POST',{action:'restore'});toast('Cota restaurada para '+r.count+' pessoa(s).');await loadCred()});
 $('cr-allzero').onclick=()=>run(async()=>{if(!confirm('Zerar os créditos de TODAS as pessoas da lista (e os presentes delas)? Quem não aparece na lista não é afetado.'))return;const r=await api('/api/admin/credits/all','POST',{action:'zero'});toast('Créditos zerados para '+r.count+' pessoa(s).');await loadCred()});
 $('cr-reload').onclick=()=>run(loadCred);
+
+/* ---- cupons ---- */
+let CUP=null,CPEDIT=null;
+const cpNum=i=>Math.max(0,Math.round(+$(i).value)||0);
+async function loadCup(){CUP=await api('/api/admin/coupons');renderCup()}
+function cpPerks(c){const a=[];if(c.credits)a.push(c.credits+' crédito(s) de presente');if(c.extra)a.push('+'+c.extra+' por período ('+c.days+' d)');if(c.disc)a.push(c.disc+'% de desconto ('+c.days+' d)');if(c.unlimitedHours)a.push('ilimitado '+c.unlimitedHours+' h');return a.join(' · ')||'—'}
+const CPST={ok:['ok','ativo'],off:['','desligado'],expired:['warn','vencido'],full:['warn','esgotado']};
+function renderCup(){
+  const w=[];if(CUP.store&&CUP.store.note)w.push(`<div class="notice warn">${esc(CUP.store.note)}</div>`);
+  if(!CUP.enabled)w.push('<div class="notice warn">O sistema de créditos está <b>desligado</b> (aba Créditos): ninguém consegue resgatar cupons até você ligar.</div>');
+  if(!CUP.loginOn)w.push('<div class="notice">O login (Supabase) está desligado, então a opção "só quem tem conta" não tem efeito: cada visitante é identificado só pelo IP.</div>');
+  $('cp-warn').innerHTML=w.join('');
+  $('cp-n').textContent=CUP.coupons.length?'('+CUP.coupons.length+')':'';
+  $('cptbl').innerHTML=CUP.coupons.length?`<table class="tbl"><thead><tr><th>Código</th><th>Vantagens</th><th>Usos</th><th>Vale até</th><th>Estado</th><th></th></tr></thead><tbody>${CUP.coupons.map(c=>{const st=CPST[c.status]||['',c.status];return `<tr><td><span class="cup-code">${esc(c.pretty)}</span>${c.note?`<div class="muted" style="font-size:12px">${esc(c.note)}</div>`:''}</td><td>${esc(cpPerks(c))}${c.loginOnly?'':' <span class="badge info">sem conta</span>'}</td><td>${c.uses}${c.maxUses?' / '+c.maxUses:''}${c.perPerson>1?`<div class="muted" style="font-size:12px">${c.perPerson}x por pessoa</div>`:''}</td><td>${c.expires?fmtDate(c.expires).split(',')[0]:'<span class="muted">—</span>'}</td><td><span class="badge ${st[0]}">${st[1]}</span></td><td><div class="acts"><button class="sec sm" data-c="${esc(c.code)}" data-a="copy" title="Copia o código">Copiar</button><button class="sec sm" data-c="${esc(c.code)}" data-a="link" title="Copia um link que já abre o cupom no gerador">Link</button><button class="sec sm" data-c="${esc(c.code)}" data-a="edit">Editar</button><button class="sec sm" data-c="${esc(c.code)}" data-a="toggle">${c.active?'Desligar':'Ligar'}</button><button class="sec sm" data-c="${esc(c.code)}" data-a="del">Apagar</button></div></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhum cupom ainda. Crie o primeiro acima.</div>'}
+function cpReset(){CPEDIT=null;$('cpf').reset();$('cp-credits').value=50;$('cp-days').value=7;$('cp-per').value=1;$('cp-login').checked=true;$('cp-code').readOnly=false;
+  ['cp-count-w','cp-prefix-w','cp-count-help'].forEach(i=>$(i).classList.remove('hidden'));$('cp-formtitle').textContent='Novo cupom';$('cp-save').textContent='Criar cupom';$('cp-cancel').hidden=true}
+function cpFill(c){CPEDIT=c.code;$('cp-code').value=c.code;$('cp-code').readOnly=true;$('cp-credits').value=c.credits;$('cp-extra').value=c.extra;$('cp-disc').value=c.disc;$('cp-days').value=c.days;$('cp-unl').value=c.unlimitedHours;
+  $('cp-max').value=c.maxUses;$('cp-per').value=c.perPerson;$('cp-note').value=c.note||'';$('cp-login').checked=!!c.loginOnly;
+  const d=c.expires?new Date(c.expires):null;$('cp-exp').value=d?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`:'';
+  ['cp-count-w','cp-prefix-w','cp-count-help'].forEach(i=>$(i).classList.add('hidden'));$('cp-formtitle').textContent='Editando '+c.code;$('cp-save').textContent='Salvar alterações';$('cp-cancel').hidden=false;$('cp-code').scrollIntoView({block:'center',behavior:'smooth'})}
+function cpBody(){const e=$('cp-exp').value;return{credits:cpNum('cp-credits'),extra:cpNum('cp-extra'),disc:cpNum('cp-disc'),days:Math.max(1,cpNum('cp-days')),unlimitedHours:cpNum('cp-unl'),maxUses:cpNum('cp-max'),perPerson:Math.max(1,cpNum('cp-per')),note:$('cp-note').value.trim(),loginOnly:$('cp-login').checked,expires:e?new Date(e+'T23:59:59').getTime():0}}
+$('cpf').onsubmit=e=>{e.preventDefault();run(async()=>{const b=cpBody();
+  if(CPEDIT){await api('/api/admin/coupons/'+encodeURIComponent(CPEDIT),'PUT',b);toast('Cupom salvo.');cpReset();await loadCup();return}
+  const count=Math.max(1,Math.min(200,cpNum('cp-count')||1)),code=$('cp-code').value.trim();
+  if(count>1&&code){toast('Para criar vários códigos, deixe o campo "Código" vazio (use o prefixo).',true);return}
+  const r=await api('/api/admin/coupons','POST',{...b,code,prefix:$('cp-prefix').value.trim(),count});
+  const made=r.coupons||[r.coupon];toast(made.length>1?made.length+' cupons criados.':'Cupom criado: '+made[0].pretty);cpReset();await loadCup();
+  const m=$('cp-made');m.classList.remove('hidden');m.innerHTML=`<div class="notice ok"><b>${made.length>1?'Códigos criados':'Código criado'}:</b> copie e entregue. <button class="sec sm" id="cp-copyall" style="margin-left:8px">Copiar ${made.length>1?'todos':'o código'}</button></div><textarea readonly rows="${Math.min(8,made.length)}" style="width:100%;font-family:var(--mono)">${esc(made.map(c=>c.pretty).join('\n'))}</textarea>`;
+  $('cp-copyall').onclick=()=>copyTxt(made.map(c=>c.pretty).join('\n'))})};
+$('cp-cancel').onclick=cpReset;$('cp-reload').onclick=()=>run(loadCup);
+async function copyTxt(t){try{await navigator.clipboard.writeText(t);toast('Copiado.')}catch{toast('Não consegui copiar: selecione e copie à mão.',true)}}
+$('cptbl').onclick=e=>{const b=e.target.closest('button[data-c]');if(!b)return;const c=CUP.coupons.find(x=>x.code===b.dataset.c);if(!c)return;run(async()=>{
+  if(b.dataset.a==='copy')return copyTxt(c.pretty);
+  if(b.dataset.a==='link')return copyTxt(location.origin+'/gerar?cupom='+c.code);
+  if(b.dataset.a==='edit')return cpFill(c);
+  if(b.dataset.a==='toggle'){await api('/api/admin/coupons/'+encodeURIComponent(c.code),'PUT',{active:!c.active});toast(c.active?'Cupom desligado.':'Cupom ligado.')}
+  if(b.dataset.a==='del'){if(!confirm('Apagar o cupom '+c.pretty+'? Quem já resgatou fica com o que ganhou.'))return;await api('/api/admin/coupons/'+encodeURIComponent(c.code),'DELETE');toast('Cupom apagado.')}
+  await loadCup()})};
+
+/* ---- suporte ---- */
+let SUP=[],SUPID=null,SUPT=null;
+const supName=t=>t.name||'Visitante';
+async function loadSupCount(){try{const r=await api('/api/admin/support/unread');const n=r.unread||0;$('cnt-sup').textContent=n?String(n):''}catch{}}
+async function loadSup(){const r=await api('/api/admin/support');SUP=r.threads;$('cnt-sup').textContent=r.unread?String(r.unread):'';renderSupList();if(SUPID&&SUP.some(t=>t.id===SUPID))await openSup(SUPID,true)}
+function renderSupList(){const f=$('sp-filter').value,rows=SUP.filter(t=>f==='all'||(f==='closed')===t.closed);
+  $('sp-list').innerHTML=rows.length?rows.map(t=>`<button class="sup-it${t.unread?' un':''}" data-id="${t.id}" aria-current="${t.id===SUPID}"><div class="t"><b>${esc(supName(t))}</b>${t.unread?`<span class="badge info">${t.unread} nova${t.unread>1?'s':''}</span>`:t.closed?'<span class="badge">encerrada</span>':''}</div>${t.email?`<div class="m">${esc(t.email)}</div>`:''}<div class="p">${t.last?(t.last.f==='a'?'Você: ':'')+esc(t.last.t):''}</div><div class="m">${fmtDate(t.updated)}</div></button>`).join(''):'<div class="empty">Nenhuma conversa aqui.</div>'}
+async function openSup(id,keepDraft){const draft=keepDraft&&$('sp-text')?$('sp-text').value:'';SUPT=await api('/api/admin/support/'+id);SUPID=id;
+  const t=SUPT,box=$('sp-conv'),atEnd=!$('sp-msgs')||keepDraft&&$('sp-msgs').scrollHeight-$('sp-msgs').scrollTop-$('sp-msgs').clientHeight<80;
+  box.innerHTML=`<div class="row sb" style="margin-bottom:10px"><div><b>${esc(supName(t))}</b>${t.email?` <span class="muted">· ${esc(t.email)}</span>`:''}<div class="muted" style="font-size:12px">Começou em ${fmtDate(t.created)} · ${t.count} mensagem(ns)${t.closed?' · <b>encerrada</b>':''}</div></div><div class="row"><button class="sec sm" id="sp-close">${t.closed?'Reabrir':'Encerrar'}</button><button class="sec sm" id="sp-del">Apagar</button></div></div><div class="sup-msgs" id="sp-msgs">${t.msgs.map(m=>`<div class="sup-b ${m.f}">${esc(m.t)}<small>${m.f==='a'?'Você · ':''}${fmtDate(m.at)}</small></div>`).join('')}</div><form id="sp-form"><textarea id="sp-text" rows="3" maxlength="1000" placeholder="Escreva a resposta… (Ctrl+Enter envia)" style="width:100%"></textarea><div class="row sb" style="margin-top:8px"><span class="muted" style="font-size:12px">Só você responde. A pessoa vê a resposta no navegador dela.</span><button type="submit">Responder</button></div></form>`;
+  $('sp-text').value=draft;if(atEnd){const m=$('sp-msgs');m.scrollTop=m.scrollHeight}
+  const row=SUP.find(x=>x.id===id);if(row&&row.unread){row.unread=0;const n=SUP.filter(x=>x.unread>0).length;$('cnt-sup').textContent=n?String(n):''}renderSupList()}
+$('sp-list').onclick=e=>{const b=e.target.closest('button[data-id]');if(b)run(()=>openSup(b.dataset.id))};
+$('sp-conv').onclick=e=>{const b=e.target.closest('button');if(!b||!SUPID)return;
+  if(b.id==='sp-close')run(async()=>{await api('/api/admin/support/'+SUPID+'/close','POST',{closed:!SUPT.closed});await loadSup()});
+  if(b.id==='sp-del')run(async()=>{if(!confirm('Apagar esta conversa para sempre? A pessoa perde o histórico dela.'))return;await api('/api/admin/support/'+SUPID,'DELETE');SUPID=null;SUPT=null;$('sp-conv').innerHTML='<div class="empty">Conversa apagada.</div>';await loadSup()})};
+$('sp-conv').onsubmit=e=>{e.preventDefault();const tx=$('sp-text').value.trim();if(!tx)return;run(async()=>{await api('/api/admin/support/'+SUPID+'/reply','POST',{text:tx});$('sp-text').value='';await loadSup();const m=$('sp-msgs');if(m)m.scrollTop=m.scrollHeight})};
+$('sp-conv').onkeydown=e=>{if(e.target.id==='sp-text'&&e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();$('sp-form').requestSubmit()}};
+$('sp-filter').onchange=renderSupList;$('sp-reload').onclick=()=>run(loadSup);
+$('sp-purge').onclick=()=>run(async()=>{if(!confirm('Apagar TODAS as conversas encerradas?'))return;const r=await api('/api/admin/support/purge','POST',{});toast(r.count+' conversa(s) apagada(s).');if(SUPT&&SUPT.closed){SUPID=null;SUPT=null;$('sp-conv').innerHTML='<div class="empty">Escolha uma conversa na lista.</div>'}await loadSup()});
+// Atualiza o contador (e a conversa aberta) sozinho enquanto o painel está aberto.
+setInterval(()=>{if(document.hidden||$('app').classList.contains('hidden'))return;
+  if(!$('t-suporte').classList.contains('hidden')){const typing=document.activeElement&&document.activeElement.id==='sp-text'&&$('sp-text').value;if(!typing)loadSup().catch(()=>{});else loadSupCount()}else loadSupCount()},15000);
 
 /* ---- IA ---- */
 let AIS=null,AIMAIN='gemini',AIFB=[];

@@ -38,3 +38,17 @@ Como usar: `DATA_KEY=uma-frase-longa node server.js` (guarde essa frase: sem ela
 - O desconto é síncrono e acontece antes de chamar a IA ou a voz, então pedidos simultâneos não gastam o mesmo crédito; falhas devolvem o crédito uma única vez.
 - IPs de visitantes nunca vão para o disco: só um hash com sal. O número de pessoas guardadas tem teto e entradas antigas são removidas.
 - As rotas de presente/zerar crédito exigem o login do admin e o mesmo teste de origem das demais rotas que alteram dados.
+
+## Cupons
+
+- Quem decide tudo é o servidor (`server/cupons.js`): o navegador só envia o código. O resgate é síncrono, então pedidos simultâneos não passam do limite de usos nem do limite por pessoa.
+- A contagem por pessoa fica no registro de créditos da pessoa (persistida), e a mensagem de erro é a mesma para código inexistente e desligado. Tentativas por IP são limitadas.
+- Criar, editar, desligar e apagar cupons exigem o login do admin e o teste de origem das demais rotas que alteram dados. A lista de códigos nunca é pública.
+- Sem login (Supabase), a identidade é o IP: use "só com conta" para cupons valiosos.
+
+## Chat de suporte
+
+- Rotas públicas só criam/leem a **própria** conversa (token de 192 bits no navegador; o servidor guarda só o SHA-256). Não existe rota pública que liste conversas.
+- Responder e administrar conversas exige a sessão do admin (`/api/admin/support/*`).
+- Conteúdo de visitantes é sempre renderizado como texto (`textContent` no site; escape no painel), e a política CSP continua sem `unsafe-inline` para scripts.
+- Limites por IP e por conversa, campo-isca, tamanho máximo, tetos de armazenamento e limpeza automática contra spam e enchimento do disco.

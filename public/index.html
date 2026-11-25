@@ -15,6 +15,7 @@
 .cred b{font-size:15px;font-variant-numeric:tabular-nums}
 .cred span{color:var(--muted);font-weight:500}
 .cred small{color:var(--muted);font-weight:500;font-size:12px}
+.credbox{display:flex;align-items:center;gap:8px;flex:none;margin-top:4px}.credbox .cred{margin-top:0}.credbox button{white-space:nowrap}
 .cred.low{border-color:#e9a63a;background:color-mix(in srgb,#e9a63a 12%,var(--panel))}.cred.low svg{fill:#d98a0b}
 .cred.zero{border-color:#e0556b;background:color-mix(in srgb,#e0556b 11%,var(--panel))}.cred.zero svg{fill:#e0556b}
 .cost{display:inline-block;margin-left:7px;padding:0 7px;border-radius:99px;font-size:11.5px;font-weight:700;line-height:18px;background:rgba(255,255,255,.22);color:inherit}
@@ -120,7 +121,7 @@ footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;t
 <main class="app">
 <aside class="stage" id="stage" aria-label="Prévia do vídeo"><div class="phone"><canvas id="cv"></canvas></div><div class="muted" id="prevlbl">Prévia 9:16</div></aside>
 <div class="col">
-<header class="top"><div><h1>Criar um vídeo</h1><p class="lead">Conte a ideia, confira o roteiro e grave o vídeo.</p></div><div class="cred" id="cred" hidden role="status" aria-live="polite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><b id="credn">0</b><span>créditos</span><small id="credr"></small></div></header>
+<header class="top"><div><h1>Criar um vídeo</h1><p class="lead">Conte a ideia, confira o roteiro e grave o vídeo.</p></div><div class="credbox"><div class="cred" id="cred" hidden role="status" aria-live="polite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><b id="credn">0</b><span>créditos</span><small id="credr"></small></div><button type="button" class="sec sm" id="cupbtn" hidden title="Tenho um cupom">Cupom</button></div></header>
 
 <section class="step" id="s1"><div class="sh"><span class="n">1</span><h2>Ideia</h2></div>
 <textarea id="idea" maxlength="6000" placeholder="Ex.: por que esquecemos o que íamos fazer quando passamos por uma porta, em tom bem-humorado."></textarea>
@@ -1279,14 +1280,16 @@ function applyAI(j,opts){if(j.script!=null)$('script').value=j.script;if(j.story
 /* ---- créditos: o servidor é quem conta; aqui só mostramos o saldo ---- */
 let CRED=null,credT=null;
 const waitTxt=s=>{const t=Math.max(1,Math.ceil(s/60)),h=Math.floor(t/60),m=t%60;return h?h+' h'+(m?' '+m+' min':''):m+' min'};
-function paintCred(){const p=$('cred');if(!p)return;
+function perkTxt(){const k=CRED&&CRED.perks;if(!k||!k.until)return '';const left=Math.max(0,k.until-Date.now()),t=left>=864e5?Math.ceil(left/864e5)+' dia(s)':left>=36e5?Math.ceil(left/36e5)+' h':Math.max(1,Math.ceil(left/6e4))+' min',a=[];
+  if(k.unlimited)a.push('uso ilimitado');if(k.extra)a.push('+'+k.extra+' créditos por período');if(k.disc)a.push(k.disc+'% de desconto');return a.length?' Cupom ativo: '+a.join(', ')+' (acaba em ~'+t+').':''}
+function paintCred(){const p=$('cred'),cb=$('cupbtn');if(cb)cb.hidden=!(CRED&&CRED.enabled);if(!p)return;
   document.querySelectorAll('.cost').forEach(e=>e.remove());
   if(!CRED||!CRED.enabled){p.hidden=true;return}
-  p.hidden=false;$('credn').textContent=CRED.left;
+  p.hidden=false;$('credn').textContent=CRED.perks&&CRED.perks.unlimited?'∞':CRED.left;
   const low=CRED.left>0&&CRED.left<=Math.max(3,Math.round(CRED.daily*.2));
-  p.classList.toggle('low',low);p.classList.toggle('zero',CRED.left<=0);
-  $('credr').textContent=(CRED.left<=0||low)?'renovam em '+waitTxt(CRED.resetIn):'';
-  p.title='Você ganha '+CRED.daily+' créditos '+(CRED.every?'a cada '+CRED.every+' h':'por dia')+'. Eles não acumulam e renovam '+(CRED.every?CRED.every+' h depois do seu primeiro uso':'à meia-noite')+' (em '+waitTxt(CRED.resetIn)+').'+(CRED.bonus?' Presente: '+CRED.bonus+'.':'');
+  const unl=!!(CRED.perks&&CRED.perks.unlimited);p.classList.toggle('low',low&&!unl);p.classList.toggle('zero',CRED.left<=0&&!unl);
+  $('credr').textContent=(CRED.perks&&CRED.perks.unlimited)?'ilimitado':(CRED.left<=0||low)?'renovam em '+waitTxt(CRED.resetIn):'';
+  p.title='Você ganha '+CRED.daily+' créditos '+(CRED.every?'a cada '+CRED.every+' h':'por dia')+'. Eles não acumulam e renovam '+(CRED.every?CRED.every+' h depois do seu primeiro uso':'à meia-noite')+' (em '+waitTxt(CRED.resetIn)+').'+(CRED.bonus?' Presente: '+CRED.bonus+'.':'')+perkTxt();
   document.querySelectorAll('[data-cost]').forEach(b=>{const c=CRED.costs&&CRED.costs[b.dataset.cost];if(c>0){const e=document.createElement('span');e.className='cost';e.textContent=c;e.title=c+(c===1?' crédito':' créditos');b.appendChild(e)}})}
 /* Os créditos aparecem NA HORA: o último saldo fica guardado no navegador (por conta) e é pintado antes de qualquer
    pedido ao servidor; a resposta real chega logo depois e corrige o número. Antes, a barra ficava escondida até o
@@ -1306,6 +1309,7 @@ function credHdr(r){if(!CRED)return;const l=r.headers.get('X-Credits-Left');if(l
 {const go=()=>loadCred(),A=window.Auth;if(sessUid()!=='anon'&&A&&A.ready)A.ready.then(go,go);else go()}
 if(window.Auth)Auth.onChange(()=>{const c=credCache();if(c){CRED=c;paintCred()}loadCred()}); // entrou ou saiu da conta: troca o saldo
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadCred()});
+window.addEventListener('animae:credits',e=>{CRED={...(CRED||{}),...e.detail};paintCred();saveCred()}); // cupom resgatado: o servidor já mandou o saldo novo
 async function aiCall(btn,label,path,data){if(busy)return null;btn.disabled=true;const t0=Date.now(),tm=setInterval(()=>log(label+'… '+Math.round((Date.now()-t0)/1000)+' s'),500);log(label+'…');
   try{const r=await jpost(path,data);credHdr(r);const j=await r.json();if(!r.ok)throw new Error(j.error||('Erro '+r.status));return j}catch(e){log('IA: '+e.message);return null}finally{clearInterval(tm);btn.disabled=!aiOk}}
 $('aigo').onclick=async()=>{const idea=$('idea').value.trim();if(idea.length<8)return log('Descreva melhor a ideia do vídeo.');
@@ -1333,4 +1337,6 @@ applyDefaults();
 <script src="js/motor-extra.js"></script>
 <script src="js/motor-extra2.js"></script>
 <script src="js/guia.js"></script>
+<script src="js/cupom.js"></script>
+<script src="js/suporte.js"></script>
 </body></html>

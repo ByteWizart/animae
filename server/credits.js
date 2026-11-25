@@ -38,6 +38,23 @@ const secsToReset = (now = Date.now()) => { const [h, m, s] = hmsFmt.format(now)
 
 const int = (v, a, b, d) => { v = Math.round(+v); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
 
+// Vantagens temporárias (vindas de cupons): { e: expira (ms), x: créditos extras por período, d: desconto em %, u: 1 = ilimitado }.
+function cleanPerks(p) {
+  if (!Array.isArray(p)) return [];
+  return p.slice(0, 10).map(x => x && typeof x === 'object' ? { e: int(x.e, 0, 9e15, 0), x: int(x.x, 0, 100000, 0), d: int(x.d, 0, 100, 0), u: x.u ? 1 : 0 } : null).filter(x => x && x.e > 0 && (x.x || x.d || x.u));
+}
+// Cupons já usados pela pessoa: { CODIGO: vezes }. Fica no registro dela para o limite "por pessoa" sobreviver a reinícios.
+function cleanUsedCoupons(c) {
+  const o = {};
+  if (c && typeof c === 'object' && !Array.isArray(c)) for (const [k, v] of Object.entries(c).slice(0, 40)) if (/^[A-Z0-9]{3,32}$/.test(k)) o[k] = int(v, 1, 1000, 1);
+  return o;
+}
+const perkInfo = (e, now) => {
+  let extra = 0, disc = 0, unl = false, until = 0;
+  for (const x of (e && e.p) || []) if (x.e > now) { extra += x.x; disc = Math.max(disc, x.d); if (x.u) unl = true; until = Math.max(until, x.e); }
+  return { extra: Math.min(extra, 1e6), disc, unl, until };
+};
+
 function cleanCfg(s, cur) {
   s = s && typeof s === 'object' ? s : {};
   const base = { ...DEFAULT_CFG(), ...(cur || {}), costs: { ...DEFAULT_CFG().costs, ...((cur || {}).costs || {}) } };
@@ -60,6 +77,9 @@ function normalize(c) {
     for (const [k, v] of Object.entries(c.users)) {
       if (!/^(u:[\w-]{1,64}|ip:[0-9a-f]{8,64})$/.test(k) || !v || typeof v !== 'object') continue;
       users[k] = { d: String(v.d || ''), u: int(v.u, 0, 1e9, 0), b: int(v.b, 0, 1e9, 0), w: String(v.w || '').slice(0, 120), t: int(v.t, 0, 9e15, 0), s: int(v.s, 0, 9e15, 0) };
+      const pk = cleanPerks(v.p), cp = cleanUsedCoupons(v.c);
+      if (pk.length) users[k].p = pk;
+      if (Object.keys(cp).length) users[k].c = cp;
     }
   }
   return { cfg: cleanCfg(c.cfg, null), users, salt: typeof c.salt === 'string' && c.salt.length >= 16 ? c.salt : crypto.randomBytes(16).toString('hex') };
@@ -78,7 +98,8 @@ function create(getStore, onChange) {
   }
   const userKey = id => 'u:' + String(id).replace(/[^\w-]/g, '').slice(0, 64);
 
-  const dailyFor = key => (key.startsWith('u:') ? cfg().daily : cfg().anonDaily);
+  const baseDaily = key => (key.startsWith('u:') ? cfg().daily : cfg().anonDaily);
+  const dailyFor = (key, now = Date.now()) => baseDaily(key) + perkInfo(entry(key), now).extra; // cota do período, já com os extras de cupons
   const entry = key => st().users[key];
 
   // O registro ainda vale no período atual? (meia-noite: mesmo dia; por horas: a janela da pessoa ainda não acabou)
@@ -88,14 +109,17 @@ function create(getStore, onChange) {
 
   // Saldo "virtual": quem não tem registro no período atual tem a cota cheia.
   function view(key) {
-    const c = cfg(), e = entry(key), now = Date.now(), daily = dailyFor(key);
+    const c = cfg(), e = entry(key), now = Date.now(), pk = perkInfo(e, now), daily = baseDaily(key) + pk.extra;
     const used = isCur(e, now) ? e.u : 0, bonus = e ? e.b : 0, dailyLeft = Math.max(0, daily - used);
-    return { enabled: !!c.enabled, daily, used: Math.min(used, daily), bonus, left: c.enabled ? dailyLeft + bonus : 0, resetIn: resetIn(e, now), every: hours(), costs: { ...c.costs } };
+    const costs = {}; // o custo já vem com o desconto de cupom (arredondado para cima); ilimitado = tudo grátis
+    for (const op of OPS) costs[op] = pk.unl ? 0 : Math.ceil((c.costs[op] || 0) * (100 - pk.disc) / 100);
+    return { enabled: !!c.enabled, daily, used: Math.min(used, daily), bonus, left: c.enabled ? dailyLeft + bonus : 0, resetIn: resetIn(e, now), every: hours(), costs,
+      perks: { extra: pk.extra, disc: pk.disc, unlimited: pk.unl, until: pk.until } };
   }
 
   // Tenta gastar o custo da operação. Tudo síncrono. Devolve { ok, cost, left, ..., refund() }.
   function charge(key, who, op) {
-    const c = cfg(), cost = c.enabled ? (c.costs[op] || 0) : 0, v = view(key);
+    const c = cfg(), v = view(key), cost = c.enabled ? (v.costs[op] || 0) : 0;
     if (!c.enabled || cost <= 0) return { ok: true, cost: 0, ...v, refund() {} };
     if (v.left < cost) return { ok: false, cost, ...v, refund() {} };
     const now = Date.now(), t = today(now);
@@ -106,7 +130,7 @@ function create(getStore, onChange) {
     }
     if (!isCur(e, now)) { e.d = t; e.u = 0; e.s = now; } // acabou o período: a cota recomeça (e a nova janela começa agora)
     const d0 = e.d, s0 = e.s;
-    const fromDaily = Math.min(cost, Math.max(0, dailyFor(key) - e.u)), fromBonus = cost - fromDaily;
+    const fromDaily = Math.min(cost, Math.max(0, dailyFor(key, now) - e.u)), fromBonus = cost - fromDaily;
     e.u += fromDaily; e.b = Math.max(0, e.b - fromBonus); e.t = now;
     if (who) e.w = String(who).slice(0, 120);
     changed();
@@ -130,6 +154,26 @@ function create(getStore, onChange) {
     e.b = Math.max(0, e.b + int(amount, -1e6, 1e6, 0)); if (who) e.w = String(who).slice(0, 120); e.t = Date.now();
     changed(); return view(key);
   }
+  // Vantagem temporária de cupom (cota extra, desconto, ilimitado). Várias podem valer ao mesmo tempo (no máximo 10).
+  function perk(key, p, who) {
+    const now = Date.now();
+    let e = entry(key);
+    if (!e) e = st().users[key] = { d: today(now), u: 0, b: 0, w: '', t: now, s: 0 };
+    e.p = cleanPerks(e.p).filter(x => x.e > now);
+    if (e.p.length >= 10) e.p.shift();
+    e.p.push({ e: int(p.until, 1, 9e15, now + 3600e3), x: int(p.extra, 0, 100000, 0), d: int(p.disc, 0, 100, 0), u: p.unl ? 1 : 0 });
+    if (who) e.w = String(who).slice(0, 120); e.t = now;
+    changed(); return view(key);
+  }
+  const couponUses = (key, code) => { const e = entry(key); return (e && e.c && e.c[code]) || 0; };
+  function markCoupon(key, code, who) {
+    let e = entry(key);
+    if (!e) e = st().users[key] = { d: today(), u: 0, b: 0, w: '', t: Date.now(), s: 0 };
+    e.c = e.c || {};
+    if (!e.c[code] && Object.keys(e.c).length >= 40) delete e.c[Object.keys(e.c)[0]];
+    e.c[code] = (e.c[code] || 0) + 1;
+    if (who) e.w = String(who).slice(0, 120); e.t = Date.now(); changed();
+  }
   // "Restaurar cota": devolve a cota cheia do período (zera o GASTO). Os créditos de presente não mudam.
   function resetUsage(key) { const e = entry(key); if (e) { e.u = 0; e.t = Date.now(); changed(); } return view(key); }
   // "Zerar créditos": a pessoa fica com 0 até a próxima renovação (gasta toda a cota do período e perde o presente).
@@ -137,7 +181,8 @@ function create(getStore, onChange) {
     const now = Date.now(); let e = entry(key);
     if (!e) e = st().users[key] = { d: today(now), u: 0, b: 0, w: '', t: now, s: now };
     if (!isCur(e, now)) { e.d = today(now); e.u = 0; e.s = now; }
-    e.u = dailyFor(key); e.b = 0; e.t = now; if (who) e.w = String(who).slice(0, 120);
+    delete e.p; // sem vantagens de cupom (senão o "ilimitado" continuaria gastando de graça)
+    e.u = dailyFor(key, now); e.b = 0; e.t = now; if (who) e.w = String(who).slice(0, 120);
     changed(); return view(key);
   }
   // Em lote, para quem aparece na lista do painel (usou neste período ou tem presente). Devolve quantas pessoas mudaram.
@@ -154,7 +199,8 @@ function create(getStore, onChange) {
   // Tira do disco quem não tem mais nada a guardar (dia antigo e sem presente).
   function prune(force) {
     const t = today(), us = st().users; let n = 0;
-    for (const [k, e] of Object.entries(us)) if (!isCur(e) && !e.b) { delete us[k]; n++; }
+    const now = Date.now();
+    for (const [k, e] of Object.entries(us)) if (!isCur(e) && !e.b && !e.c && !perkInfo(e, now).until) { delete us[k]; n++; } // quem usou cupom fica (o limite por pessoa depende disso)
     if (force && Object.keys(us).length >= MAX_USERS) { // ainda cheio: descarta os mais antigos
       const old = Object.entries(us).sort((a, b) => a[1].t - b[1].t).slice(0, Math.ceil(MAX_USERS / 10));
       for (const [k] of old) delete us[k];
@@ -166,16 +212,15 @@ function create(getStore, onChange) {
   function list() {
     const t = today(), out = [];
     for (const [k, e] of Object.entries(st().users)) {
-      const used = isCur(e) ? e.u : 0; if (!used && !e.b) continue;
-      const v = view(k);
-      out.push({ key: k, who: k.startsWith('u:') ? (e.w || k) : 'Visitante ' + k.slice(3, 9), anon: !k.startsWith('u:'), used, bonus: e.b, left: v.left, daily: v.daily, at: e.t });
+      const used = isCur(e) ? e.u : 0, v = view(k); if (!used && !e.b && !v.perks.until) continue;
+      out.push({ key: k, who: k.startsWith('u:') ? (e.w || k) : 'Visitante ' + k.slice(3, 9), anon: !k.startsWith('u:'), used, bonus: e.b, left: v.left, daily: v.daily, at: e.t, perks: v.perks.until ? v.perks : null });
     }
     return out.sort((a, b) => b.used - a.used || b.at - a.at).slice(0, 200);
   }
   const findByEmail = email => { email = String(email).toLowerCase(); for (const [k, e] of Object.entries(st().users)) if (k.startsWith('u:') && String(e.w).toLowerCase() === email) return k; return null; };
   const totals = () => { const t = today(); let people = 0, spent = 0; for (const e of Object.values(st().users)) if (isCur(e) && e.u) { people++; spent += e.u; } return { people, spent }; };
 
-  return { anonKey, userKey, view, charge, grant, resetUsage, zero, bulk, isCur, prune, list, findByEmail, totals, cleanCfg };
+  return { anonKey, userKey, view, charge, grant, perk, couponUses, markCoupon, resetUsage, zero, bulk, isCur, prune, list, findByEmail, totals, cleanCfg };
 }
 
-module.exports = { create, normalize, cleanCfg, DEFAULT_CFG, OPS, OP_NAMES, today, secsToReset, TZ };
+module.exports = { create, normalize, cleanCfg, cleanPerks, cleanUsedCoupons, perkInfo, DEFAULT_CFG, OPS, OP_NAMES, today, secsToReset, TZ };
