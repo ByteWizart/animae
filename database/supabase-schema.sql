@@ -68,7 +68,7 @@ revoke all on public.admin_config from anon, authenticated;
 -- Saldos diários de créditos (uma linha por pessoa que usou hoje ou tem créditos de presente). Sem isso, reiniciar o servidor
 -- (ou trocar de hospedagem) devolveria a cota cheia a todo mundo. Mesma proteção: sem policy, só o servidor (service_role) acessa.
 --   key = u:<id da conta> ou ip:<hash do IP>;  d = dia (fuso de Brasília);  u = usado hoje;  b = presente (não expira);
---   w = e-mail (para o painel);  t = último uso (ms). Linhas de dias antigos sem presente são apagadas pelo servidor.
+--   w = e-mail (para o painel);  t = último uso (ms);  s = início da janela (ms). Linhas de dias antigos sem presente são apagadas pelo servidor.
 create table if not exists public.credit_balances (
   key         text primary key check (char_length(key) <= 80),
   d           text   not null default '',
@@ -78,6 +78,8 @@ create table if not exists public.credit_balances (
   t           bigint not null default 0,
   updated_at  timestamptz not null default now()
 );
+-- s = início da janela de renovação (ms); usado quando o painel renova os créditos "a cada N horas" em vez de à meia-noite.
+alter table public.credit_balances add column if not exists s bigint not null default 0;
 alter table public.credit_balances enable row level security;
 revoke all on public.credit_balances from anon, authenticated;
 

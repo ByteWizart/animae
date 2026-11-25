@@ -278,8 +278,8 @@ async function needLogin(req, res) {
 // Quem é "a pessoa" para efeito de crédito: conta (token conferido) ou, sem login, o IP.
 const credWho = (req, lg) => lg && lg.user ? { key: CR.userKey(lg.user.id), name: lg.user.email || lg.user.name || '' } : { key: CR.anonKey(ipOf(req)), name: '' };
 const credHeaders = v => ({ 'X-Credits-Left': String(v.left), 'X-Credits-Daily': String(v.daily), 'X-Credits-Reset': String(v.resetIn) });
-const fmtWait = s => { const h = Math.floor(s / 3600), m = Math.ceil((s % 3600) / 60); return h ? h + ' h' + (m ? ' ' + m + ' min' : '') : m + ' min'; };
-const noCredit = (res, c) => send(res, 402, { error: `Seus créditos de hoje acabaram (esta ação custa ${c.cost}, você tem ${c.left}). Eles renovam em ${fmtWait(c.resetIn)}.`, credits: true }, credHeaders(c));
+const fmtWait = s => { const t = Math.max(1, Math.ceil(s / 60)), h = Math.floor(t / 60), m = t % 60; return h ? h + ' h' + (m ? ' ' + m + ' min' : '') : m + ' min'; };
+const noCredit = (res, c) => send(res, 402, { error: `Seus créditos acabaram (esta ação custa ${c.cost}, você tem ${c.left}). Eles renovam em ${fmtWait(c.resetIn)}.`, credits: true }, credHeaders(c));
 
 /* ---------- provedores de IA ---------- */
 const aiCfg = id => db.ai.providers[id] || {};
@@ -501,8 +501,8 @@ if (!cfgDbReady()) ensureAdminDefaults(); // sem Supabase, tudo como antes (com 
 // Pensado para UM servidor ativo por vez (o saldo é contado na memória do servidor).
 const BAL = '/rest/v1/credit_balances';
 const bal = { ok: null, error: '', loaded: false, loading: null, tried: 0, synced: new Map(), timer: null, busy: null };
-const balRow = (k, e) => ({ key: k, d: String(e.d || ''), u: e.u | 0, b: e.b | 0, w: String(e.w || '').slice(0, 120), t: Math.round(e.t || 0) });
-const balSig = e => [e.d, e.u | 0, e.b | 0, e.w || ''].join('|');
+const balRow = (k, e) => ({ key: k, d: String(e.d || ''), u: e.u | 0, b: e.b | 0, w: String(e.w || '').slice(0, 120), t: Math.round(e.t || 0), s: Math.round(e.s || 0) });
+const balSig = e => [e.d, e.u | 0, e.b | 0, e.w || '', e.s | 0].join('|');
 const balErr = r => (r.status === 404 || (r.json && /PGRST205|42P01/.test(String(r.json.code || '')))) ? 'A tabela credit_balances não existe: rode o supabase-schema.sql no SQL Editor do Supabase.' : cfgDbErr(r);
 // Lê tudo do banco e junta com o que já existe na memória: vale a linha mais recente (campo t) de cada pessoa.
 function balLoad() {
@@ -511,9 +511,9 @@ function balLoad() {
   bal.tried = Date.now();
   bal.loading = (async () => {
     try {
-      const today = CRED.today(), us = db.credits.users, remote = new Map();
+      const us = db.credits.users, remote = new Map();
       for (let from = 0; from < 200000; from += 1000) { // PostgREST entrega até 1000 linhas por vez
-        const r = await SB.call(sbCfg(), 'GET', BAL + '?select=key,d,u,b,w,t&order=key.asc&limit=1000&offset=' + from);
+        const r = await SB.call(sbCfg(), 'GET', BAL + '?select=key,d,u,b,w,t,s&order=key.asc&limit=1000&offset=' + from);
         if (!r.ok) { bal.ok = false; bal.error = balErr(r); return false; }
         const rows = Array.isArray(r.json) ? r.json : []; for (const x of rows) remote.set(x.key, x);
         if (rows.length < 1000) break;
@@ -521,8 +521,8 @@ function balLoad() {
       const stale = [];
       for (const [k, x] of remote) {
         if (!/^(u:[\w-]{1,64}|ip:[0-9a-f]{8,64})$/.test(k)) continue;
-        if (x.d !== today && !(x.b > 0)) { stale.push(k); continue; } // dia antigo e sem presente: não precisa mais
-        const e = { d: String(x.d || ''), u: Math.max(0, x.u | 0), b: Math.max(0, x.b | 0), w: String(x.w || '').slice(0, 120), t: +x.t || 0 }, cur = us[k];
+        const e = { d: String(x.d || ''), u: Math.max(0, x.u | 0), b: Math.max(0, x.b | 0), w: String(x.w || '').slice(0, 120), t: +x.t || 0, s: +x.s || 0 }, cur = us[k];
+        if (!CR.isCur(e) && !(e.b > 0)) { stale.push(k); continue; } // período antigo e sem presente: não precisa mais
         if (!cur || (+cur.t || 0) <= e.t) us[k] = e;
         bal.synced.set(k, balSig(e));
       }
@@ -706,7 +706,7 @@ async function api(req, res, p) {
       const w = credWho(req, { user });
       if (!take(creditHits, w.key, 240)) return send(res, 429, { error: 'Muitas consultas.' });
       const v = CR.view(w.key);
-      return send(res, 200, { enabled: v.enabled, daily: v.daily, used: v.used, bonus: v.bonus, left: v.left, resetIn: v.resetIn, costs: v.costs, anon: !user }, { 'Cache-Control': 'no-store', ...credHeaders(v) });
+      return send(res, 200, { enabled: v.enabled, daily: v.daily, used: v.used, bonus: v.bonus, left: v.left, resetIn: v.resetIn, every: v.every, costs: v.costs, anon: !user }, { 'Cache-Control': 'no-store', ...credHeaders(v) });
     }
     if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.enabled && i.hasKey, perHour: i.perHour }); }
     // Prompt pronto para copiar e usar em outra IA (ChatGPT, Claude...): as mesmas regras que o site usa.
@@ -876,6 +876,11 @@ async function api(req, res, p) {
     if (r[0] === 'credits') {
       if (!id && m === 'GET') return send(res, 200, { cfg: db.credits.cfg, users: CR.list(), totals: CR.totals(), tz: CRED.TZ, ops: CRED.OP_NAMES, store: { enabled: cfgDbReady(), ok: bal.ok, error: bal.error } });
       if (!id && m === 'PUT') { db.credits.cfg = CR.cleanCfg(await body(req, 5e3), db.credits.cfg); save(); return send(res, 200, { cfg: db.credits.cfg }); }
+      if (id === 'all' && m === 'POST') { // em lote, para quem aparece na lista: restaurar a cota ou zerar os créditos
+        const b = await body(req, 1e3), act = b.action === 'zero' ? 'zero' : b.action === 'restore' ? 'restore' : '';
+        if (!act) return send(res, 400, { error: 'Ação inválida.' });
+        const n = CR.bulk(act); save(); return send(res, 200, { ok: true, count: n });
+      }
       if (id === 'grant' && m === 'POST') { // dar (ou tirar) créditos de presente, ou zerar o uso de hoje
         const b = await body(req, 2e3), who = str(b.who, 120);
         if (!who) return send(res, 400, { error: 'Informe o e-mail da pessoa (ou o código do visitante).' });
@@ -888,7 +893,8 @@ async function api(req, res, p) {
           }
         }
         if (!key) return send(res, 404, { error: 'Não encontrei essa pessoa. Use o e-mail da conta (o Supabase precisa estar ligado com a service_role) ou o código "ip:…" da lista.' });
-        if (b.reset) return send(res, 200, { ok: true, credits: CR.resetUsage(key) });
+        if (b.reset) return send(res, 200, { ok: true, credits: CR.resetUsage(key) }); // restaurar a cota (zera o gasto)
+        if (b.zero) { const v = CR.zero(key, label); save(); return send(res, 200, { ok: true, credits: v }); } // zerar os créditos da pessoa
         const n = Math.round(+b.amount);
         if (!Number.isFinite(n) || n === 0 || Math.abs(n) > 100000) return send(res, 400, { error: 'Informe uma quantidade de créditos (ex.: 50, ou -10 para tirar).' });
         const v = CR.grant(key, n, label); save(); return send(res, 200, { ok: true, credits: v });

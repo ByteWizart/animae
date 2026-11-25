@@ -2,8 +2,10 @@
 // Tudo acontece AQUI, no servidor: o navegador só mostra o saldo, nunca decide nada.
 //  - O saldo é descontado ANTES de chamar a IA (síncrono, sem await no meio: dois pedidos
 //    simultâneos não conseguem gastar o mesmo crédito) e devolvido se o pedido falhar.
-//  - A cota diária NÃO acumula: o "usado hoje" zera na virada do dia (fuso CREDITS_TZ, padrão Brasília).
-//    Créditos de presente (dados pelo admin) não expiram e só são gastos depois da cota do dia.
+//  - A cota NÃO acumula e renova de um destes dois jeitos (cfg.resetHours, escolhido no painel):
+//      0  = à meia-noite, todo dia (fuso CREDITS_TZ, padrão Brasília);
+//      N  = N horas depois do primeiro uso da pessoa (janela própria de cada um, de 1 a 720 h).
+//    Créditos de presente (dados pelo admin) não expiram e só são gastos depois da cota do período.
 //  - Pessoa logada = chave u:<id do Supabase> (token conferido pelo servidor).
 //    Visitante sem login = chave ip:<hash do IP>; o IP em si nunca é gravado no disco.
 //  - Só guardamos quem já gastou algo hoje (ou tem presente). Quem não usou tem sempre a cota cheia.
@@ -19,6 +21,7 @@ const DEFAULT_CFG = () => ({
   enabled: true,
   daily: 25,      // créditos por dia para quem está logado
   anonDaily: 25,  // créditos por dia para visitantes sem login (por IP)
+  resetHours: 0,  // 0 = renova à meia-noite; N = renova N horas depois do primeiro uso
   costs: { generate: 5, ideas: 1, refine: 2, review: 1, translate: 2, tts: 3 },
 });
 
@@ -44,6 +47,7 @@ function cleanCfg(s, cur) {
     enabled: s.enabled === undefined ? !!base.enabled : !!s.enabled,
     daily: int(s.daily, 0, 100000, base.daily),
     anonDaily: int(s.anonDaily, 0, 100000, base.anonDaily),
+    resetHours: int(s.resetHours, 0, 720, base.resetHours || 0),
     costs,
   };
 }
@@ -55,7 +59,7 @@ function normalize(c) {
   if (c.users && typeof c.users === 'object') {
     for (const [k, v] of Object.entries(c.users)) {
       if (!/^(u:[\w-]{1,64}|ip:[0-9a-f]{8,64})$/.test(k) || !v || typeof v !== 'object') continue;
-      users[k] = { d: String(v.d || ''), u: int(v.u, 0, 1e9, 0), b: int(v.b, 0, 1e9, 0), w: String(v.w || '').slice(0, 120), t: int(v.t, 0, 9e15, 0) };
+      users[k] = { d: String(v.d || ''), u: int(v.u, 0, 1e9, 0), b: int(v.b, 0, 1e9, 0), w: String(v.w || '').slice(0, 120), t: int(v.t, 0, 9e15, 0), s: int(v.s, 0, 9e15, 0) };
     }
   }
   return { cfg: cleanCfg(c.cfg, null), users, salt: typeof c.salt === 'string' && c.salt.length >= 16 ? c.salt : crypto.randomBytes(16).toString('hex') };
@@ -77,11 +81,16 @@ function create(getStore, onChange) {
   const dailyFor = key => (key.startsWith('u:') ? cfg().daily : cfg().anonDaily);
   const entry = key => st().users[key];
 
-  // Saldo "virtual": quem não tem registro de hoje tem a cota cheia.
+  // O registro ainda vale no período atual? (meia-noite: mesmo dia; por horas: a janela da pessoa ainda não acabou)
+  const hours = () => Math.max(0, +cfg().resetHours || 0);
+  const isCur = (e, now = Date.now()) => !!e && (hours() ? e.s > 0 && now - e.s < hours() * 3600e3 : e.d === today(now));
+  const resetIn = (e, now) => hours() ? (isCur(e, now) ? Math.max(1, Math.ceil((e.s + hours() * 3600e3 - now) / 1000)) : hours() * 3600) : secsToReset(now);
+
+  // Saldo "virtual": quem não tem registro no período atual tem a cota cheia.
   function view(key) {
-    const c = cfg(), e = entry(key), now = Date.now(), t = today(now), daily = dailyFor(key);
-    const used = e && e.d === t ? e.u : 0, bonus = e ? e.b : 0, dailyLeft = Math.max(0, daily - used);
-    return { enabled: !!c.enabled, daily, used: Math.min(used, daily), bonus, left: c.enabled ? dailyLeft + bonus : 0, resetIn: secsToReset(now), costs: { ...c.costs } };
+    const c = cfg(), e = entry(key), now = Date.now(), daily = dailyFor(key);
+    const used = isCur(e, now) ? e.u : 0, bonus = e ? e.b : 0, dailyLeft = Math.max(0, daily - used);
+    return { enabled: !!c.enabled, daily, used: Math.min(used, daily), bonus, left: c.enabled ? dailyLeft + bonus : 0, resetIn: resetIn(e, now), every: hours(), costs: { ...c.costs } };
   }
 
   // Tenta gastar o custo da operação. Tudo síncrono. Devolve { ok, cost, left, ..., refund() }.
@@ -93,9 +102,10 @@ function create(getStore, onChange) {
     let e = entry(key);
     if (!e) {
       if (Object.keys(st().users).length >= MAX_USERS) prune(true);
-      e = st().users[key] = { d: t, u: 0, b: 0, w: '', t: now };
+      e = st().users[key] = { d: t, u: 0, b: 0, w: '', t: now, s: now };
     }
-    if (e.d !== t) { e.d = t; e.u = 0; } // virou o dia: a cota recomeça
+    if (!isCur(e, now)) { e.d = t; e.u = 0; e.s = now; } // acabou o período: a cota recomeça (e a nova janela começa agora)
+    const d0 = e.d, s0 = e.s;
     const fromDaily = Math.min(cost, Math.max(0, dailyFor(key) - e.u)), fromBonus = cost - fromDaily;
     e.u += fromDaily; e.b = Math.max(0, e.b - fromBonus); e.t = now;
     if (who) e.w = String(who).slice(0, 120);
@@ -106,7 +116,7 @@ function create(getStore, onChange) {
       refund() { // devolve se o pedido falhou; só uma vez
         if (done) return; done = true;
         const cur = entry(key); if (!cur) return;
-        if (cur.d === t) cur.u = Math.max(0, cur.u - fromDaily); // se já virou o dia, a cota nova já está cheia
+        if (cur.d === d0 && cur.s === s0) cur.u = Math.max(0, cur.u - fromDaily); // se o período já acabou, a cota nova já está cheia
         cur.b += fromBonus; changed();
       },
     };
@@ -116,16 +126,35 @@ function create(getStore, onChange) {
   function grant(key, amount, who) {
     const t = today();
     let e = entry(key);
-    if (!e) e = st().users[key] = { d: t, u: 0, b: 0, w: '', t: Date.now() };
+    if (!e) e = st().users[key] = { d: t, u: 0, b: 0, w: '', t: Date.now(), s: 0 };
     e.b = Math.max(0, e.b + int(amount, -1e6, 1e6, 0)); if (who) e.w = String(who).slice(0, 120); e.t = Date.now();
     changed(); return view(key);
   }
-  function resetUsage(key) { const e = entry(key); if (e) { e.u = 0; changed(); } return view(key); }
+  // "Restaurar cota": devolve a cota cheia do período (zera o GASTO). Os créditos de presente não mudam.
+  function resetUsage(key) { const e = entry(key); if (e) { e.u = 0; e.t = Date.now(); changed(); } return view(key); }
+  // "Zerar créditos": a pessoa fica com 0 até a próxima renovação (gasta toda a cota do período e perde o presente).
+  function zero(key, who) {
+    const now = Date.now(); let e = entry(key);
+    if (!e) e = st().users[key] = { d: today(now), u: 0, b: 0, w: '', t: now, s: now };
+    if (!isCur(e, now)) { e.d = today(now); e.u = 0; e.s = now; }
+    e.u = dailyFor(key); e.b = 0; e.t = now; if (who) e.w = String(who).slice(0, 120);
+    changed(); return view(key);
+  }
+  // Em lote, para quem aparece na lista do painel (usou neste período ou tem presente). Devolve quantas pessoas mudaram.
+  function bulk(action) {
+    let n = 0;
+    for (const [k, e] of Object.entries(st().users)) {
+      const cur = isCur(e), used = cur ? e.u : 0;
+      if (!used && !e.b) continue;
+      if (action === 'zero') { zero(k); n++; } else if (action === 'restore' && used) { e.u = 0; e.t = Date.now(); n++; }
+    }
+    if (n) changed(); return n;
+  }
 
   // Tira do disco quem não tem mais nada a guardar (dia antigo e sem presente).
   function prune(force) {
     const t = today(), us = st().users; let n = 0;
-    for (const [k, e] of Object.entries(us)) if (e.d !== t && !e.b) { delete us[k]; n++; }
+    for (const [k, e] of Object.entries(us)) if (!isCur(e) && !e.b) { delete us[k]; n++; }
     if (force && Object.keys(us).length >= MAX_USERS) { // ainda cheio: descarta os mais antigos
       const old = Object.entries(us).sort((a, b) => a[1].t - b[1].t).slice(0, Math.ceil(MAX_USERS / 10));
       for (const [k] of old) delete us[k];
@@ -137,16 +166,16 @@ function create(getStore, onChange) {
   function list() {
     const t = today(), out = [];
     for (const [k, e] of Object.entries(st().users)) {
-      const used = e.d === t ? e.u : 0; if (!used && !e.b) continue;
+      const used = isCur(e) ? e.u : 0; if (!used && !e.b) continue;
       const v = view(k);
       out.push({ key: k, who: k.startsWith('u:') ? (e.w || k) : 'Visitante ' + k.slice(3, 9), anon: !k.startsWith('u:'), used, bonus: e.b, left: v.left, daily: v.daily, at: e.t });
     }
     return out.sort((a, b) => b.used - a.used || b.at - a.at).slice(0, 200);
   }
   const findByEmail = email => { email = String(email).toLowerCase(); for (const [k, e] of Object.entries(st().users)) if (k.startsWith('u:') && String(e.w).toLowerCase() === email) return k; return null; };
-  const totals = () => { const t = today(); let people = 0, spent = 0; for (const e of Object.values(st().users)) if (e.d === t && e.u) { people++; spent += e.u; } return { people, spent }; };
+  const totals = () => { const t = today(); let people = 0, spent = 0; for (const e of Object.values(st().users)) if (isCur(e) && e.u) { people++; spent += e.u; } return { people, spent }; };
 
-  return { anonKey, userKey, view, charge, grant, resetUsage, prune, list, findByEmail, totals, cleanCfg };
+  return { anonKey, userKey, view, charge, grant, resetUsage, zero, bulk, isCur, prune, list, findByEmail, totals, cleanCfg };
 }
 
 module.exports = { create, normalize, cleanCfg, DEFAULT_CFG, OPS, OP_NAMES, today, secsToReset, TZ };

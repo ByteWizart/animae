@@ -1278,7 +1278,7 @@ function showPub(j){const p=j.publish||{},pl=j.plan||{};PUBCOPY=[];const reg=t=>
 function applyAI(j,opts){if(j.script!=null)$('script').value=j.script;if(j.story){$('story').value=JSON.stringify(j.story,null,1);if(j.title){storyName=j.title}openId=opts&&opts.keepOpen?openId:null;if(readStory()){if(story.style&&story.style.look)$('look').value=story.style.look;drawFrame(story,.5)}}}
 /* ---- créditos: o servidor é quem conta; aqui só mostramos o saldo ---- */
 let CRED=null,credT=null;
-const waitTxt=s=>{const h=Math.floor(s/3600),m=Math.ceil((s%3600)/60);return h?h+' h'+(m?' '+m+' min':''):m+' min'};
+const waitTxt=s=>{const t=Math.max(1,Math.ceil(s/60)),h=Math.floor(t/60),m=t%60;return h?h+' h'+(m?' '+m+' min':''):m+' min'};
 function paintCred(){const p=$('cred');if(!p)return;
   document.querySelectorAll('.cost').forEach(e=>e.remove());
   if(!CRED||!CRED.enabled){p.hidden=true;return}
@@ -1286,7 +1286,7 @@ function paintCred(){const p=$('cred');if(!p)return;
   const low=CRED.left>0&&CRED.left<=Math.max(3,Math.round(CRED.daily*.2));
   p.classList.toggle('low',low);p.classList.toggle('zero',CRED.left<=0);
   $('credr').textContent=(CRED.left<=0||low)?'renovam em '+waitTxt(CRED.resetIn):'';
-  p.title='Você ganha '+CRED.daily+' créditos por dia. Eles não acumulam e renovam à meia-noite (em '+waitTxt(CRED.resetIn)+').'+(CRED.bonus?' Presente: '+CRED.bonus+'.':'');
+  p.title='Você ganha '+CRED.daily+' créditos '+(CRED.every?'a cada '+CRED.every+' h':'por dia')+'. Eles não acumulam e renovam '+(CRED.every?CRED.every+' h depois do seu primeiro uso':'à meia-noite')+' (em '+waitTxt(CRED.resetIn)+').'+(CRED.bonus?' Presente: '+CRED.bonus+'.':'');
   document.querySelectorAll('[data-cost]').forEach(b=>{const c=CRED.costs&&CRED.costs[b.dataset.cost];if(c>0){const e=document.createElement('span');e.className='cost';e.textContent=c;e.title=c+(c===1?' crédito':' créditos');b.appendChild(e)}})}
 /* Os créditos aparecem NA HORA: o último saldo fica guardado no navegador (por conta) e é pintado antes de qualquer
    pedido ao servidor; a resposta real chega logo depois e corrige o número. Antes, a barra ficava escondida até o

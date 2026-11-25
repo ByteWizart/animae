@@ -265,17 +265,20 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
 
   <!-- CRÉDITOS -->
   <section id="t-creditos" class="hidden">
-    <div class="pagehead"><div><h1>Créditos</h1><div class="muted">Cada pessoa ganha uma cota por dia. Usar a IA ou a voz gasta créditos; gravar o vídeo no navegador é de graça.</div></div>
+    <div class="pagehead"><div><h1>Créditos</h1><div class="muted">Cada pessoa ganha uma cota que renova de tempos em tempos (você escolhe abaixo). Usar a IA ou a voz gasta créditos; gravar o vídeo no navegador é de graça.</div></div>
       <div class="row"><button class="sec sm" id="cr-reload">Atualizar</button></div></div>
     <div class="grid g3" id="crkpi" style="margin-bottom:16px"></div>
     <div class="card">
       <form id="crf">
         <label class="sw"><input type="checkbox" id="cr-on"><span class="tk"></span>Sistema de créditos ligado</label>
-        <p class="muted" style="margin:10px 0 14px">A conta é feita só no servidor, então ninguém consegue burlar pelo navegador. O crédito é descontado antes de chamar a IA e volta sozinho se a IA falhar. A cota do dia <b>não acumula</b> e renova à meia-noite (<span id="cr-tz">horário de Brasília</span>). Créditos de presente não expiram.</p>
+        <p class="muted" style="margin:10px 0 14px">A conta é feita só no servidor, então ninguém consegue burlar pelo navegador. O crédito é descontado antes de chamar a IA e volta sozinho se a IA falhar. A cota <b>não acumula</b>: <span id="cr-renew-txt">renova à meia-noite</span> (<span id="cr-tz">horário de Brasília</span>). Créditos de presente não expiram.</p>
         <div class="grid g3">
-          <label class="f">Créditos por dia (quem tem conta)<input id="cr-daily" type="number" min="0" max="100000"></label>
-          <label class="f">Créditos por dia (visitante sem conta)<input id="cr-anon" type="number" min="0" max="100000"></label>
+          <label class="f">Créditos por período (quem tem conta)<input id="cr-daily" type="number" min="0" max="100000"></label>
+          <label class="f">Créditos por período (visitante sem conta)<input id="cr-anon" type="number" min="0" max="100000"></label>
+          <label class="f">Renovar os créditos<select id="cr-every"><option value="0">Todo dia, à meia-noite</option><option value="1">A cada 1 hora</option><option value="2">A cada 2 horas</option><option value="3">A cada 3 horas</option><option value="6">A cada 6 horas</option><option value="12">A cada 12 horas</option><option value="24">A cada 24 horas</option><option value="48">A cada 2 dias</option><option value="72">A cada 3 dias</option><option value="168">A cada 7 dias</option><option value="custom">Outro (informe as horas)…</option></select></label>
+          <label class="f hidden" id="cr-hrs-wrap">Horas entre renovações<input id="cr-hrs" type="number" min="1" max="720" step="1"></label>
         </div>
+        <p class="muted" style="margin:8px 0 0">Com "a cada N horas", o tempo de cada pessoa começa a contar no <b>primeiro uso</b> e, passadas N horas, ela volta à cota cheia. A configuração fica salva no Supabase junto com as outras do painel.</p>
         <h3>Quanto cada ação custa</h3>
         <div class="grid g3" id="cr-costs"></div>
         <div style="margin-top:16px"><button type="submit">Salvar créditos</button></div>
@@ -290,7 +293,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
         <button type="submit">Dar créditos</button>
       </form>
     </div>
-    <div class="card" style="margin-top:16px"><h3 style="margin-top:0">Uso de hoje</h3><div class="tbl-wrap" id="crtbl"></div></div>
+    <div class="card" style="margin-top:16px"><div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">Uso neste período</h3><div class="row"><button class="sec sm" id="cr-allrestore" title="Devolve a cota cheia a todos da lista">Restaurar cota de todos</button><button class="sec sm" id="cr-allzero" title="Zera os créditos de todos da lista">Zerar créditos de todos</button></div></div><div class="tbl-wrap" id="crtbl"></div></div>
   </section>
 
   <!-- HISTÓRICO -->
@@ -495,15 +498,26 @@ $('log-clear').onclick=()=>{if(LOG.length&&confirm('Limpar o registro de ativida
 /* ---- Créditos ---- */
 let CRD=null;
 async function loadCred(){CRD=await api('/api/admin/credits');fillCred();renderCred()}
+const CRP=['0','1','2','3','6','12','24','48','72','168'],hTxt=h=>h%168===0?(h/168===1?'7 dias':h/168+' semanas'):h%24===0?(h/24===1?'24 horas':h/24+' dias'):h+(h===1?' hora':' horas');
+function crEveryChange(){const c=$('cr-every').value==='custom';$('cr-hrs-wrap').classList.toggle('hidden',!c);if(c&&!$('cr-hrs').value)$('cr-hrs').value=CRD&&CRD.cfg.resetHours>0?CRD.cfg.resetHours:5}
+$('cr-every').onchange=crEveryChange;
+const crHours=()=>{const v=$('cr-every').value;return v==='custom'?Math.max(1,Math.min(720,Math.round(+$('cr-hrs').value)||1)):+v};
 function fillCred(){const c=CRD.cfg;$('cr-on').checked=!!c.enabled;$('cr-daily').value=c.daily;$('cr-anon').value=c.anonDaily;$('cr-tz').textContent=CRD.tz||'';
+  const h=c.resetHours||0;$('cr-every').value=CRP.includes(String(h))?String(h):'custom';$('cr-hrs').value=h>0?h:'';crEveryChange();
+  $('cr-renew-txt').innerHTML=h?'renova <b>'+hTxt(h)+' depois do primeiro uso</b> de cada pessoa':'renova à meia-noite';
   $('cr-costs').innerHTML=Object.keys(CRD.ops).map(op=>`<label class="f">${esc(CRD.ops[op])}<input type="number" min="0" max="1000" data-op="${op}" value="${c.costs[op]}"></label>`).join('')}
 function renderCred(){const c=CRD.cfg,t=CRD.totals;
-  $('crkpi').innerHTML=[[c.enabled?c.daily:'desligado','créditos por dia',c.enabled?'visitante sem conta: '+c.anonDaily:'ninguém gasta nada'],[t.people,'pessoas usaram hoje','só quem gastou crédito'],[t.spent,'créditos gastos hoje','soma de todos']].map(([n,l,sub])=>`<div class="card kpi"><div class="n" style="font-size:${String(n).length>8?22:32}px">${esc(n)}</div><div class="l">${l}</div><div class="sub">${esc(sub)}</div></div>`).join('');
-  $('crtbl').innerHTML=CRD.users.length?`<table class="tbl"><thead><tr><th>Pessoa</th><th>Gastou hoje</th><th>Presente</th><th>Restam</th><th>Último uso</th><th></th></tr></thead><tbody>${CRD.users.map(u=>`<tr><td>${esc(u.who)}${u.anon?' <span class="badge info">sem conta</span>':''}</td><td>${u.used} / ${u.daily}</td><td>${u.bonus||'<span class="muted">—</span>'}</td><td><b>${u.left}</b></td><td>${fmtDate(u.at)}</td><td><div class="acts"><button class="sec sm" data-k="${esc(u.key)}" data-a="plus">+10</button><button class="sec sm" data-k="${esc(u.key)}" data-a="reset">Zerar uso</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Ninguém gastou créditos hoje ainda.</div>'}
+  $('crkpi').innerHTML=[[c.enabled?c.daily:'desligado','créditos por período',c.enabled?'visitante sem conta: '+c.anonDaily:'ninguém gasta nada'],[t.people,'pessoas usaram neste período','só quem gastou crédito'],[t.spent,'créditos gastos neste período','soma de todos']].map(([n,l,sub])=>`<div class="card kpi"><div class="n" style="font-size:${String(n).length>8?22:32}px">${esc(n)}</div><div class="l">${l}</div><div class="sub">${esc(sub)}</div></div>`).join('');
+  $('crtbl').innerHTML=CRD.users.length?`<table class="tbl"><thead><tr><th>Pessoa</th><th>Gasto na cota</th><th>Presente</th><th>Restam</th><th>Último uso</th><th></th></tr></thead><tbody>${CRD.users.map(u=>`<tr><td>${esc(u.who)}${u.anon?' <span class="badge info">sem conta</span>':''}</td><td>${u.used} / ${u.daily}</td><td>${u.bonus||'<span class="muted">—</span>'}</td><td><b>${u.left}</b></td><td>${fmtDate(u.at)}</td><td><div class="acts"><button class="sec sm" data-k="${esc(u.key)}" data-a="plus">+10</button><button class="sec sm" data-k="${esc(u.key)}" data-a="reset" title="Devolve a cota cheia (zera o gasto)">Restaurar cota</button><button class="sec sm" data-k="${esc(u.key)}" data-a="zero" title="Deixa a pessoa com 0 créditos até a próxima renovação">Zerar créditos</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Ninguém gastou créditos neste período ainda.</div>'}
 $('crf').onsubmit=e=>{e.preventDefault();run(async()=>{const costs={};document.querySelectorAll('#cr-costs input').forEach(i=>{costs[i.dataset.op]=+i.value});
-  await api('/api/admin/credits','PUT',{enabled:$('cr-on').checked,daily:+$('cr-daily').value,anonDaily:+$('cr-anon').value,costs});toast('Créditos salvos.');await loadCred()})};
+  await api('/api/admin/credits','PUT',{enabled:$('cr-on').checked,daily:+$('cr-daily').value,anonDaily:+$('cr-anon').value,resetHours:crHours(),costs});toast('Créditos salvos.');await loadCred()})};
 $('crg').onsubmit=e=>{e.preventDefault();run(async()=>{const r=await api('/api/admin/credits/grant','POST',{who:$('cr-who').value.trim(),amount:+$('cr-amt').value});toast('Pronto. Agora essa pessoa tem '+r.credits.left+' crédito(s).');$('cr-who').value='';await loadCred()})};
-$('crtbl').onclick=e=>{const b=e.target.closest('button[data-k]');if(!b)return;run(async()=>{if(b.dataset.a==='reset')await api('/api/admin/credits/grant','POST',{who:b.dataset.k,reset:true});else await api('/api/admin/credits/grant','POST',{who:b.dataset.k,amount:10});toast('Atualizado.');await loadCred()})};
+$('crtbl').onclick=e=>{const b=e.target.closest('button[data-k]');if(!b)return;run(async()=>{const a=b.dataset.a;
+  if(a==='reset')await api('/api/admin/credits/grant','POST',{who:b.dataset.k,reset:true});
+  else if(a==='zero'){if(!confirm('Zerar os créditos desta pessoa? Ela fica com 0 até a próxima renovação e perde os créditos de presente.'))return;await api('/api/admin/credits/grant','POST',{who:b.dataset.k,zero:true})}
+  else await api('/api/admin/credits/grant','POST',{who:b.dataset.k,amount:10});toast(a==='zero'?'Créditos zerados.':a==='reset'?'Cota restaurada.':'Atualizado.');await loadCred()})};
+$('cr-allrestore').onclick=()=>run(async()=>{if(!confirm('Devolver a cota cheia a todas as pessoas da lista?'))return;const r=await api('/api/admin/credits/all','POST',{action:'restore'});toast('Cota restaurada para '+r.count+' pessoa(s).');await loadCred()});
+$('cr-allzero').onclick=()=>run(async()=>{if(!confirm('Zerar os créditos de TODAS as pessoas da lista (e os presentes delas)? Quem não aparece na lista não é afetado.'))return;const r=await api('/api/admin/credits/all','POST',{action:'zero'});toast('Créditos zerados para '+r.count+' pessoa(s).');await loadCred()});
 $('cr-reload').onclick=()=>run(loadCred);
 
 /* ---- IA ---- */

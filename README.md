@@ -57,7 +57,7 @@ Ao escolher **30 s** (ou 20, 45, 60) em "Duração", a caixa "Vídeo e voz com e
 
 Desmarque a caixa para voltar ao comportamento antigo (duração = a da voz enviada).
 
-## Créditos (cota diária por pessoa)
+## Créditos (cota por pessoa, renovação configurável)
 
 O gerador tem um sistema de créditos: **cada pessoa ganha 25 créditos por dia** e cada uso de IA ou de voz gasta créditos. Gravar o vídeo no navegador não gasta nada. Tudo é configurado em **Painel > Créditos**: liga/desliga, créditos por dia (quem tem conta e visitantes sem conta, separados) e o custo de cada ação (padrão: gerar roteiro 5, sugerir ideias 1, editar 2, avaliar 1, traduzir 2, gerar voz 3).
 
@@ -65,7 +65,8 @@ Como é protegido (tudo no servidor, o navegador só mostra o saldo):
 
 - O crédito é descontado **antes** de chamar a IA, sem brechas para pedidos simultâneos, e **volta sozinho** se a IA ou a voz falharem. Pedido inválido não gasta.
 - Quem tem conta (Supabase) é identificado pelo token conferido no servidor. Sem login, a cota é por IP (IPv6 agrupado pelo prefixo /64); o IP em si nunca é gravado, só um hash com sal.
-- A cota do dia **não acumula** e renova à meia-noite no fuso de Brasília (mude com `CREDITS_TZ`, ex.: `America/Manaus`). Créditos de presente dados pelo admin não expiram e só são usados depois da cota do dia.
+- **De quanto em quanto tempo renova** (Admin > Créditos > "Renovar os créditos", salvo no Supabase): *todo dia à meia-noite* (fuso de Brasília; mude com `CREDITS_TZ`, ex.: `America/Manaus`) ou *a cada N horas* (1, 2, 3, 6, 12, 24 h, 2, 3 ou 7 dias, ou qualquer valor de 1 a 720 h). No modo por horas, o tempo de cada pessoa começa a contar no **primeiro uso** dela; passadas N horas, volta à cota cheia. A cota **não acumula**. Créditos de presente dados pelo admin não expiram e só são usados depois da cota do dia.
+- Na lista do painel há dois botões por pessoa (e dois para todos): **Restaurar cota** devolve a cota cheia do período (zera o *gasto*) e **Zerar créditos** deixa a pessoa com **0** até a próxima renovação (e tira os presentes). Os botões "de todos" valem para quem aparece na lista.
 - O admin pode dar ou tirar créditos de presente (pelo e-mail da conta) e zerar o uso de alguém, na mesma aba. Também há a lista de quem gastou hoje.
 - O saldo aparece na hora: o último valor fica guardado no navegador (por conta) e é corrigido assim que o servidor responde; o servidor também deixou de conferir o mesmo login várias vezes ao mesmo tempo.
 - **Os saldos não recarregam ao reiniciar:** com o Supabase ligado (chave `service_role`), o saldo de cada pessoa (usado hoje e créditos de presente) é guardado na tabela `credit_balances`. Ao iniciar, o servidor lê o banco antes de abrir a porta; depois, cada uso é enviado em ~1,5 s. O código do visitante (hash do IP) usa um sal que também fica guardado no banco (`admin_config`), então o mesmo visitante continua sendo a mesma pessoa depois de reiniciar ou trocar de servidor. Se o banco estiver fora do ar ao iniciar, o servidor usa o `dados.json`, tenta de novo a cada 30 s e, quando conseguir ler, junta os dois (vale o registro mais recente de cada pessoa). Pensado para **um servidor ativo por vez**. Sem Supabase, os saldos ficam só no `.dados/dados.json` (em hospedagem que apaga arquivos, volta tudo a cada reinício).
