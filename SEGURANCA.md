@@ -27,6 +27,17 @@
 
 Como usar: `DATA_KEY=uma-frase-longa node server.js` (guarde essa frase: sem ela as chaves cifradas não abrem). Para o 2FA: Admin > Segurança > Ativar 2FA.
 
+## Terceira rodada (auditoria de cupons e suporte)
+| # | Gravidade | Onde | O que foi feito |
+|---|-----------|------|-----------------|
+| 18 | Média | `server/supabase.js` + `server.js` | **Tokens falsos não esgotam mais o Supabase Auth.** O token é conferido antes só na forma (3 partes, JSON, não vencido): lixo nunca sai do servidor. Tokens recusados ficam 30 s em cache e as conferências que de fato vão ao Supabase têm limite de 120/min por IP. |
+| 19 | Média | `server.js` cupons | **Contas novas não multiplicam um cupom.** Cada rede (IP) resgata no máximo 10 cupons por hora, mesmo que cada resgate dê certo em uma conta diferente. O painel avisa sobre cupons de valor sem limite de usos e sem validade. |
+| 20 | Baixa | `server.js` + `server/cupons.js` | **Adivinhar códigos ficou mais difícil.** Limite de tentativas também **por conta** (20/hora), além do limite por IP, e a mesma mensagem para código inexistente, desligado, vencido, esgotado ou que exige conta (antes, vencido/esgotado revelavam que o código existia). |
+| 21 | Baixa | `server/suporte.js` + `server.js` | **Spam não trava mais o suporte.** Conversas de visitantes sem conta, sem resposta e paradas há mais de 1 dia saem primeiro quando falta espaço; com o suporte a 80% da capacidade, só quem tem conta abre conversa nova (quem já tem conversa continua normalmente). |
+| 22 | Média | `database/supabase-schema.sql` | **Tabela antiga `ai_config` fechada.** Se ela existir, o SQL liga o RLS e tira o acesso de `anon` e `authenticated`. Também há o arquivo avulso `database/corrigir-ai-config.sql`, com uma consulta que mostra se todas as tabelas estão com RLS ligado. **Rode o SQL no Supabase.** |
+
+Cupons valiosos: defina sempre **usos totais** e **validade**, e ative *Confirm email* no Supabase. Com `TRUST_PROXY` ligado, os limites por IP dependem de o servidor estar mesmo atrás do proxy; exposto direto na internet, deixe `TRUST_PROXY` desligado (senão o IP pode ser forjado).
+
 ## Limitações que continuam
 - Sem Supabase configurado, o site é aberto a qualquer visitante (só há limites por IP e globais).
 - Com `DATA_KEY` na mesma máquina/painel de hospedagem do `dados.json`, a proteção é contra vazamento do arquivo (backup, repositório), não contra quem já controla o servidor.

@@ -107,11 +107,14 @@ function create(getStore, CR, onChange) {
   // Resgate. who = { key, name, hasAccount }. Devolve { ok, ... } ou { error, code? }.
   function redeem(rawCode, who, loginRequired) {
     const code = canon(rawCode), now = Date.now(), c = validCode(code) ? st()[code] : null;
-    const NOPE = 'Cupom inválido ou indisponível.'; // mesma mensagem para "não existe" e "desligado": não ajuda a adivinhar códigos
-    if (!c || !c.active) return { error: NOPE };
-    if (c.expires && c.expires <= now) return { error: 'Esse cupom venceu.' };
-    if (c.maxUses && c.uses >= c.maxUses) return { error: 'Esse cupom já foi usado o máximo de vezes.' };
-    if (c.loginOnly && loginRequired && !who.hasAccount) return { error: 'Entre na sua conta para usar este cupom.', login: true };
+    // UMA mensagem só para "não existe", "desligado", "vencido", "esgotado" e "exige conta": quem chuta códigos não descobre quais existem.
+    // (Quem não tem conta recebe a dica de entrar, igual para qualquer código, para não revelar quais cupons exigem conta.)
+    const anon = !!loginRequired && !who.hasAccount;
+    const NOPE = { error: 'Cupom inválido, vencido ou indisponível.' + (anon ? ' Alguns cupons só funcionam para quem tem conta: entre e tente de novo.' : '') };
+    if (!c || !c.active) return NOPE;
+    if (c.expires && c.expires <= now) return NOPE;
+    if (c.maxUses && c.uses >= c.maxUses) return NOPE;
+    if (c.loginOnly && anon) return NOPE;
     if (CR.couponUses(who.key, code) >= c.perPerson) return { error: c.perPerson === 1 ? 'Você já usou este cupom.' : 'Você já usou este cupom o máximo de vezes.' };
     // --- a partir daqui tudo é síncrono ---
     const gave = {};

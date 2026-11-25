@@ -52,6 +52,15 @@ function create(file) {
   const totalMsgs = () => { let n = 0; for (const t of Object.values(data.threads)) n += t.msgs.length; return n; };
   const drop = id => { const t = data.threads[id]; if (!t) return false; byHash.delete(t.h); delete data.threads[id]; return true; };
 
+  // Conversa de visitante SEM conta (sem e-mail), que nunca recebeu resposta e está parada há mais de 1 dia: é a primeira a sair
+  // quando falta espaço. Assim, spam com IPs trocados não consegue lotar o suporte e travar quem precisa de ajuda de verdade.
+  function evictStale(want) {
+    const now = Date.now(), cand = Object.values(data.threads).filter(t => !t.email && !t.msgs.some(m => m.f === 'a') && now - (t.updated || t.created) > 86400e3).sort((a, b) => (a.updated || a.created) - (b.updated || b.created));
+    let n = 0; while (cand.length && count() > want) { drop(cand.shift().id); n++; }
+    if (n) soon(); return n;
+  }
+  const nearFull = () => count() >= MAX_THREADS * 0.8; // a partir daqui, conversa nova só para quem tem conta (veja server.js)
+
   // Abre espaço: apaga as conversas paradas há muito tempo e, se ainda estiver cheio, as mais antigas.
   function prune() {
     const now = Date.now(); let n = 0;
@@ -60,6 +69,7 @@ function create(file) {
       const old = Object.values(data.threads).sort((a, b) => (a.closed === b.closed ? a.updated - b.updated : a.closed ? -1 : 1)); // encerradas primeiro, depois as mais velhas
       while (old.length && (count() > MAX_THREADS - 50 || totalMsgs() > MAX_TOTAL_MSGS - 1000)) { drop(old.shift().id); n++; }
     }
+    if (count() > MAX_THREADS * 0.9) n += evictStale(Math.floor(MAX_THREADS * 0.9)); // spam parado sai antes de encher de vez
     if (n) soon(); return n;
   }
 
@@ -83,6 +93,7 @@ function create(file) {
       if (lastU && Date.now() - lastU.at < 1500) return { error: 'Calma, você está enviando rápido demais.', code: 429 };
     } else {
       if (count() >= MAX_THREADS) prune();
+      if (count() >= MAX_THREADS) evictStale(MAX_THREADS - 50);
       if (count() >= MAX_THREADS) return { error: 'O suporte está cheio no momento. Tente de novo mais tarde.', code: 503 };
       created = crypto.randomBytes(24).toString('hex');
       const id = crypto.randomBytes(8).toString('hex'), now = Date.now();
@@ -125,7 +136,7 @@ function create(file) {
   function remove(id) { const ok = drop(id); if (ok) soon(); return ok; }
   function purgeClosed() { let n = 0; for (const t of Object.values(data.threads)) if (t.closed) { drop(t.id); n++; } if (n) soon(); return n; }
 
-  return { send, poll, markReadByUser, unreadForUser, unread, list, get, reply, setClosed, remove, purgeClosed, prune, flush, count, MAX_TEXT };
+  return { send, poll, markReadByUser, unreadForUser, unread, list, get, reply, setClosed, remove, purgeClosed, prune, flush, count, nearFull, MAX_TEXT };
 }
 
 module.exports = { create, cleanText, cleanLine, validToken, MAX_TEXT };

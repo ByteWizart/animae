@@ -29,18 +29,41 @@ async function call(c, method, path, { token, body, extra, timeout = 10e3 } = {}
 
 // Confere o token com o Supabase. Devolve { id, email, name } ou null.
 const pending = new Map(); // token -> promessa em andamento (a página dispara vários pedidos ao mesmo tempo: uma só conferência)
-function verify(c, token) {
-  if (!token || token.length > 4000) return Promise.resolve(null);
-  const hit = cache.get(token);
-  if (hit && hit.exp > Date.now()) return Promise.resolve(hit.user);
+const bad = new Map(); // token -> até quando lembrar que o Supabase o recusou (evita perguntar de novo a cada pedido)
+const BAD_TTL = 30e3;
+// Confere só a FORMA do token (3 partes base64url, cabeçalho e corpo em JSON, ainda não vencido), sem falar com ninguém.
+// Lixo como "Bearer abc" é barrado aqui e nunca chega ao Supabase Auth (senão qualquer pessoa gastaria a cota dele).
+function looksLikeJwt(t) {
+  const p = t.split('.');
+  if (p.length !== 3 || !p.every(x => /^[A-Za-z0-9_-]+$/.test(x))) return false;
+  try {
+    const h = JSON.parse(Buffer.from(p[0], 'base64url').toString('utf8')), b = JSON.parse(Buffer.from(p[1], 'base64url').toString('utf8'));
+    if (!h || typeof h !== 'object' || !b || typeof b !== 'object') return false;
+    if (b.exp !== undefined && !(+b.exp > Date.now() / 1000 - 5)) return false; // já venceu
+    return true;
+  } catch { return false; }
+}
+// gate (opcional): chamada só quando for preciso perguntar ao Supabase; devolve false para recusar (limite por IP, no server.js).
+function verify(c, token, gate) {
+  if (!token || token.length > 4000 || !looksLikeJwt(token)) return Promise.resolve(null);
+  const now = Date.now(), hit = cache.get(token);
+  if (hit && hit.exp > now) return Promise.resolve(hit.user);
+  const nb = bad.get(token); if (nb && nb > now) return Promise.resolve(null);
   let p = pending.get(token);
-  if (!p) { p = verifyNow(c, token).finally(() => pending.delete(token)); pending.set(token, p); }
+  if (!p) {
+    if (gate && !gate()) return Promise.resolve(null);
+    p = verifyNow(c, token).finally(() => pending.delete(token)); pending.set(token, p);
+  }
   return p;
+}
+function rememberBad(token) {
+  bad.set(token, Date.now() + BAD_TTL);
+  if (bad.size > 2000) { const now = Date.now(); for (const [k, v] of bad) if (v < now) bad.delete(k); if (bad.size > 2000) bad.clear(); }
 }
 async function verifyNow(c, token) {
   try {
     const r = await call(c, 'GET', '/auth/v1/user', { token });
-    if (!r.ok || !r.json || !r.json.id) { cache.delete(token); return null; }
+    if (!r.ok || !r.json || !r.json.id) { cache.delete(token); if ([400, 401, 403].includes(r.status)) rememberBad(token); return null; } // 429/5xx não contam: o token pode ser bom
     const user = { id: r.json.id, email: r.json.email || '', name: (r.json.user_metadata && (r.json.user_metadata.name || r.json.user_metadata.full_name)) || '' };
     cache.set(token, { user, exp: Date.now() + TTL });
     if (cache.size > 500) for (const [k, v] of cache) { if (v.exp < Date.now()) cache.delete(k); }

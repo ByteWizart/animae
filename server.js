@@ -270,7 +270,11 @@ function sbCfg() {
 const PROV_URL_OK = u => !!PROV.validUrl(u);
 const tokenOf = req => { const m = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || ''); return m ? m[1] : ''; };
 // Usuário logado (ou null). Sem Supabase configurado, ninguém é "usuário" e o site funciona aberto, como antes.
-const authUser = async req => { const c = sbCfg(); return c.enabled ? SB.verify(c, tokenOf(req)) : null; };
+// Só as conferências que de fato vão ao Supabase (token novo, fora do cache) contam no limite por IP: quem manda tokens falsos
+// em massa é barrado aqui e não esgota a cota do Supabase Auth (que derrubaria o login de todo mundo).
+const verifyHits = new Map(); // ip -> [timestamps] (janela de 1 minuto)
+const verifyGate = ip => { const now = Date.now(), a = (verifyHits.get(ip) || []).filter(t => now - t < 60e3); if (a.length >= 120) { verifyHits.set(ip, a); return false; } a.push(now); verifyHits.set(ip, a); return true; };
+const authUser = async req => { const c = sbCfg(); if (!c.enabled) return null; const ip = ipOf(req); return SB.verify(c, tokenOf(req), () => verifyGate(ip)); };
 // Barra quem não entrou: devolve o usuário, ou responde 401 e devolve false. { user:null } quando o login não é exigido.
 async function needLogin(req, res) {
   const c = sbCfg();
@@ -595,6 +599,8 @@ const aiHits = new Map(); // ip -> [timestamps]
 const histHits = new Map();
 const creditHits = new Map();
 const couponHits = new Map(); // ip -> tentativas de cupom por hora
+const couponUserHits = new Map(); // conta -> tentativas de cupom por hora (quem troca de IP não escapa do limite)
+const couponOk = new Map(); // ip -> cupons resgatados COM SUCESSO na última hora (contra criar várias contas para o mesmo cupom)
 const supportHits = new Map(); // ip -> mensagens de suporte por hora
 const supportNew = new Map(); // ip -> conversas novas por hora
 const supportPoll = new Map(); // token/ip -> consultas por hora
@@ -731,13 +737,20 @@ async function api(req, res, p) {
     // Resgatar um cupom. Tudo é conferido aqui: o navegador só manda o código e mostra a resposta.
     if (p === '/api/coupons/redeem' && m === 'POST') {
       const lg = await needLogin(req, res); if (!lg) return;
-      const give = take(couponHits, ipOf(req), 15); // tentativas por IP: quem chuta códigos é barrado rápido
-      if (!give) return send(res, 429, { error: 'Muitas tentativas de cupom. Aguarde um pouco e tente de novo.' });
+      const ip = ipOf(req);
+      const giveIp = take(couponHits, ip, 15); // tentativas por IP: quem chuta códigos é barrado rápido
+      if (!giveIp) return send(res, 429, { error: 'Muitas tentativas de cupom. Aguarde um pouco e tente de novo.' });
+      const giveUser = lg.user ? take(couponUserHits, lg.user.id, 20) : null; // e também por conta: trocar de IP não zera a contagem
+      if (lg.user && !giveUser) { giveIp(); return send(res, 429, { error: 'Muitas tentativas de cupom. Aguarde um pouco e tente de novo.' }); }
+      const undo = () => { giveIp(); if (giveUser) giveUser(); };
       const b = await body(req, 1e3);
-      if (!db.credits.cfg.enabled) { give(); return send(res, 409, { error: 'O sistema de créditos está desligado no momento.' }); }
+      if (!db.credits.cfg.enabled) { undo(); return send(res, 409, { error: 'O sistema de créditos está desligado no momento.' }); }
+      // Resgates com SUCESSO por rede: sem isso, uma pessoa criaria várias contas e usaria o mesmo cupom em todas.
+      const nowOk = Date.now(), okList = (couponOk.get(ip) || []).filter(t => nowOk - t < 3600e3); couponOk.set(ip, okList);
+      if (okList.length >= 10) return send(res, 429, { error: 'Muitos cupons resgatados desta rede na última hora. Tente de novo mais tarde.' });
       const cw = credWho(req, lg), r = CP.redeem(b.code, { key: cw.key, name: cw.name, hasAccount: !!lg.user }, sbCfg().enabled);
       if (r.error) return send(res, r.login ? 401 : 400, { error: r.error, ...(r.login ? { login: true } : {}) });
-      give(); // deu certo: não conta como tentativa errada
+      undo(); okList.push(nowOk); // deu certo: não conta como tentativa errada (mas conta no limite de resgates por rede)
       save(); const v = CR.view(cw.key);
       return send(res, 200, { ok: true, message: r.message, gave: r.gave, credits: { enabled: v.enabled, daily: v.daily, used: v.used, bonus: v.bonus, left: v.left, resetIn: v.resetIn, every: v.every, costs: v.costs, perks: v.perks, anon: !lg.user } }, credHeaders(v));
     }
@@ -752,6 +765,8 @@ async function api(req, res, p) {
       if (b.website) { undoMsg(); return send(res, 200, { ok: true }); } // campo-isca: robôs preenchem, pessoas não (não responde erro de propósito)
       const tok = SUPORTE.validToken(b.token) ? b.token : (SUPORTE.validToken(supTok()) ? supTok() : '');
       let undoNew = null;
+      // Quase cheio: só quem tem conta abre conversa nova (spam com IPs trocados não consegue lotar e travar o suporte).
+      if (!tok && SP.nearFull() && sbCfg().enabled) { const u0 = await authUser(req).catch(() => null); if (!u0) { undoMsg(); return send(res, 401, { error: 'O suporte está com muitas conversas abertas. Entre na sua conta para abrir uma nova.', login: true }); } }
       if (!tok) { undoNew = take(supportNew, ip, 4); if (!undoNew) { undoMsg(); return send(res, 429, { error: 'Muitas conversas novas por hora. Tente de novo mais tarde.' }); } }
       const user = await authUser(req).catch(() => null); // se a pessoa estiver logada, o admin vê o e-mail da conta
       const r = SP.send(tok, b.text, { name: b.name, email: user ? user.email : '' });
@@ -1091,7 +1106,7 @@ process.on('unhandledRejection', e => console.error('Erro não tratado:', e));
 /* ---------- limpeza periódica da memória ---------- */
 setInterval(() => {
   const now = Date.now(), old = a => a.filter(t => now - t < 3600e3);
-  for (const m of [aiHits, ttsHits, iconHits, histHits, creditHits, couponHits, supportHits, supportNew, supportPoll]) { for (const [k, v] of m) { const n = old(v); if (n.length) m.set(k, n); else m.delete(k); } if (m.size > 20000) m.clear(); }
+  for (const m of [aiHits, ttsHits, iconHits, histHits, creditHits, couponHits, couponUserHits, couponOk, verifyHits, supportHits, supportNew, supportPoll]) { for (const [k, v] of m) { const n = old(v); if (n.length) m.set(k, n); else m.delete(k); } if (m.size > 20000) m.clear(); }
   for (const [k, v] of fails) if (v.until < now && now - (v.at || 0) > 3600e3) fails.delete(k);
   for (const [k, v] of iconMiss) if (v < now) iconMiss.delete(k);
   CR.prune(); SP.prune();

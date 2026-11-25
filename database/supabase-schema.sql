@@ -64,6 +64,14 @@ create table if not exists public.admin_config (
 alter table public.admin_config enable row level security;
 revoke all on public.admin_config from anon, authenticated;
 -- A tabela ai_config das versões anteriores não é mais usada; se existir, o servidor lê o que ela tem uma única vez e a migra para cá.
+-- Se ela ainda existe (criada por uma versão antiga, possivelmente sem RLS), fecha o acesso pela API pública: só o servidor (service_role) lê.
+do $$
+begin
+  if to_regclass('public.ai_config') is not null then
+    execute 'alter table public.ai_config enable row level security';
+    execute 'revoke all on public.ai_config from anon, authenticated';
+  end if;
+end $$;
 
 -- Saldos diários de créditos (uma linha por pessoa que usou hoje ou tem créditos de presente). Sem isso, reiniciar o servidor
 -- (ou trocar de hospedagem) devolveria a cota cheia a todo mundo. Mesma proteção: sem policy, só o servidor (service_role) acessa.
