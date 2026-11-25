@@ -117,6 +117,7 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
       <button role="tab" data-t="atividade" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Atividade da IA<span class="cnt" id="cnt-log"></span></button>
       <button role="tab" data-t="conta" aria-selected="false"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>Conta e banco<span class="cnt" id="cnt-sb"></span></button>
       <button role="tab" data-t="padroes" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Padrões</button>
+      <button role="tab" data-t="creditos" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Créditos</button>
       <button role="tab" data-t="historico" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Histórico<span class="cnt" id="cnt-hist"></span></button>
       <button role="tab" data-t="seguranca" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Segurança e backup</button>
     </nav>
@@ -262,6 +263,36 @@ textarea.json{height:180px;font:12px ui-monospace,Menlo,Consolas,monospace}
     </div></div>
   </section>
 
+  <!-- CRÉDITOS -->
+  <section id="t-creditos" class="hidden">
+    <div class="pagehead"><div><h1>Créditos</h1><div class="muted">Cada pessoa ganha uma cota por dia. Usar a IA ou a voz gasta créditos; gravar o vídeo no navegador é de graça.</div></div>
+      <div class="row"><button class="sec sm" id="cr-reload">Atualizar</button></div></div>
+    <div class="grid g3" id="crkpi" style="margin-bottom:16px"></div>
+    <div class="card">
+      <form id="crf">
+        <label class="sw"><input type="checkbox" id="cr-on"><span class="tk"></span>Sistema de créditos ligado</label>
+        <p class="muted" style="margin:10px 0 14px">A conta é feita só no servidor, então ninguém consegue burlar pelo navegador. O crédito é descontado antes de chamar a IA e volta sozinho se a IA falhar. A cota do dia <b>não acumula</b> e renova à meia-noite (<span id="cr-tz">horário de Brasília</span>). Créditos de presente não expiram.</p>
+        <div class="grid g3">
+          <label class="f">Créditos por dia (quem tem conta)<input id="cr-daily" type="number" min="0" max="100000"></label>
+          <label class="f">Créditos por dia (visitante sem conta)<input id="cr-anon" type="number" min="0" max="100000"></label>
+        </div>
+        <h3>Quanto cada ação custa</h3>
+        <div class="grid g3" id="cr-costs"></div>
+        <div style="margin-top:16px"><button type="submit">Salvar créditos</button></div>
+      </form>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">Dar créditos de presente</h3>
+      <p class="muted" style="margin-bottom:12px">Use o e-mail da conta (para quem ainda não usou nada, o Supabase precisa estar ligado com a service_role). Número negativo tira presente.</p>
+      <form id="crg" class="row" style="align-items:end">
+        <label class="f" style="flex:1 1 260px">E-mail ou código<input id="cr-who" placeholder="pessoa@email.com" autocomplete="off"></label>
+        <label class="f" style="width:130px">Créditos<input id="cr-amt" type="number" value="25" step="1"></label>
+        <button type="submit">Dar créditos</button>
+      </form>
+    </div>
+    <div class="card" style="margin-top:16px"><h3 style="margin-top:0">Uso de hoje</h3><div class="tbl-wrap" id="crtbl"></div></div>
+  </section>
+
   <!-- HISTÓRICO -->
   <section id="t-historico" class="hidden">
     <div class="card">
@@ -356,15 +387,15 @@ $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST',headers:{
 (async()=>{try{const s=await api('/api/session');s.admin?showApp():showLogin(s.totp)}catch{showLogin()}})();
 
 /* ---- abas ---- */
-const TABS=['painel','ia','atividade','conta','padroes','historico','seguranca'];
-function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{history.replaceState(null,'','#'+n)}catch{}if(n==='atividade')run(loadLog);if(n==='conta')run(loadSb);window.scrollTo({top:0})}
+const TABS=['painel','ia','atividade','conta','padroes','creditos','historico','seguranca'];
+function tab(n){TABS.forEach(t=>{$('t-'+t).classList.toggle('hidden',t!==n)});document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===n));try{history.replaceState(null,'','#'+n)}catch{}if(n==='atividade')run(loadLog);if(n==='conta')run(loadSb);if(n==='creditos')run(loadCred);window.scrollTo({top:0})}
 $('tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.t)};
 $('tabs').onkeydown=e=>{const bs=[...document.querySelectorAll('#tabs button')],i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true');
   const nx=e.key==='ArrowRight'||e.key==='ArrowDown',pv=e.key==='ArrowLeft'||e.key==='ArrowUp';if(nx||pv){e.preventDefault();const n=bs[(i+(nx?1:bs.length-1))%bs.length];tab(n.dataset.t);n.focus()}};
 if(TABS.includes(location.hash.slice(1)))tab(location.hash.slice(1));
 
 let HIST=[];
-async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadSettings(),loadAi(),loadLog(),loadSb()])})}
+async function loadAll(){await run(async()=>{await Promise.all([loadStatus(),loadHistory(),loadSettings(),loadAi(),loadLog(),loadSb(),loadCred()])})}
 
 /* ---- painel ---- */
 const IC={vid:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9l5 3-5 3z"/>',clk:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',ai:'<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/>',up:'<path d="M12 20V10M7 14l5-5 5 5M5 4h14"/>'};
@@ -459,6 +490,21 @@ function renderLog(){const only=$('log-err').checked,rows=only?LOG.filter(x=>!x.
   $('logtbl').innerHTML=rows.length?`<table class="tbl"><thead><tr><th>Quando</th><th>Operação</th><th>IA que respondeu</th><th>Tempo</th><th>Resultado</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${fmtDate(x.at)}</td><td>${esc(OPN[x.op]||x.op)}</td><td>${x.who?esc(x.who):'<span class="muted">—</span>'}</td><td class="ms">${(x.ms/1000).toFixed(1)} s</td><td>${x.ok?'<span class="badge ok">ok</span>':`<span class="badge bad">erro</span><div class="errtxt">${esc(x.err)}</div>`}</td></tr>`).join('')}</tbody></table>`:`<div class="empty">${only?'Nenhum erro registrado. 🎉':'Nenhum uso da IA ainda. Quando alguém gerar um roteiro, ele aparece aqui.'}</div>`}
 $('log-err').onchange=renderLog;$('log-reload').onclick=()=>run(loadLog);
 $('log-clear').onclick=()=>{if(LOG.length&&confirm('Limpar o registro de atividade e os totais da IA?'))run(async()=>{await api('/api/admin/ailog','DELETE');toast('Registro limpo.');await Promise.all([loadLog(),loadStatus()])})};
+
+
+/* ---- Créditos ---- */
+let CRD=null;
+async function loadCred(){CRD=await api('/api/admin/credits');fillCred();renderCred()}
+function fillCred(){const c=CRD.cfg;$('cr-on').checked=!!c.enabled;$('cr-daily').value=c.daily;$('cr-anon').value=c.anonDaily;$('cr-tz').textContent=CRD.tz||'';
+  $('cr-costs').innerHTML=Object.keys(CRD.ops).map(op=>`<label class="f">${esc(CRD.ops[op])}<input type="number" min="0" max="1000" data-op="${op}" value="${c.costs[op]}"></label>`).join('')}
+function renderCred(){const c=CRD.cfg,t=CRD.totals;
+  $('crkpi').innerHTML=[[c.enabled?c.daily:'desligado','créditos por dia',c.enabled?'visitante sem conta: '+c.anonDaily:'ninguém gasta nada'],[t.people,'pessoas usaram hoje','só quem gastou crédito'],[t.spent,'créditos gastos hoje','soma de todos']].map(([n,l,sub])=>`<div class="card kpi"><div class="n" style="font-size:${String(n).length>8?22:32}px">${esc(n)}</div><div class="l">${l}</div><div class="sub">${esc(sub)}</div></div>`).join('');
+  $('crtbl').innerHTML=CRD.users.length?`<table class="tbl"><thead><tr><th>Pessoa</th><th>Gastou hoje</th><th>Presente</th><th>Restam</th><th>Último uso</th><th></th></tr></thead><tbody>${CRD.users.map(u=>`<tr><td>${esc(u.who)}${u.anon?' <span class="badge info">sem conta</span>':''}</td><td>${u.used} / ${u.daily}</td><td>${u.bonus||'<span class="muted">—</span>'}</td><td><b>${u.left}</b></td><td>${fmtDate(u.at)}</td><td><div class="acts"><button class="sec sm" data-k="${esc(u.key)}" data-a="plus">+10</button><button class="sec sm" data-k="${esc(u.key)}" data-a="reset">Zerar uso</button></div></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Ninguém gastou créditos hoje ainda.</div>'}
+$('crf').onsubmit=e=>{e.preventDefault();run(async()=>{const costs={};document.querySelectorAll('#cr-costs input').forEach(i=>{costs[i.dataset.op]=+i.value});
+  await api('/api/admin/credits','PUT',{enabled:$('cr-on').checked,daily:+$('cr-daily').value,anonDaily:+$('cr-anon').value,costs});toast('Créditos salvos.');await loadCred()})};
+$('crg').onsubmit=e=>{e.preventDefault();run(async()=>{const r=await api('/api/admin/credits/grant','POST',{who:$('cr-who').value.trim(),amount:+$('cr-amt').value});toast('Pronto. Agora essa pessoa tem '+r.credits.left+' crédito(s).');$('cr-who').value='';await loadCred()})};
+$('crtbl').onclick=e=>{const b=e.target.closest('button[data-k]');if(!b)return;run(async()=>{if(b.dataset.a==='reset')await api('/api/admin/credits/grant','POST',{who:b.dataset.k,reset:true});else await api('/api/admin/credits/grant','POST',{who:b.dataset.k,amount:10});toast('Atualizado.');await loadCred()})};
+$('cr-reload').onclick=()=>run(loadCred);
 
 /* ---- IA ---- */
 let AIS=null,AIMAIN='gemini',AIFB=[];

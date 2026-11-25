@@ -46,6 +46,20 @@ public/              tudo o que o navegador recebe
 
 Em **Painel > Padrões > Formato da tela** o administrador escolhe quais formatos o gerador oferece: só vertical 9:16, só horizontal 16:9 ou os dois (com o formato que abre selecionado). Com um só liberado, o seletor some do gerador, a IA monta tudo nesse formato e qualquer história enviada em outro formato é ajustada automaticamente. A regra vale também no servidor (`/api/ai/*`), então não dá para burlá-la pelo navegador. Fica salvo em `settings.aspects` e `settings.aspectDefault`.
 
+## Créditos (cota diária por pessoa)
+
+O gerador tem um sistema de créditos: **cada pessoa ganha 25 créditos por dia** e cada uso de IA ou de voz gasta créditos. Gravar o vídeo no navegador não gasta nada. Tudo é configurado em **Painel > Créditos**: liga/desliga, créditos por dia (quem tem conta e visitantes sem conta, separados) e o custo de cada ação (padrão: gerar roteiro 5, sugerir ideias 1, editar 2, avaliar 1, traduzir 2, gerar voz 3).
+
+Como é protegido (tudo no servidor, o navegador só mostra o saldo):
+
+- O crédito é descontado **antes** de chamar a IA, sem brechas para pedidos simultâneos, e **volta sozinho** se a IA ou a voz falharem. Pedido inválido não gasta.
+- Quem tem conta (Supabase) é identificado pelo token conferido no servidor. Sem login, a cota é por IP (IPv6 agrupado pelo prefixo /64); o IP em si nunca é gravado, só um hash com sal.
+- A cota do dia **não acumula** e renova à meia-noite no fuso de Brasília (mude com `CREDITS_TZ`, ex.: `America/Manaus`). Créditos de presente dados pelo admin não expiram e só são usados depois da cota do dia.
+- O admin pode dar ou tirar créditos de presente (pelo e-mail da conta) e zerar o uso de alguém, na mesma aba. Também há a lista de quem gastou hoje.
+- Os saldos ficam em `.dados/dados.json` e só quem usou hoje (ou tem presente) é guardado, então o arquivo não cresce sem parar. Continuam valendo os limites por hora da IA e da voz.
+
+Para uma cota realmente "por usuário", ative o login (Admin > Conta e banco) e, se quiser, exija-o (`REQUIRE_LOGIN=1`): por IP, quem troca de rede ou de VPN ganha uma cota nova, e redes que compartilham o mesmo IP dividem a cota. Com o login obrigatório, e-mail confirmado no Supabase dificulta a criação de várias contas.
+
 ## Como usar
 
 1. Instale o Node.js **18 ou mais novo**.

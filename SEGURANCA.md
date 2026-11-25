@@ -31,3 +31,10 @@ Como usar: `DATA_KEY=uma-frase-longa node server.js` (guarde essa frase: sem ela
 - Sem Supabase configurado, o site é aberto a qualquer visitante (só há limites por IP e globais).
 - Com `DATA_KEY` na mesma máquina/painel de hospedagem do `dados.json`, a proteção é contra vazamento do arquivo (backup, repositório), não contra quem já controla o servidor.
 - No Supabase, ative *Confirm email* e confira *Redirect URLs*: o PKCE exige que o link de retorno seja o mesmo domínio do site.
+
+## Créditos
+
+- O saldo e o desconto existem só no servidor (`server/credits.js`). O navegador recebe o saldo apenas para exibir; qualquer valor enviado por ele é ignorado.
+- O desconto é síncrono e acontece antes de chamar a IA ou a voz, então pedidos simultâneos não gastam o mesmo crédito; falhas devolvem o crédito uma única vez.
+- IPs de visitantes nunca vão para o disco: só um hash com sal. O número de pessoas guardadas tem teto e entradas antigas são removidas.
+- As rotas de presente/zerar crédito exigem o login do admin e o mesmo teste de origem das demais rotas que alteram dados.

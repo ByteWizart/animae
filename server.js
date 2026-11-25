@@ -6,6 +6,7 @@ const AI = require('./server/ai.js');
 const PROV = require('./server/providers.js');
 const SB = require('./server/supabase.js');
 const TTS = require('./server/tts.js');
+const CRED = require('./server/credits.js');
 
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
@@ -44,6 +45,7 @@ const DEFAULTS = () => ({
   adminPath: null,
   ai: { enabled: true, provider: 'gemini', fallback: [], providers: {}, perHour: 20, maxTokens: 12000, extra: '' },
   tts: { enabled: true, perHour: 60, voice: 'pt-BR-FranciscaNeural' },
+  credits: CRED.normalize(null), // créditos diários por pessoa (config + saldos); veja server/credits.js
   supabase: { url: '', anonKey: '', serviceKey: '', required: true, google: false },
   history: [], aiLog: [], aiStats: { total: 0, ok: 0, fail: 0, ms: 0 },
 });
@@ -77,6 +79,7 @@ function load() {
     const d = mapSecrets(JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')), decS), base = DEFAULTS();
     db = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}), caption: { ...base.settings.caption, ...((d.settings || {}).caption || {}) } }, ai: { ...base.ai, ...(d.ai || {}) }, tts: { ...base.tts, ...(d.tts || {}) }, supabase: { ...base.supabase, ...(d.supabase || {}) } };
     delete db.stories; // a biblioteca agora fica no navegador de cada usuário
+    db.credits = CRED.normalize(db.credits);
     // migração: o formato antigo (uma única chave, da Groq) vira o provedor "groq" do novo formato
     const a = db.ai;
     a.providers = a.providers && typeof a.providers === 'object' ? a.providers : {};
@@ -99,6 +102,11 @@ function save() {
   fs.renameSync(tmp, DATA_FILE);
 }
 load();
+// Os saldos mudam a cada uso: gravamos com um pequeno atraso (juntando vários usos numa só gravação) e ao encerrar.
+let saveTimer = null;
+const saveSoon = () => { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; try { save(); } catch (e) { console.warn('Aviso: não consegui gravar os créditos (' + e.message + ')'); } }, 1500); saveTimer.unref && saveTimer.unref(); };
+const CR = CRED.create(() => db.credits, saveSoon);
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { try { save(); } catch {} process.exit(0); });
 
 /* ---------- senha e sessões ---------- */
 const hashPw = (pw, salt) => crypto.scryptSync(String(pw), salt, 32).toString('hex');
@@ -258,6 +266,13 @@ async function needLogin(req, res) {
   if (!user) { send(res, 401, { error: 'Entre na sua conta para gerar vídeos.', login: true }); return false; }
   return { user };
 }
+
+/* ---------- créditos ---------- */
+// Quem é "a pessoa" para efeito de crédito: conta (token conferido) ou, sem login, o IP.
+const credWho = (req, lg) => lg && lg.user ? { key: CR.userKey(lg.user.id), name: lg.user.email || lg.user.name || '' } : { key: CR.anonKey(ipOf(req)), name: '' };
+const credHeaders = v => ({ 'X-Credits-Left': String(v.left), 'X-Credits-Daily': String(v.daily), 'X-Credits-Reset': String(v.resetIn) });
+const fmtWait = s => { const h = Math.floor(s / 3600), m = Math.ceil((s % 3600) / 60); return h ? h + ' h' + (m ? ' ' + m + ' min' : '') : m + ' min'; };
+const noCredit = (res, c) => send(res, 402, { error: `Seus créditos de hoje acabaram (esta ação custa ${c.cost}, você tem ${c.left}). Eles renovam em ${fmtWait(c.resetIn)}.`, credits: true }, credHeaders(c));
 
 /* ---------- provedores de IA ---------- */
 const aiCfg = id => db.ai.providers[id] || {};
@@ -433,12 +448,13 @@ function logAi(op, who, ok, ms, err) {
 }
 const aiHits = new Map(); // ip -> [timestamps]
 const histHits = new Map();
+const creditHits = new Map();
 const ttsHits = new Map(); // ip -> [timestamps]
 let ttsBusy = 0; const TTS_MAX_PARALLEL = 3;
 const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, perHour: db.tts.perHour, voice: db.tts.voice, maxChars: TTS.MAX_CHARS });
 
 function status() {
-  const expected = ['server.js', 'package.json', 'README.md', 'admin/admin.html', 'database/supabase-schema.sql', 'server/ai.js', 'server/providers.js', 'server/supabase.js', 'server/tts.js', 'public/index.html', 'public/home.html', 'public/docs.html', 'public/favicon.svg', 'public/css/ui.css', 'public/js/audio.js', 'public/js/auth.js', 'public/js/schema.js', 'public/js/guia.js', 'public/js/theme.js', 'public/js/motor-extra.js', 'public/js/motor-extra2.js', 'public/exemplos/historia-teste.json', 'public/exemplos/historia-demo-v9.json', 'public/exemplos/historia-demo-16x9.json'];
+  const expected = ['server.js', 'package.json', 'README.md', 'admin/admin.html', 'database/supabase-schema.sql', 'server/ai.js', 'server/credits.js', 'server/providers.js', 'server/supabase.js', 'server/tts.js', 'public/index.html', 'public/home.html', 'public/docs.html', 'public/favicon.svg', 'public/css/ui.css', 'public/js/audio.js', 'public/js/auth.js', 'public/js/schema.js', 'public/js/guia.js', 'public/js/theme.js', 'public/js/motor-extra.js', 'public/js/motor-extra2.js', 'public/exemplos/historia-teste.json', 'public/exemplos/historia-demo-v9.json', 'public/exemplos/historia-demo-16x9.json'];
   const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
@@ -552,6 +568,15 @@ async function api(req, res, p) {
 
     // IA: as chaves dos provedores ficam só no servidor. Limite por IP para ninguém gastar a cota.
     if (p === '/api/config' && m === 'GET') { const c = sbCfg(); return send(res, 200, { auth: { enabled: c.enabled, required: c.enabled && c.required, url: c.enabled ? c.url : '', anonKey: c.enabled ? c.anonKey : '', google: c.enabled && c.google } }, { 'Cache-Control': 'no-store' }); }
+    // Saldo de créditos de quem está perguntando (só leitura; quem decide é sempre o servidor).
+    if (p === '/api/credits' && m === 'GET') {
+      const c = sbCfg(), user = await authUser(req);
+      if (c.enabled && c.required && !user) return send(res, 200, { enabled: false }, { 'Cache-Control': 'no-store' });
+      const w = credWho(req, { user });
+      if (!take(creditHits, w.key, 240)) return send(res, 429, { error: 'Muitas consultas.' });
+      const v = CR.view(w.key);
+      return send(res, 200, { enabled: v.enabled, daily: v.daily, used: v.used, bonus: v.bonus, left: v.left, resetIn: v.resetIn, costs: v.costs, anon: !user }, { 'Cache-Control': 'no-store', ...credHeaders(v) });
+    }
     if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.enabled && i.hasKey, perHour: i.perHour }); }
     // Prompt pronto para copiar e usar em outra IA (ChatGPT, Claude...): as mesmas regras que o site usa.
     if (p === '/api/ai/prompt' && m === 'GET') {
@@ -587,17 +612,18 @@ async function api(req, res, p) {
       if (!t.installed) return send(res, 503, { error: 'A voz com IA não está instalada no servidor (rode "npm install" e reinicie).' });
       const refund = take(ttsHits, lg.user ? 'u:' + lg.user.id : ipOf(req), db.tts.perHour);
       if (!refund) return send(res, 429, { error: `Limite de ${db.tts.perHour} vozes por hora atingido. Tente mais tarde.` });
-      let done = false, gt = false, busy = false;
+      let done = false, gt = false, busy = false, cr = null;
       try {
         const b = await body(req, 3e4);
         gt = !lg.user; if (gt && !gTake('tts')) { gt = false; return send(res, 429, { error: 'O site atingiu o limite de vozes desta hora. Tente mais tarde ou entre na sua conta.' }); }
         if (ttsBusy >= TTS_MAX_PARALLEL) { if (gt) gRefund('tts'); return send(res, 429, { error: 'O servidor de voz está ocupado. Tente de novo em alguns segundos.' }); }
+        { const cw = credWho(req, lg); cr = CR.charge(cw.key, cw.name, 'tts'); if (!cr.ok) { const c = cr; cr = null; if (gt) gRefund('tts'); return noCredit(res, c); } }
         ttsBusy++; busy = true; // checagem e incremento juntos, sem await no meio
         const mp3 = await TTS.synth({ text: b.text, voice: str(b.voice, 60) || db.tts.voice, rate: +b.rate, pitch: +b.pitch });
         done = true;
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': mp3.length, 'Cache-Control': 'no-store' });
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': mp3.length, 'Cache-Control': 'no-store', ...credHeaders(CR.view(credWho(req, lg).key)) });
         return res.end(mp3);
-      } catch (e) { if (gt) gRefund('tts'); throw e; } finally { if (busy) ttsBusy--; if (!done) refund(); }
+      } catch (e) { if (gt) gRefund('tts'); throw e; } finally { if (busy) ttsBusy--; if (!done) { refund(); if (cr) cr.refund(); } }
     }
     const aiOp = p.startsWith('/api/ai/') ? p.slice(8) : '';
     if (m === 'POST' && ['generate', 'refine', 'ideas', 'review', 'translate'].includes(aiOp)) {
@@ -631,15 +657,17 @@ async function api(req, res, p) {
         } else if (aiOp === 'review') job = () => AI.review({ llm, story: b.story, script, tpm: common.tpm });
         else job = () => AI.translate({ ...common, story: b.story, script, lang: str(b.lang, 8) });
       }
-      const ga = !lg.user; if (ga && !gTake('ai')) return send(res, 429, { error: 'O site atingiu o limite de usos da IA desta hora. Tente mais tarde ou entre na sua conta.' });
+      const cw = credWho(req, lg), cr = CR.charge(cw.key, cw.name, aiOp); // gasta o crédito ANTES de chamar a IA
+      if (!cr.ok) return noCredit(res, cr);
+      const ga = !lg.user; if (ga && !gTake('ai')) { cr.refund(); return send(res, 429, { error: 'O site atingiu o limite de usos da IA desta hora. Tente mais tarde ou entre na sua conta.' }); }
       counted = true;
       const t0 = Date.now();
       try {
         const out = await job();
         if (out && typeof out === 'object') out.provider = llm.lastUsed || ''; // qual IA respondeu (útil quando há reserva)
         db.aiCount = (db.aiCount || 0) + 1; logAi(aiOp, llm.lastUsed, true, Date.now() - t0); save();
-        return send(res, 200, out);
-      } catch (e) { counted = false; if (ga) gRefund('ai'); logAi(aiOp, llm.lastUsed, false, Date.now() - t0, e && (e.msg || e.message)); save(); throw e; }
+        return send(res, 200, out, credHeaders(CR.view(cw.key)));
+      } catch (e) { counted = false; cr.refund(); if (ga) gRefund('ai'); logAi(aiOp, llm.lastUsed, false, Date.now() - t0, e && (e.msg || e.message)); save(); throw e; }
       } finally { if (!counted) refund(); }
     }
 
@@ -703,16 +731,38 @@ async function api(req, res, p) {
     if (r[0] === 'export' && m === 'GET') { // backup das configurações (sem as chaves, a menos que se peça ?keys=1)
       const withKeys = new URL(req.url, 'http://x').searchParams.get('keys') === '1';
       const provs = JSON.parse(JSON.stringify(db.ai.providers)); if (!withKeys) for (const v of Object.values(provs)) delete v.key;
-      return send(res, 200, { app: 'shorts-animados', version: 1, exportedAt: new Date().toISOString(), settings: db.settings, ai: { enabled: db.ai.enabled, provider: db.ai.provider, fallback: db.ai.fallback, perHour: db.ai.perHour, extra: db.ai.extra, providers: provs } });
+      return send(res, 200, { app: 'shorts-animados', version: 1, exportedAt: new Date().toISOString(), settings: db.settings, credits: db.credits.cfg, ai: { enabled: db.ai.enabled, provider: db.ai.provider, fallback: db.ai.fallback, perHour: db.ai.perHour, extra: db.ai.extra, providers: provs } });
     }
     if (r[0] === 'import' && m === 'POST') {
       const b = await body(req, 2e5);
       if (!b || b.app !== 'shorts-animados') return send(res, 400, { error: 'Esse arquivo não é um backup do painel.' });
       if (b.settings) db.settings = cleanSettings(b.settings, db.settings);
+      if (b.credits && typeof b.credits === 'object') db.credits.cfg = CR.cleanCfg(b.credits, db.credits.cfg);
       if (b.ai && typeof b.ai === 'object') { const err = applyAi(b.ai); if (err) return send(res, 400, { error: err }); }
       save(); await aiDbSave(); return send(res, 200, { ok: true });
     }
 
+    if (r[0] === 'credits') {
+      if (!id && m === 'GET') return send(res, 200, { cfg: db.credits.cfg, users: CR.list(), totals: CR.totals(), tz: CRED.TZ, ops: CRED.OP_NAMES });
+      if (!id && m === 'PUT') { db.credits.cfg = CR.cleanCfg(await body(req, 5e3), db.credits.cfg); save(); return send(res, 200, { cfg: db.credits.cfg }); }
+      if (id === 'grant' && m === 'POST') { // dar (ou tirar) créditos de presente, ou zerar o uso de hoje
+        const b = await body(req, 2e3), who = str(b.who, 120);
+        if (!who) return send(res, 400, { error: 'Informe o e-mail da pessoa (ou o código do visitante).' });
+        let key = /^(u:[\w-]{1,64}|ip:[0-9a-f]{8,64})$/.test(who) ? who : null, label = '';
+        if (!key && who.includes('@')) {
+          key = CR.findByEmail(who); label = who;
+          if (!key) { // quem ainda não usou nada: procura no Supabase
+            const c = sbCfg();
+            if (c.enabled && c.serviceKey) { try { const u = (await SB.listUsers(c, 1, 1000)).users.find(x => String(x.email).toLowerCase() === who.toLowerCase()); if (u) key = CR.userKey(u.id); } catch {} }
+          }
+        }
+        if (!key) return send(res, 404, { error: 'Não encontrei essa pessoa. Use o e-mail da conta (o Supabase precisa estar ligado com a service_role) ou o código "ip:…" da lista.' });
+        if (b.reset) return send(res, 200, { ok: true, credits: CR.resetUsage(key) });
+        const n = Math.round(+b.amount);
+        if (!Number.isFinite(n) || n === 0 || Math.abs(n) > 100000) return send(res, 400, { error: 'Informe uma quantidade de créditos (ex.: 50, ou -10 para tirar).' });
+        const v = CR.grant(key, n, label); save(); return send(res, 200, { ok: true, credits: v });
+      }
+    }
     if (r[0] === 'tts' && m === 'GET') return send(res, 200, ttsInfo());
     if (r[0] === 'tts' && m === 'PUT') {
       const b = await body(req, 1e4), a = db.tts;
@@ -820,9 +870,10 @@ server.listen(PORT, async () => {
 /* ---------- limpeza periódica da memória ---------- */
 setInterval(() => {
   const now = Date.now(), old = a => a.filter(t => now - t < 3600e3);
-  for (const m of [aiHits, ttsHits, iconHits, histHits]) { for (const [k, v] of m) { const n = old(v); if (n.length) m.set(k, n); else m.delete(k); } if (m.size > 20000) m.clear(); }
+  for (const m of [aiHits, ttsHits, iconHits, histHits, creditHits]) { for (const [k, v] of m) { const n = old(v); if (n.length) m.set(k, n); else m.delete(k); } if (m.size > 20000) m.clear(); }
   for (const [k, v] of fails) if (v.until < now && now - (v.at || 0) > 3600e3) fails.delete(k);
   for (const [k, v] of iconMiss) if (v < now) iconMiss.delete(k);
+  CR.prune();
   for (const [k, v] of sessions) if (v < now) sessions.delete(k);
   if (fails.size > 20000) fails.clear(); if (iconMiss.size > 20000) iconMiss.clear();
 }, 600e3).unref();

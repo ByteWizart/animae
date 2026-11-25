@@ -9,7 +9,16 @@
 /* Gerador: três passos, uma ação principal em cada, o resto recolhido */
 .app{display:grid;grid-template-columns:320px minmax(0,1fr);gap:48px;max-width:1120px;margin:0 auto;align-items:start}
 .col{display:flex;flex-direction:column;gap:14px;min-width:0}
-.top{margin:0 0 6px}
+.top{margin:0 0 6px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.cred{display:inline-flex;align-items:center;gap:7px;padding:7px 13px 7px 10px;border:1px solid var(--line);border-radius:99px;background:var(--panel);font-size:13px;font-weight:600;white-space:nowrap;margin-top:4px;cursor:help;flex:none}
+.cred svg{width:15px;height:15px;fill:var(--accent);stroke:none;flex:none}
+.cred b{font-size:15px;font-variant-numeric:tabular-nums}
+.cred span{color:var(--muted);font-weight:500}
+.cred small{color:var(--muted);font-weight:500;font-size:12px}
+.cred.low{border-color:#e9a63a;background:color-mix(in srgb,#e9a63a 12%,var(--panel))}.cred.low svg{fill:#d98a0b}
+.cred.zero{border-color:#e0556b;background:color-mix(in srgb,#e0556b 11%,var(--panel))}.cred.zero svg{fill:#e0556b}
+.cost{display:inline-block;margin-left:7px;padding:0 7px;border-radius:99px;font-size:11.5px;font-weight:700;line-height:18px;background:rgba(255,255,255,.22);color:inherit}
+.page button.sec .cost,.page button.sm .cost{background:var(--panel2);color:var(--muted)}
 .top h1{font-size:clamp(26px,3.2vw,32px);margin:0 0 4px}
 .lead{margin:0;color:var(--muted);font-size:15px;max-width:52ch}
 .muted{font-size:13px}
@@ -105,24 +114,24 @@ footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;t
 .pubbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.55}.pubbox h3{margin:12px 0 4px;font-size:12px;color:var(--muted);font-weight:700}.pubbox h3:first-child{margin-top:0}.pubbox .tg{display:inline-block;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px 11px;margin:2px 4px 2px 0;font-size:12.5px;cursor:pointer}.pubbox .tg:hover{border-color:var(--accent);color:var(--accent)}.pubbox button{padding:4px 11px;font-size:12px;margin:2px 4px 2px 0}.warnb{border-left:3px solid var(--hl);padding-left:10px;color:var(--muted)}#ideas .lib-item b{font-size:14px}.score{font-size:32px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 
 @media(max-width:900px){.app{grid-template-columns:1fr;gap:22px}.stage{position:static;max-width:240px;margin:0 auto}.app.land{grid-template-columns:1fr}.app.land .stage{max-width:100%}}
-@media(max-width:560px){body.page{padding:0 14px 120px}.step{padding:18px;border-radius:18px}details.box>summary{padding:14px 16px}details.box>.in{padding:0 16px 16px}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}.row .push{margin-left:0;width:100%}.page button.go.push{width:100%}}
+@media(max-width:560px){.top{flex-wrap:wrap}.cred small{display:none}body.page{padding:0 14px 120px}.step{padding:18px;border-radius:18px}details.box>summary{padding:14px 16px}details.box>.in{padding:0 16px 16px}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}.row .push{margin-left:0;width:100%}.page button.go.push{width:100%}}
 </style></head><body class="page">
 <nav class="topnav"><a class="brand" href="/"><i></i>Animaê</a><a class="nl" href="/">Início</a><a class="nl" href="/gerar" aria-current="page">Gerador</a><a class="nl" href="/docs">Docs</a><a class="nl" href="#tutorial" id="tourlink">Tutorial</a></nav>
 <main class="app">
 <aside class="stage" id="stage" aria-label="Prévia do vídeo"><div class="phone"><canvas id="cv"></canvas></div><div class="muted" id="prevlbl">Prévia 9:16</div></aside>
 <div class="col">
-<header class="top"><h1>Criar um vídeo</h1><p class="lead">Conte a ideia, confira o roteiro e grave o vídeo.</p></header>
+<header class="top"><div><h1>Criar um vídeo</h1><p class="lead">Conte a ideia, confira o roteiro e grave o vídeo.</p></div><div class="cred" id="cred" hidden role="status" aria-live="polite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><b id="credn">0</b><span>créditos</span><small id="credr"></small></div></header>
 
 <section class="step" id="s1"><div class="sh"><span class="n">1</span><h2>Ideia</h2></div>
 <textarea id="idea" maxlength="6000" placeholder="Ex.: por que esquecemos o que íamos fazer quando passamos por uma porta, em tom bem-humorado."></textarea>
 <div class="muted" id="aist">Descreva o tema, o tom e o público.</div>
 <div class="row"><div class="fld" id="aspfld">Formato<div class="seg" id="aspseg" role="radiogroup" aria-label="Formato da tela"><button type="button" role="radio" data-a="9:16" aria-checked="true"><i class="ar v"></i>Vertical <small>9:16</small></button><button type="button" role="radio" data-a="16:9" aria-checked="false"><i class="ar h"></i>Horizontal <small>16:9</small></button></div><select id="aspect" hidden aria-hidden="true" tabindex="-1"><option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select></div>
 <label class="fld">Duração<select id="aisec"><option value="20">~20 s</option><option value="30" selected>~30 s</option><option value="45">~45 s</option><option value="60">~60 s</option></select></label>
-<button class="go push" id="aigo">Gerar roteiro</button></div>
+<button class="go push" id="aigo" data-cost="generate">Gerar roteiro</button></div>
 <details class="more" id="aiopt"><summary>Mais opções</summary><div class="in">
 <div class="grid3"><label class="fld">Tipo de conteúdo<select id="aifmt"></select></label><label class="fld">Tom<select id="aitone"></select></label><label class="fld">Idioma<select id="ailang"></select></label>
 <label class="fld">Estilo visual<select id="ailook"><option value="">A IA escolhe</option></select></label><label class="fld">Trilha<select id="aimusic"><option value="">A IA escolhe</option></select></label><label class="fld">Personagens<select id="aicast"><option value="0">A IA escolhe</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></div>
-<div class="row"><button class="sec sm" id="aiideas">Sugerir ideias</button><button class="sec sm" id="aiprompt">Copiar prompt para outra IA</button></div>
+<div class="row"><button class="sec sm" id="aiideas" data-cost="ideas">Sugerir ideias</button><button class="sec sm" id="aiprompt">Copiar prompt para outra IA</button></div>
 <div class="muted">Dica: cole um texto longo (notícia, artigo) no campo da ideia e a IA resume e transforma em vídeo.</div></div></details>
 <div id="ideas"></div></section>
 
@@ -131,7 +140,7 @@ footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;t
 <details class="more" id="pubd" hidden><summary>Título, descrição e hashtags para publicar</summary><div class="in"><div id="pub" class="pubbox" hidden></div></div></details>
 <div id="voz" style="display:flex;flex-direction:column;gap:12px">
 <div class="row"><label class="fld grow">Voz<select id="ttsvoice"><option value="">Carregando vozes...</option></select></label>
-<button class="go" id="ttsgo">Gerar voz</button><button class="sec" id="ttsplay" disabled>Ouvir</button><a id="ttsdl" class="btn sec" download="narracao.mp3" hidden>Baixar MP3</a></div>
+<button class="go" id="ttsgo" data-cost="tts">Gerar voz</button><button class="sec" id="ttsplay" disabled>Ouvir</button><a id="ttsdl" class="btn sec" download="narracao.mp3" hidden>Baixar MP3</a></div>
 <div class="muted" id="ttsst">A voz é feita a partir do roteiro e já fica carregada como narração.</div>
 <details class="more" id="ttsbox"><summary>Velocidade e tom da voz</summary><div class="in">
 <div class="row"><label class="fld">Velocidade <span id="ttsratev">0%</span><input type="range" id="ttsrate" min="-30" max="40" value="0"></label>
@@ -139,9 +148,9 @@ footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;t
 <details class="more" id="aiedit"><summary>Melhorar com a IA: editar, avaliar, traduzir</summary><div class="in">
 <label class="fld">Atalho<select id="aipre"><option value="">Escolha um atalho ou escreva abaixo</option></select></label>
 <textarea id="aiins" maxlength="1200" placeholder="Ex.: deixe a cena 2 mais engraçada e troque o cenário para noite."></textarea>
-<div class="row"><button id="airefine">Aplicar mudança</button><button class="sec" id="aireview">Avaliar a direção</button></div>
+<div class="row"><button id="airefine" data-cost="refine">Aplicar mudança</button><button class="sec" id="aireview" data-cost="review">Avaliar a direção</button></div>
 <div id="aireviewout"></div>
-<div class="row"><label class="fld">Traduzir tudo para<select id="aitr"></select></label><button class="sec" id="aitrgo">Traduzir</button></div>
+<div class="row"><label class="fld">Traduzir tudo para<select id="aitr"></select></label><button class="sec" id="aitrgo" data-cost="translate">Traduzir</button></div>
 <div class="muted">Cada uso conta no limite por hora da IA. A história atual (JSON) é enviada para a IA e a resposta substitui a atual: salve na biblioteca antes se quiser guardar a versão anterior.</div></div></details>
 </section>
 
@@ -1066,7 +1075,7 @@ $('ttspitch').oninput=()=>{$('ttspitchv').textContent=($('ttspitch').value>0?'+'
 $('ttsgo').onclick=async()=>{if(busy||!ttsOk)return;const text=$('script').value.trim();if(text.length<2)return log('Escreva ou gere o roteiro primeiro: a voz é feita a partir dele.');
   const b=$('ttsgo'),st=$('ttsst');b.disabled=true;st.textContent='Gerando a voz... (textos longos levam alguns segundos)';
   try{const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:$('ttsvoice').value,rate:+$('ttsrate').value,pitch:+$('ttspitch').value})});
-    if(!r.ok){let m='Falha ao gerar a voz.';try{m=(await r.json()).error||m}catch{}throw new Error(m)}
+    credHdr(r);if(!r.ok){let m='Falha ao gerar a voz.';try{m=(await r.json()).error||m}catch{}throw new Error(m)}
     const blob=await r.blob();if(ttsUrl)URL.revokeObjectURL(ttsUrl);ttsUrl=URL.createObjectURL(blob);
     if(await setVoice(await blob.arrayBuffer(),'Voz com IA pronta')){st.textContent='Pronto. Agora clique em \"Ajustar ao áudio\", depois em \"Prévia\" e \"Gerar vídeo\".';$('ttsplay').disabled=false;$('ttsdl').href=ttsUrl;$('ttsdl').hidden=false}}
   catch(e){st.textContent=e.message;log(e.message)}finally{b.disabled=false}};
@@ -1222,8 +1231,24 @@ function showPub(j){const p=j.publish||{},pl=j.plan||{};PUBCOPY=[];const reg=t=>
   if(pl.concept||pl.beats&&pl.beats.length)o+=`<details><summary class="muted" style="cursor:pointer;margin-top:8px">Plano de direção da IA</summary><div class="muted" style="line-height:1.5">${esc2(pl.concept)}${pl.hook?'<br><b>Gancho:</b> '+esc2(pl.hook):''}${pl.motif?'<br><b>Motivo visual:</b> '+esc2(pl.motif):''}${pl.palette&&pl.palette.length?'<br><b>Paleta:</b> '+pl.palette.map(c=>`<span style="background:${esc2(c)};padding:0 10px;border:1px solid #555;margin-right:3px">&nbsp;</span>`).join(''):''}${pl.cast&&pl.cast.length?'<br><b>Elenco:</b> '+pl.cast.map(c=>esc2(c.name+' ('+c.look+')')).join('; '):''}${pl.beats&&pl.beats.length?'<br>'+pl.beats.map(esc2).join('<br>'):''}</div></details>`;
   const bx=$('pub');bx.innerHTML=o;bx.hidden=!o;{const pd=$('pubd');if(pd)pd.hidden=!o}bx.querySelectorAll('[data-c]').forEach(e=>e.onclick=()=>copyTxt(PUBCOPY[+e.dataset.c]))}
 function applyAI(j,opts){if(j.script!=null)$('script').value=j.script;if(j.story){$('story').value=JSON.stringify(j.story,null,1);if(j.title){storyName=j.title}openId=opts&&opts.keepOpen?openId:null;if(readStory()){if(story.style&&story.style.look)$('look').value=story.style.look;drawFrame(story,.5)}}}
+/* ---- créditos: o servidor é quem conta; aqui só mostramos o saldo ---- */
+let CRED=null,credT=null;
+const waitTxt=s=>{const h=Math.floor(s/3600),m=Math.ceil((s%3600)/60);return h?h+' h'+(m?' '+m+' min':''):m+' min'};
+function paintCred(){const p=$('cred');if(!p)return;
+  document.querySelectorAll('.cost').forEach(e=>e.remove());
+  if(!CRED||!CRED.enabled){p.hidden=true;return}
+  p.hidden=false;$('credn').textContent=CRED.left;
+  const low=CRED.left>0&&CRED.left<=Math.max(3,Math.round(CRED.daily*.2));
+  p.classList.toggle('low',low);p.classList.toggle('zero',CRED.left<=0);
+  $('credr').textContent=(CRED.left<=0||low)?'renovam em '+waitTxt(CRED.resetIn):'';
+  p.title='Você ganha '+CRED.daily+' créditos por dia. Eles não acumulam e renovam à meia-noite (em '+waitTxt(CRED.resetIn)+').'+(CRED.bonus?' Presente: '+CRED.bonus+'.':'');
+  document.querySelectorAll('[data-cost]').forEach(b=>{const c=CRED.costs&&CRED.costs[b.dataset.cost];if(c>0){const e=document.createElement('span');e.className='cost';e.textContent=c;e.title=c+(c===1?' crédito':' créditos');b.appendChild(e)}})}
+async function loadCred(){try{const r=await fetch('/api/credits',{cache:'no-store'});if(!r.ok)return;CRED=await r.json();paintCred();
+  clearTimeout(credT);if(CRED.enabled)credT=setTimeout(loadCred,Math.min(2147e3,(CRED.resetIn+3)*1000))}catch{}}
+function credHdr(r){if(!CRED)return;const l=r.headers.get('X-Credits-Left');if(l===null)return;CRED.left=+l;const rs=+r.headers.get('X-Credits-Reset');if(rs)CRED.resetIn=rs;paintCred()}
+loadCred();document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadCred()});
 async function aiCall(btn,label,path,data){if(busy)return null;btn.disabled=true;const t0=Date.now(),tm=setInterval(()=>log(label+'… '+Math.round((Date.now()-t0)/1000)+' s'),500);log(label+'…');
-  try{const r=await jpost(path,data),j=await r.json();if(!r.ok)throw new Error(j.error||('Erro '+r.status));return j}catch(e){log('IA: '+e.message);return null}finally{clearInterval(tm);btn.disabled=!aiOk}}
+  try{const r=await jpost(path,data);credHdr(r);const j=await r.json();if(!r.ok)throw new Error(j.error||('Erro '+r.status));return j}catch(e){log('IA: '+e.message);return null}finally{clearInterval(tm);btn.disabled=!aiOk}}
 $('aigo').onclick=async()=>{const idea=$('idea').value.trim();if(idea.length<8)return log('Descreva melhor a ideia do vídeo.');
   const j=await aiCall($('aigo'),'Gerando roteiro e história com a IA','/api/ai/generate',{idea,...aiOpts()});if(!j)return;
   applyAI(j);showPub(j);
