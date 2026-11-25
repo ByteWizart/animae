@@ -64,7 +64,7 @@ async function listUsers(c, page = 1, perPage = 50) {
   return { users: list.map(u => ({ id: u.id, email: u.email || '', provider: (u.app_metadata && u.app_metadata.provider) || '', createdAt: u.created_at, lastSignIn: u.last_sign_in_at, confirmed: !!(u.email_confirmed_at || u.confirmed_at) })), total };
 }
 
-// Testa a conexão: Auth no ar, provedores de login e se as tabelas do supabase-schema.sql (videos, stories, ai_config) existem.
+// Testa a conexão: Auth no ar, provedores de login e se as tabelas do supabase-schema.sql (videos, stories, admin_config, credit_balances) existem.
 async function health(c) {
   const out = { ok: false, auth: false, google: false, signup: true, autoconfirm: false, tables: {}, error: '' };
   try {
@@ -73,15 +73,15 @@ async function health(c) {
     out.auth = true;
     const j = s.json || {};
     out.google = !!(j.external && j.external.google); out.signup = !j.disable_signup; out.autoconfirm = !!j.mailer_autoconfirm;
-    for (const t of ['videos', 'stories', 'ai_config']) {
+    for (const t of ['videos', 'stories', 'admin_config', 'credit_balances']) {
       const r = await call(c, 'GET', `/rest/v1/${t}?select=id&limit=1`, { token: c.serviceKey || c.anonKey });
       out.tables[t] = r.ok ? true : (r.status === 401 || r.status === 403) ? 'rls' : false; // 'rls' = existe, mas as regras escondem as linhas (normal com a chave anon)
     }
-    // Teste de verdade da chave secreta: lê a tabela ai_config, que SÓ a service_role / secret enxerga.
+    // Teste de verdade da chave secreta: lê a tabela admin_config, que SÓ a service_role / secret enxerga.
     // (Sem isso, "tabela encontrada" também aparece quando a chave foi recusada.)
     if (c.serviceKey) {
       const k = c.serviceKey, fmt = isJwt(k) ? 'antiga (eyJ...)' : /^sb_secret_/.test(k) ? 'nova (sb_secret_...)' : /^sb_publishable_/.test(k) ? 'PUBLISHABLE (errada: precisa ser a secret)' : /^eyJ/.test(c.anonKey) || !k ? 'desconhecida' : 'formato desconhecido';
-      const r = await call(c, 'GET', '/rest/v1/ai_config?select=id&limit=1');
+      const r = await call(c, 'GET', '/rest/v1/admin_config?select=id&limit=1');
       out.serviceTest = { ok: r.ok, status: r.status, format: fmt, msg: (r.json && (r.json.message || r.json.hint || r.json.msg || r.json.error_description)) || '' };
     }
     out.ok = true;

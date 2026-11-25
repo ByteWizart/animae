@@ -34,7 +34,7 @@ public/              tudo o que o navegador recebe
 | public/js/audio.js | Trilha e efeitos sonoros gerados por código + análise da voz (`analyzeVoice`: onde há fala e onde há pausa, com limiar adaptativo) |
 | public/js/auth.js | Login no navegador (Supabase): janela de entrar/criar conta, sessão e biblioteca na nuvem |
 | server/supabase.js | Ponte do servidor com o Supabase (confere o login, grava vídeos, lista usuários) |
-| database/supabase-schema.sql | **Único SQL do projeto**: tabelas `videos`, `stories` (RLS por usuário) e `ai_config` (provedor padrão e modelos, só o servidor acessa). Rode uma vez no SQL Editor do Supabase |
+| database/supabase-schema.sql | **Único SQL do projeto**: tabelas `videos`, `stories` (RLS por usuário), `admin_config` (todas as configurações do painel) e `credit_balances` (saldos de créditos); as duas últimas só o servidor acessa. Rode uma vez no SQL Editor do Supabase |
 | public/js/theme.js | Botão de tema claro/escuro (lua/sol na barra); a escolha fica salva no navegador |
 | public/css/ui.css | Estilos compartilhados (visual novo: degradê violeta/rosa/âmbar, claro e escuro automático) |
 | public/exemplos/historia-teste.json | História de exemplo simples |
@@ -68,7 +68,8 @@ Como é protegido (tudo no servidor, o navegador só mostra o saldo):
 - A cota do dia **não acumula** e renova à meia-noite no fuso de Brasília (mude com `CREDITS_TZ`, ex.: `America/Manaus`). Créditos de presente dados pelo admin não expiram e só são usados depois da cota do dia.
 - O admin pode dar ou tirar créditos de presente (pelo e-mail da conta) e zerar o uso de alguém, na mesma aba. Também há a lista de quem gastou hoje.
 - O saldo aparece na hora: o último valor fica guardado no navegador (por conta) e é corrigido assim que o servidor responde; o servidor também deixou de conferir o mesmo login várias vezes ao mesmo tempo.
-- Os saldos ficam em `.dados/dados.json` e só quem usou hoje (ou tem presente) é guardado, então o arquivo não cresce sem parar. Continuam valendo os limites por hora da IA e da voz.
+- **Os saldos não recarregam ao reiniciar:** com o Supabase ligado (chave `service_role`), o saldo de cada pessoa (usado hoje e créditos de presente) é guardado na tabela `credit_balances`. Ao iniciar, o servidor lê o banco antes de abrir a porta; depois, cada uso é enviado em ~1,5 s. O código do visitante (hash do IP) usa um sal que também fica guardado no banco (`admin_config`), então o mesmo visitante continua sendo a mesma pessoa depois de reiniciar ou trocar de servidor. Se o banco estiver fora do ar ao iniciar, o servidor usa o `dados.json`, tenta de novo a cada 30 s e, quando conseguir ler, junta os dois (vale o registro mais recente de cada pessoa). Pensado para **um servidor ativo por vez**. Sem Supabase, os saldos ficam só no `.dados/dados.json` (em hospedagem que apaga arquivos, volta tudo a cada reinício).
+- Os saldos também ficam em `.dados/dados.json` e só quem usou hoje (ou tem presente) é guardado, então o arquivo não cresce sem parar. Continuam valendo os limites por hora da IA e da voz.
 
 Para uma cota realmente "por usuário", ative o login (Admin > Conta e banco) e, se quiser, exija-o (`REQUIRE_LOGIN=1`): por IP, quem troca de rede ou de VPN ganha uma cota nova, e redes que compartilham o mesmo IP dividem a cota. Com o login obrigatório, e-mail confirmado no Supabase dificulta a criação de várias contas.
 
@@ -93,9 +94,9 @@ O site fala com qualquer provedor que aceite o formato de chat da OpenAI. O cat�
 
 Os limites grátis mudam sem aviso: confira no site de cada provedor.
 
-**Onde fica salvo:** o provedor **padrão**, as **reservas** e, por provedor, o **modelo**, os modelos de reserva, o TPM e o endereço do "Outro" ficam na tabela `ai_config` do Supabase (criada pelo mesmo `supabase-schema.sql`). Para isso o servidor precisa da chave `service_role` (Admin > Conta e banco, ou `SUPABASE_SERVICE_KEY`). Na primeira conexão o servidor cria a linha com a configuração que já estava valendo, e depois o banco manda: reiniciar ou trocar de servidor não perde nada, e mudanças feitas direto no banco valem em até 30 s. **As chaves de API não vão para o banco** (variável de ambiente ou `dados.json`). Sem Supabase, tudo continua só no `dados.json`, como antes.
+**Onde fica salvo:** com o Supabase ligado, a configuração da IA (e todas as outras do painel) fica na tabela `admin_config`; veja a seção "Configurações do painel no Supabase" abaixo. Sem Supabase, tudo continua só no `dados.json`, como antes.
 
-- Informe a chave por variável de ambiente (prioridade) ou em **Admin > IA**. As chaves ficam só no servidor.
+- Informe a chave por variável de ambiente (prioridade) ou em **Admin > IA**. As chaves nunca vão para o navegador (e, com Supabase, são guardadas na `admin_config`, que só o servidor lê; defina `DATA_KEY` para irem cifradas).
 - **Aceita qualquer modelo.** O campo **Modelo** aceita qualquer nome. O botão **Carregar modelos** pergunta ao provedor o que ele oferece agora, com busca; **Usar** troca o modelo e **+ Reserva** adiciona aos modelos de reserva.
 - **Modelos de reserva por provedor:** se um modelo sumir ou estourar o limite, o próximo do mesmo provedor é tentado antes de passar a outro provedor. Muitos limites são por modelo, então isso soma cotas.
 - Em **Admin > IA** escolha o provedor **principal** e os de **reserva**. Se o principal estourar o limite grátis, recusar a chave, cair ou demorar demais, o site passa sozinho para a reserva. Pedidos grandes são enviados só a provedores com cota suficiente.
@@ -107,11 +108,23 @@ Os limites grátis mudam sem aviso: confira no site de cada provedor.
 - O servidor valida o JSON da IA e pede uma correção automática se vier com erro.
 - Configurações antigas continuam valendo (a chave da Groq é migrada sozinha). Provedores que saíram do catálogo (OpenRouter, Cloudflare, NVIDIA, Mistral, Cohere, Z.ai, Ollama...) são apagados do `dados.json` ao iniciar; para usá-los, cadastre-os no cartão **Outro**.
 
+## Configurações do painel no Supabase
+
+**Todas as configurações do Admin são salvas no Supabase**, na tabela `admin_config` (uma linha, criada pelo `supabase-schema.sql`): formato da tela e legendas, IA (liga/desliga, provedor, reservas, modelos, TPM, limite por hora, instruções da casa, chaves de API), voz, créditos (cota e custos), senha do painel (só o hash), 2FA, endereço secreto do painel e opções de login.
+
+- É automático: qualquer mudança feita no painel vai para o banco em cerca de 1 s. Reiniciar ou trocar de servidor (inclusive hospedagem que apaga arquivos) não perde nada: ao iniciar, o servidor lê o banco primeiro. Mudanças feitas direto no banco valem em até 30 s.
+- Na primeira conexão, o servidor envia a configuração que já estava valendo (e migra a tabela `ai_config` antiga, se existir).
+- Precisa da chave `service_role` (Admin > Conta e banco, ou `SUPABASE_SERVICE_KEY`). Sem ela, tudo fica só no `dados.json`.
+- A tabela não tem nenhuma policy: visitantes e contas de usuários não acessam. Como ela guarda as chaves de API, defina `DATA_KEY` no servidor para elas irem **cifradas** (AES-256-GCM) também para o banco.
+- **Não vão para o banco:** o endereço e as chaves de acesso ao próprio Supabase (precisam existir antes de conectar: variáveis de ambiente ou Admin > Conta e banco), o histórico de vídeos e o registro da IA. (Os saldos de créditos têm tabela própria: `credit_balances`, veja "Créditos".)
+- Se o banco estiver fora do ar ao iniciar, o servidor usa o `dados.json` e **não** envia nada até conseguir ler o banco (para nunca apagar o que está lá). O painel mostra o erro e o envio é repetido a cada 30 s.
+- Atenção: ao apontar para um projeto Supabase que já tem configurações de outro servidor, as do banco passam a valer (inclusive a senha do painel).
+
 ## Login e banco de dados (Supabase)
 
 Com o Supabase configurado, **só quem entrou na conta consegue usar a IA, a voz e gerar vídeos**. O servidor confere o login em cada pedido (IA, voz e histórico respondem 401 sem login) e o botão "Gerar vídeo" abre a janela de entrar. A "Prévia" continua livre.
 
-1. Crie um projeto grátis em supabase.com e, no **SQL Editor**, rode o conteúdo de `supabase-schema.sql` (cria `videos`, `stories` e `ai_config`; nas duas primeiras cada pessoa só vê o que é dela).
+1. Crie um projeto grátis em supabase.com e, no **SQL Editor**, rode o conteúdo de `supabase-schema.sql` (cria `videos`, `stories`, `admin_config` e `credit_balances`; nas duas primeiras cada pessoa só vê o que é dela).
 2. Informe o **Project URL** e a chave **anon** em **Admin > Conta e banco** (ou `SUPABASE_URL` e `SUPABASE_ANON_KEY`). A chave **service_role** é opcional (`SUPABASE_SERVICE_KEY`): permite listar os usuários no painel. Ela fica só no servidor.
 3. Em **Authentication** do Supabase, deixe *Email* ligado e coloque o endereço do seu site em *Site URL* e *Redirect URLs* (necessário para recuperar senha e para o Google). Para o botão do Google, ative o provedor lá e marque a opção no painel.
 4. Clique em **Salvar e testar conexão**.

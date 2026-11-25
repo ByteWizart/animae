@@ -96,17 +96,20 @@ function load() {
     if (a.maxTokens < 12000) a.maxTokens = 12000;
   } catch (e) { if (e.code !== 'ENOENT') console.warn('Aviso: dados.json ilegível, começando vazio (' + e.message + ')'); }
 }
+const cfgHook = { fn: null }; // preenchido mais abaixo (sincronização das configurações com o Supabase)
 function save() {
   const tmp = DATA_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(DATA_KEY ? mapSecrets(JSON.parse(JSON.stringify(db)), encS) : db, null, 1), { mode: 0o600 });
   fs.renameSync(tmp, DATA_FILE);
+  if (cfgHook.fn) try { cfgHook.fn(); } catch {}
 }
 load();
 // Os saldos mudam a cada uso: gravamos com um pequeno atraso (juntando vários usos numa só gravação) e ao encerrar.
 let saveTimer = null;
 const saveSoon = () => { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; try { save(); } catch (e) { console.warn('Aviso: não consegui gravar os créditos (' + e.message + ')'); } }, 1500); saveTimer.unref && saveTimer.unref(); };
-const CR = CRED.create(() => db.credits, saveSoon);
-for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { try { save(); } catch {} process.exit(0); });
+const balHook = { fn: null }; // saldos de créditos no Supabase (definido mais abaixo)
+const CR = CRED.create(() => db.credits, () => { saveSoon(); if (balHook.fn) balHook.fn(); });
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { try { save(); await Promise.race([Promise.all([cfgDbSave(), balFlush()]), new Promise(r => setTimeout(r, 2500))]); } catch {} process.exit(0); });
 
 /* ---------- senha e sessões ---------- */
 const hashPw = (pw, salt) => crypto.scryptSync(String(pw), salt, 32).toString('hex');
@@ -133,13 +136,17 @@ function totpCheck(secret, code, last) {
 }
 const totpOn = () => !!(db.auth && db.auth.totp && db.auth.totp.enabled);
 let firstRunPassword = null;
-if (!process.env.ADMIN_PASSWORD && !(db.auth && db.auth.hash)) {
-  firstRunPassword = crypto.randomBytes(6).toString('base64url');
-  setPassword(firstRunPassword);
-}
 const validPath = v => /^[a-z0-9][a-z0-9_-]{3,39}$/i.test(v) && !['api', 'ajuda', 'docs', 'index', 'admin'].includes(v.toLowerCase());
-if (!db.adminPath) { db.adminPath = 'painel-' + crypto.randomBytes(5).toString('hex'); save(); }
-const adminPath = () => (process.env.ADMIN_PATH && validPath(process.env.ADMIN_PATH) ? process.env.ADMIN_PATH : db.adminPath);
+// Cria a senha inicial e o endereço secreto do painel se ainda não existirem. Com Supabase, só roda DEPOIS de ler a
+// configuração de lá (senão um servidor novo inventaria uma senha e apagaria a que já está guardada no banco).
+function ensureAdminDefaults() {
+  if (!process.env.ADMIN_PASSWORD && !(db.auth && db.auth.hash)) {
+    firstRunPassword = crypto.randomBytes(6).toString('base64url');
+    setPassword(firstRunPassword);
+  }
+  if (!db.adminPath) { db.adminPath = 'painel-' + crypto.randomBytes(5).toString('hex'); save(); }
+}
+const adminPath = () => (process.env.ADMIN_PATH && validPath(process.env.ADMIN_PATH) ? process.env.ADMIN_PATH : db.adminPath) || '';
 const sessions = new Map(); // token -> expira
 const SESSION_MS = 8 * 3600e3;
 const newSession = () => { const t = crypto.randomBytes(24).toString('hex'); sessions.set(t, Date.now() + SESSION_MS); return t; };
@@ -304,7 +311,7 @@ const aiInfo = () => {
   const chain = aiChain(), top = chain[0];
   return {
     enabled: !!db.ai.enabled, perHour: db.ai.perHour, extra: db.ai.extra || '', provider: db.ai.provider, fallback: db.ai.fallback,
-    store: { enabled: aiDbReady(), ok: aiDb.ok, error: aiDb.error },
+    store: { enabled: cfgDbReady(), ok: cfgDb.ok, error: cfgDb.error },
     hasKey: chain.length > 0, active: [...new Set(chain.map(p => p.label))], model: top ? top.model : '', tpm: top ? top.tpm : 0,
     providers: PROV.IDS.map(id => {
       const P = PROV.PROVIDERS[id], k = provKey(id);
@@ -376,69 +383,193 @@ function applyAi(b) {
   return '';
 }
 
-/* ---------- configuração da IA no Supabase (tabela ai_config, veja supabase-schema.sql) ---------- */
-// O banco guarda o provedor padrão, as reservas e, por provedor, o modelo, os modelos de reserva, o TPM e o endereço do "Outro".
-// As chaves de API NÃO vão para o banco. Precisa da chave service_role; sem ela (ou sem Supabase) tudo fica só em dados.json, como antes.
-const AI_ROW = '/rest/v1/ai_config';
-const aiDb = { ok: null, error: '', at: 0, loading: null }; // ok: null = não usa o banco, true = sincronizado, false = deu erro
-const aiDbReady = () => { const c = sbCfg(); return c.enabled && !!c.serviceKey; };
-const aiDbErr = r => (r.status === 404 || (r.json && /PGRST205|42P01/.test(String(r.json.code || '')))) ? 'A tabela ai_config não existe: rode o supabase-schema.sql no SQL Editor do Supabase.'
+/* ---------- configurações do painel no Supabase (tabela admin_config, veja supabase-schema.sql) ---------- */
+// TODAS as configurações do Admin ficam numa única linha (id = 1) da tabela admin_config: formato da tela e legendas,
+// IA (liga/desliga, provedor, reservas, modelos, TPM, limite por hora, instruções da casa e as chaves de API),
+// voz, créditos (cota e custos), senha do painel (só o hash), 2FA, endereço secreto do painel e as opções de login.
+// Fica fora: o endereço e as chaves de ACESSO ao próprio Supabase (precisam existir antes de conectar: variáveis de ambiente
+// ou Admin > Conta e banco), o histórico de vídeos, o registro da IA e os saldos diários de créditos de cada pessoa.
+// Com DATA_KEY definida, as chaves de API e o segredo do 2FA vão cifrados (AES-256-GCM) também para o banco.
+// Funciona sozinho: o save() do servidor avisa (cfgHook) e qualquer mudança no painel é enviada em até ~1 s.
+// Precisa da chave service_role; sem ela (ou sem Supabase) tudo fica só em dados.json, como antes.
+const CFG_ROW = '/rest/v1/admin_config';
+const cfgDb = { ok: null, error: '', at: 0, loading: null, loaded: false, dirty: false, last: '', timer: null }; // ok: null = não usa o banco, true = sincronizado, false = deu erro
+const cfgDbReady = () => { const c = sbCfg(); return c.enabled && !!c.serviceKey; };
+const cfgDbErr = r => (r.status === 404 || (r.json && /PGRST205|42P01/.test(String(r.json.code || '')))) ? 'A tabela admin_config não existe: rode o supabase-schema.sql no SQL Editor do Supabase.'
   : r.status === 401 || r.status === 403 ? 'O Supabase recusou a chave service_role.' : (r.json && (r.json.message || r.json.hint)) || 'Erro ' + r.status + ' no Supabase.';
-const aiDbCatch = e => e.name === 'TimeoutError' ? 'O Supabase demorou para responder.' : 'Não consegui falar com o Supabase (' + ((e.cause && e.cause.code) || e.message) + ').';
-// O que vai para o banco: só o que não é segredo.
-function aiPublic() {
-  const out = {};
-  for (const id of PROV.IDS) {
-    const c = aiCfg(id), o = {};
-    if (c.model) o.model = c.model;
-    if (Array.isArray(c.extraModels) && c.extraModels.length) o.extraModels = c.extraModels;
-    if (c.tpm) o.tpm = c.tpm;
-    if (PROV.PROVIDERS[id].editableUrl && c.url) o.url = c.url;
-    out[id] = o;
-  }
-  return out;
+const cfgDbCatch = e => e.name === 'TimeoutError' ? 'O Supabase demorou para responder.' : 'Não consegui falar com o Supabase (' + ((e.cause && e.cause.code) || e.message) + ').';
+// A foto das configurações (sem cifrar: serve também para saber se algo mudou desde o último envio).
+function cfgPlain() {
+  const a = db.ai;
+  return JSON.parse(JSON.stringify({
+    v: 1, settings: db.settings,
+    ai: { enabled: a.enabled, provider: a.provider, fallback: a.fallback, providers: a.providers, perHour: a.perHour, maxTokens: a.maxTokens, extra: a.extra },
+    tts: db.tts, credits: db.credits.cfg, creditsSalt: db.credits.salt, auth: db.auth, adminPath: db.adminPath,
+    supabase: { required: db.supabase.required, google: db.supabase.google },
+  }));
 }
-async function aiDbSave() {
-  if (!aiDbReady()) { aiDb.ok = null; aiDb.error = ''; return false; }
+// Aplica o que veio do banco (validando tudo, como numa importação).
+function cfgApply(d) {
+  d = mapSecrets(JSON.parse(JSON.stringify(d)), decS);
+  if (d.settings && typeof d.settings === 'object') db.settings = cleanSettings(d.settings, db.settings);
+  if (d.ai && typeof d.ai === 'object') {
+    const a = db.ai, x = d.ai; a.providers = {};
+    const err = applyAi({ enabled: x.enabled, extra: x.extra, perHour: x.perHour, provider: x.provider, fallback: x.fallback, providers: x.providers });
+    if (err) console.warn('Aviso: a configuração da IA guardada no Supabase tem um valor inválido (' + err + ').');
+    if (Number.isFinite(+x.maxTokens)) a.maxTokens = Math.round(clampN(+x.maxTokens, 12000, 100000, a.maxTokens));
+  }
+  if (d.tts && typeof d.tts === 'object') {
+    const t = d.tts, a = db.tts;
+    if (t.enabled !== undefined) a.enabled = !!t.enabled;
+    if (+t.perHour) a.perHour = Math.round(clampN(+t.perHour, 1, 5000, a.perHour));
+    if (typeof t.voice === 'string' && /^[a-z]{2,3}-[A-Z]{2}-[A-Za-z]{2,40}Neural$/.test(t.voice)) a.voice = t.voice;
+  }
+  if (d.credits && typeof d.credits === 'object') db.credits.cfg = CR.cleanCfg(d.credits, db.credits.cfg);
+  // O sal do código dos visitantes (hash do IP) precisa ser sempre o mesmo, senão o mesmo visitante vira "outra pessoa" a cada reinício.
+  if (typeof d.creditsSalt === 'string' && /^[0-9a-f]{16,64}$/.test(d.creditsSalt)) db.credits.salt = d.creditsSalt;
+  if (d.auth && typeof d.auth === 'object' && /^[0-9a-f]{32}$/.test(d.auth.salt || '') && /^[0-9a-f]{64}$/.test(d.auth.hash || '')) {
+    const n = { salt: d.auth.salt, hash: d.auth.hash }, t = d.auth.totp;
+    if (t && typeof t === 'object' && /^[A-Z2-7]{16,64}$/.test(t.secret || '')) n.totp = { secret: t.secret, enabled: !!t.enabled, last: Math.max(0, Math.round(+t.last) || 0) };
+    db.auth = n;
+  }
+  if (typeof d.adminPath === 'string' && validPath(d.adminPath)) db.adminPath = d.adminPath;
+  if (d.supabase && typeof d.supabase === 'object') { if (typeof d.supabase.required === 'boolean') db.supabase.required = d.supabase.required; if (typeof d.supabase.google === 'boolean') db.supabase.google = d.supabase.google; }
+}
+// Envia as configurações atuais para o banco (nunca antes de ler o que já existe lá: ver cfgDb.loaded).
+async function cfgDbSave() {
+  if (!cfgDbReady()) { cfgDb.ok = null; cfgDb.error = ''; return false; }
+  if (!cfgDb.loaded) return false;
+  clearTimeout(cfgDb.timer);
+  const key = JSON.stringify(cfgPlain());
+  if (cfgDb.ok === true && key === cfgDb.last) return true; // nada mudou desde o último envio
   try {
-    const r = await SB.call(sbCfg(), 'POST', AI_ROW + '?on_conflict=id', {
-      body: { id: 1, provider: db.ai.provider, fallback: db.ai.fallback, providers: aiPublic(), updated_at: new Date().toISOString() },
+    const r = await SB.call(sbCfg(), 'POST', CFG_ROW + '?on_conflict=id', {
+      body: { id: 1, data: DATA_KEY ? mapSecrets(JSON.parse(key), encS) : JSON.parse(key), updated_at: new Date().toISOString() },
       extra: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     });
-    aiDb.ok = r.ok; aiDb.error = r.ok ? '' : aiDbErr(r); if (r.ok) aiDb.at = Date.now();
+    cfgDb.ok = r.ok; cfgDb.error = r.ok ? '' : cfgDbErr(r);
+    if (r.ok) { cfgDb.last = key; cfgDb.dirty = cfgDb.last !== JSON.stringify(cfgPlain()); cfgDb.at = Date.now(); }
+    else { cfgDb.timer = setTimeout(cfgDbSave, 30e3); cfgDb.timer.unref && cfgDb.timer.unref(); } // tenta de novo daqui a pouco
     return r.ok;
-  } catch (e) { aiDb.ok = false; aiDb.error = aiDbCatch(e); return false; }
+  } catch (e) { cfgDb.ok = false; cfgDb.error = cfgDbCatch(e); cfgDb.timer = setTimeout(cfgDbSave, 30e3); cfgDb.timer.unref && cfgDb.timer.unref(); return false; }
 }
-// Lê a configuração do banco e aplica por cima da local. Sem linha ainda (primeira vez), envia a configuração atual para o banco.
+// Chamado a cada save(): se algo das configurações mudou, agenda o envio (juntando várias mudanças seguidas).
+cfgHook.fn = () => {
+  if (!cfgDb.loaded || !cfgDbReady()) return;
+  if (JSON.stringify(cfgPlain()) === cfgDb.last) return;
+  cfgDb.dirty = true; clearTimeout(cfgDb.timer);
+  cfgDb.timer = setTimeout(cfgDbSave, 800); cfgDb.timer.unref && cfgDb.timer.unref();
+};
+// Migração: quem já usava a tabela ai_config (provedor padrão e modelos) não perde nada na primeira vez.
+async function cfgLegacyAi() {
+  try {
+    const r = await SB.call(sbCfg(), 'GET', '/rest/v1/ai_config?id=eq.1&select=provider,fallback,providers');
+    const row = r.ok && Array.isArray(r.json) ? r.json[0] : null; if (!row) return;
+    const err = applyAi({ provider: row.provider, fallback: row.fallback, providers: row.providers && typeof row.providers === 'object' ? row.providers : {} });
+    if (err) console.warn('Aviso: ai_config antigo com valor inválido (' + err + ').');
+  } catch {}
+}
+// Lê as configurações do banco e aplica por cima das locais. Sem linha ainda (primeira vez), envia as que estão valendo.
 // Com force = false só consulta de novo depois de 30 s (vários servidores ou reinícios enxergam a mesma configuração).
-function aiDbLoad(force) {
-  if (!aiDbReady()) { aiDb.ok = null; aiDb.error = ''; return Promise.resolve(false); }
-  if (!force && Date.now() - aiDb.at < 30e3) return Promise.resolve(aiDb.ok === true);
-  if (aiDb.loading) return aiDb.loading;
-  aiDb.loading = (async () => {
+function cfgDbLoad(force) {
+  if (!cfgDbReady()) { cfgDb.ok = null; cfgDb.error = ''; return Promise.resolve(false); }
+  if (!force && cfgDb.loaded && Date.now() - cfgDb.at < 30e3) return Promise.resolve(cfgDb.ok === true);
+  if (cfgDb.loading) return cfgDb.loading;
+  cfgDb.loading = (async () => {
     try {
-      const r = await SB.call(sbCfg(), 'GET', AI_ROW + '?id=eq.1&select=provider,fallback,providers');
-      if (!r.ok) { aiDb.ok = false; aiDb.error = aiDbErr(r); return false; }
-      const row = Array.isArray(r.json) ? r.json[0] : null;
-      if (!row) return await aiDbSave();
-      const a = db.ai, pv = row.providers && typeof row.providers === 'object' ? row.providers : {};
-      if (PROV.isId(row.provider)) a.provider = row.provider;
-      a.fallback = (Array.isArray(row.fallback) ? row.fallback : []).filter((id, i, arr) => PROV.isId(id) && id !== a.provider && arr.indexOf(id) === i);
-      for (const id of PROV.IDS) {
-        const v = pv[id] && typeof pv[id] === 'object' ? pv[id] : {}, P = PROV.PROVIDERS[id], c = a.providers[id] = a.providers[id] || {};
-        if (typeof v.model === 'string' && PROV.validModel(v.model.trim())) c.model = v.model.trim(); else delete c.model;
-        const xs = (Array.isArray(v.extraModels) ? v.extraModels : []).map(x => String(x).trim()).filter((x, i, arr) => x && PROV.validModel(x) && arr.indexOf(x) === i).slice(0, 6);
-        if (xs.length) c.extraModels = xs; else delete c.extraModels;
-        if (+v.tpm) c.tpm = Math.round(clampN(+v.tpm, 3000, 2000000, P.tpm)); else delete c.tpm;
-        if (P.editableUrl) { const u = PROV.validUrl(v.url || ''); if (u) c.url = u; else delete c.url; }
-      }
-      save(); aiDb.ok = true; aiDb.error = ''; aiDb.at = Date.now();
+      if (cfgDb.loaded && cfgDb.dirty) return await cfgDbSave(); // mudança local ainda não enviada vale mais que o banco
+      const r = await SB.call(sbCfg(), 'GET', CFG_ROW + '?id=eq.1&select=data');
+      if (!r.ok) { cfgDb.ok = false; cfgDb.error = cfgDbErr(r); return false; }
+      const row = Array.isArray(r.json) ? r.json[0] : null, has = row && row.data && typeof row.data === 'object' && Object.keys(row.data).length;
+      if (!has) { cfgDb.loaded = true; await cfgLegacyAi(); ensureAdminDefaults(); save(); return await cfgDbSave(); }
+      cfgApply(row.data); cfgDb.loaded = true; // só libera o envio depois de aplicar o que já existe no banco
+      cfgDb.last = JSON.stringify(cfgPlain()); cfgDb.dirty = false;
+      ensureAdminDefaults(); // se o banco não tinha senha ou endereço, cria e envia (o save() agenda o envio)
+      save(); cfgDb.ok = true; cfgDb.error = ''; cfgDb.at = Date.now();
       return true;
-    } catch (e) { aiDb.ok = false; aiDb.error = aiDbCatch(e); return false; }
-    finally { aiDb.loading = null; }
+    } catch (e) { cfgDb.ok = false; cfgDb.error = cfgDbCatch(e); return false; }
+    finally { cfgDb.loading = null; }
   })();
-  return aiDb.loading;
+  return cfgDb.loading;
 }
+if (!cfgDbReady()) ensureAdminDefaults(); // sem Supabase, tudo como antes (com Supabase, isso roda depois de ler o banco, ao iniciar)
+
+/* ---------- saldos de créditos no Supabase (tabela credit_balances, veja supabase-schema.sql) ---------- */
+// Sem isso, hospedagem que apaga os arquivos ao reiniciar devolvia a cota cheia a todo mundo. Aqui ficam só os saldos de
+// quem usou hoje ou tem créditos de presente (o mesmo que o dados.json guarda). Ao iniciar, o servidor lê o banco ANTES de abrir
+// a porta; depois, cada uso é enviado em ~1,5 s (só as linhas que mudaram). Uma linha por pessoa (chave u:<id> ou ip:<hash>).
+// Pensado para UM servidor ativo por vez (o saldo é contado na memória do servidor).
+const BAL = '/rest/v1/credit_balances';
+const bal = { ok: null, error: '', loaded: false, loading: null, tried: 0, synced: new Map(), timer: null, busy: null };
+const balRow = (k, e) => ({ key: k, d: String(e.d || ''), u: e.u | 0, b: e.b | 0, w: String(e.w || '').slice(0, 120), t: Math.round(e.t || 0) });
+const balSig = e => [e.d, e.u | 0, e.b | 0, e.w || ''].join('|');
+const balErr = r => (r.status === 404 || (r.json && /PGRST205|42P01/.test(String(r.json.code || '')))) ? 'A tabela credit_balances não existe: rode o supabase-schema.sql no SQL Editor do Supabase.' : cfgDbErr(r);
+// Lê tudo do banco e junta com o que já existe na memória: vale a linha mais recente (campo t) de cada pessoa.
+function balLoad() {
+  if (!cfgDbReady()) { bal.ok = null; bal.error = ''; return Promise.resolve(false); }
+  if (bal.loading) return bal.loading;
+  bal.tried = Date.now();
+  bal.loading = (async () => {
+    try {
+      const today = CRED.today(), us = db.credits.users, remote = new Map();
+      for (let from = 0; from < 200000; from += 1000) { // PostgREST entrega até 1000 linhas por vez
+        const r = await SB.call(sbCfg(), 'GET', BAL + '?select=key,d,u,b,w,t&order=key.asc&limit=1000&offset=' + from);
+        if (!r.ok) { bal.ok = false; bal.error = balErr(r); return false; }
+        const rows = Array.isArray(r.json) ? r.json : []; for (const x of rows) remote.set(x.key, x);
+        if (rows.length < 1000) break;
+      }
+      const stale = [];
+      for (const [k, x] of remote) {
+        if (!/^(u:[\w-]{1,64}|ip:[0-9a-f]{8,64})$/.test(k)) continue;
+        if (x.d !== today && !(x.b > 0)) { stale.push(k); continue; } // dia antigo e sem presente: não precisa mais
+        const e = { d: String(x.d || ''), u: Math.max(0, x.u | 0), b: Math.max(0, x.b | 0), w: String(x.w || '').slice(0, 120), t: +x.t || 0 }, cur = us[k];
+        if (!cur || (+cur.t || 0) <= e.t) us[k] = e;
+        bal.synced.set(k, balSig(e));
+      }
+      if (stale.length) await balDelete(stale);
+      bal.loaded = true; bal.ok = true; bal.error = '';
+      balSoon(); // o que só existia na memória (ou no dados.json) vai para o banco
+      return true;
+    } catch (e) { bal.ok = false; bal.error = cfgDbCatch(e); return false; }
+    finally { bal.loading = null; }
+  })();
+  return bal.loading;
+}
+async function balDelete(keys) {
+  for (let i = 0; i < keys.length; i += 50) {
+    const list = keys.slice(i, i + 50).map(k => '"' + k + '"').join(',');
+    const r = await SB.call(sbCfg(), 'DELETE', BAL + '?key=in.(' + encodeURIComponent(list) + ')');
+    if (!r.ok) throw Object.assign(new Error('delete'), { resp: r });
+    keys.slice(i, i + 50).forEach(k => bal.synced.delete(k));
+  }
+}
+// Envia ao banco só o que mudou desde o último envio (linhas novas ou alteradas e as que saíram da memória).
+function balFlush() {
+  if (!cfgDbReady() || !bal.loaded) return Promise.resolve(false);
+  if (bal.busy) return bal.busy;
+  bal.busy = (async () => {
+    try {
+      const us = db.credits.users, up = [], gone = [];
+      for (const [k, e] of Object.entries(us)) if (bal.synced.get(k) !== balSig(e)) up.push([k, e]);
+      for (const k of bal.synced.keys()) if (!us[k]) gone.push(k);
+      for (let i = 0; i < up.length; i += 500) {
+        const chunk = up.slice(i, i + 500), r = await SB.call(sbCfg(), 'POST', BAL + '?on_conflict=key', { body: chunk.map(([k, e]) => balRow(k, e)), extra: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+        if (!r.ok) { bal.ok = false; bal.error = balErr(r); return false; }
+        chunk.forEach(([k, e]) => bal.synced.set(k, balSig(e)));
+      }
+      if (gone.length) await balDelete(gone);
+      bal.ok = true; bal.error = ''; return true;
+    } catch (e) { bal.ok = false; bal.error = e.resp ? balErr(e.resp) : cfgDbCatch(e); return false; }
+  })().finally(() => { bal.busy = null; }); // (fora do try: sem nada a enviar a função termina antes de bal.busy receber a promessa)
+  return bal.busy;
+}
+function balSoon() {
+  if (!cfgDbReady() || bal.timer) return;
+  bal.timer = setTimeout(() => { bal.timer = null; balFlush(); }, 1500); bal.timer.unref && bal.timer.unref();
+}
+balHook.fn = balSoon;
+// Rede de segurança: se o banco estava fora do ar, tenta ler de novo a cada 30 s; se o envio falhou, tenta enviar de novo.
+setInterval(() => { if (!cfgDbReady()) return; if (!cfgDb.loaded && Date.now() - (cfgDb.tried || 0) > 30e3) { cfgDb.tried = Date.now(); cfgDbLoad(true); } if (!bal.loaded) { if (Date.now() - bal.tried > 30e3) balLoad(); } else if (bal.ok === false) balFlush(); }, 10e3).unref();
 
 // Registro de atividade da IA (últimos 200 usos) e totais, mostrados no painel.
 function logAi(op, who, ok, ms, err) {
@@ -628,7 +759,7 @@ async function api(req, res, p) {
     const aiOp = p.startsWith('/api/ai/') ? p.slice(8) : '';
     if (m === 'POST' && ['generate', 'refine', 'ideas', 'review', 'translate'].includes(aiOp)) {
       const lg = await needLogin(req, res); if (!lg) return;
-      await aiDbLoad();
+      await cfgDbLoad();
       const i = aiInfo();
       if (!i.enabled || !i.hasKey) return send(res, 503, { error: 'A criação com IA não está configurada neste site.' });
       const refund = take(aiHits, lg.user ? 'u:' + lg.user.id : ipOf(req), db.ai.perHour);
@@ -691,7 +822,7 @@ async function api(req, res, p) {
       if (!PROV.isId(pid)) return send(res, 400, { error: 'Provedor desconhecido.' });
       return send(res, 200, await listModels(pid, qs.get('free') !== '0'));
     }
-    if (r[0] === 'ai' && m === 'GET') { await aiDbLoad(true); return send(res, 200, aiInfo()); }
+    if (r[0] === 'ai' && m === 'GET') { await cfgDbLoad(true); return send(res, 200, aiInfo()); }
     if (r[0] === 'ai' && r[1] === 'test' && m === 'POST') { // testa um provedor com um pedido minúsculo
       const b = await body(req, 1e3), id = str(b.provider, 30);
       if (!PROV.isId(id) || !provReady(id)) return send(res, 400, { error: 'Esse provedor ainda não está configurado (falta a chave, o modelo ou o endereço).' });
@@ -702,7 +833,7 @@ async function api(req, res, p) {
     if (r[0] === 'ai' && m === 'PUT') {
       const err = applyAi(await body(req, 3e4));
       if (err) return send(res, 400, { error: err });
-      save(); await aiDbSave(); return send(res, 200, aiInfo());
+      save(); await cfgDbSave(); return send(res, 200, aiInfo());
     }
     if (r[0] === 'supabase') {
       const e = process.env, c = db.supabase, eff = sbCfg();
@@ -723,7 +854,7 @@ async function api(req, res, p) {
         if (b.clearAnon) c.anonKey = ''; if (b.clearService) c.serviceKey = '';
         if (b.required !== undefined) c.required = !!b.required;
         if (b.google !== undefined) c.google = !!b.google;
-        save(); await aiDbLoad(true); return send(res, 200, info());
+        cfgDb.loaded = false; cfgDb.last = ''; save(); await cfgDbLoad(true); return send(res, 200, info());
       }
     }
     if (r[0] === 'ailog' && m === 'GET') return send(res, 200, db.aiLog);
@@ -739,11 +870,11 @@ async function api(req, res, p) {
       if (b.settings) db.settings = cleanSettings(b.settings, db.settings);
       if (b.credits && typeof b.credits === 'object') db.credits.cfg = CR.cleanCfg(b.credits, db.credits.cfg);
       if (b.ai && typeof b.ai === 'object') { const err = applyAi(b.ai); if (err) return send(res, 400, { error: err }); }
-      save(); await aiDbSave(); return send(res, 200, { ok: true });
+      save(); await cfgDbSave(); return send(res, 200, { ok: true });
     }
 
     if (r[0] === 'credits') {
-      if (!id && m === 'GET') return send(res, 200, { cfg: db.credits.cfg, users: CR.list(), totals: CR.totals(), tz: CRED.TZ, ops: CRED.OP_NAMES });
+      if (!id && m === 'GET') return send(res, 200, { cfg: db.credits.cfg, users: CR.list(), totals: CR.totals(), tz: CRED.TZ, ops: CRED.OP_NAMES, store: { enabled: cfgDbReady(), ok: bal.ok, error: bal.error } });
       if (!id && m === 'PUT') { db.credits.cfg = CR.cleanCfg(await body(req, 5e3), db.credits.cfg); save(); return send(res, 200, { cfg: db.credits.cfg }); }
       if (id === 'grant' && m === 'POST') { // dar (ou tirar) créditos de presente, ou zerar o uso de hoje
         const b = await body(req, 2e3), who = str(b.who, 120);
@@ -825,7 +956,7 @@ const server = http.createServer((req, res) => {
   if (p === '/gerar') p = '/index.html';     // o gerador
   if (p === '/ajuda' || p === '/ajuda.html') { res.writeHead(301, { Location: '/docs' }); return res.end(); } // endereço antigo
   if (p === '/docs') p = '/docs.html';
-  if (p === '/' + adminPath()) {
+  if (adminPath() && p === '/' + adminPath()) {
     let d; try { d = fs.readFileSync(path.join(dir, 'admin', 'admin.html'), 'utf8'); } catch { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('não encontrado'); }
     const n = crypto.randomBytes(16).toString('base64');
     res.writeHead(200, { 'Content-Type': types['.html'], 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp(n) });
@@ -844,9 +975,12 @@ const server = http.createServer((req, res) => {
 });
 server.headersTimeout = 20e3; server.requestTimeout = 60e3; server.keepAliveTimeout = 5e3; server.maxHeadersCount = 60; // contra conexões lentas (slowloris)
 process.on('unhandledRejection', e => console.error('Erro não tratado:', e));
-server.listen(PORT, async () => {
+// Com Supabase, lê as configurações e os saldos de créditos ANTES de abrir a porta (senão os primeiros visitantes veriam a cota cheia).
+(async () => { if (cfgDbReady()) { await cfgDbLoad(true); await balLoad(); } })().catch(() => {}).then(() => server.listen(PORT, async () => {
   console.log('Animaê · build ' + BUILD);
-  if (aiDbReady()) { await aiDbLoad(true); console.log('  Config da IA: ' + (aiDb.ok ? 'sincronizada com o Supabase (tabela ai_config)' : 'Supabase com erro: ' + aiDb.error)); }
+  console.log('  Créditos: ' + (!cfgDbReady() ? 'saldos só neste servidor (dados.json)' : bal.ok ? 'saldos guardados no Supabase (tabela credit_balances)' : 'Supabase com erro nos saldos: ' + bal.error));
+  if (cfgDbReady()) { console.log('  Configurações do painel: ' + (cfgDb.ok ? 'sincronizadas com o Supabase (tabela admin_config)' : 'Supabase com erro: ' + cfgDb.error)); }
+  ensureAdminDefaults(); // com Supabase, só agora (já lemos a senha e o endereço guardados lá)
   { const c = sbCfg(); console.log('  Login: ' + (c.enabled ? 'Supabase ' + c.url + (c.required ? ' (obrigatório para gerar vídeos)' : ' (opcional)') : 'desligado (configure o Supabase em Admin > Conta e banco ou com SUPABASE_URL e SUPABASE_ANON_KEY)')); }
   console.log('  Início:  http://localhost:' + PORT);
   console.log('  Gerador: http://localhost:' + PORT + '/gerar');
@@ -865,7 +999,7 @@ server.listen(PORT, async () => {
   if (!DATA_KEY) console.log('  DICA: defina DATA_KEY no ambiente para gravar as chaves de API cifradas no dados.json.');
   if (!totpOn()) console.log('  DICA: ative a verificação em duas etapas em Admin > Segurança.');
   if (!sbCfg().enabled) console.log('  AVISO: sem login, qualquer visitante usa a IA e a voz (limite global: ' + GLOBAL_MAX.ai + ' IA e ' + GLOBAL_MAX.tts + ' vozes por hora, ajustável por AI_ANON_PER_HOUR e TTS_ANON_PER_HOUR). Para abrir ao público, configure o login com Supabase.');
-});
+}));
 
 /* ---------- limpeza periódica da memória ---------- */
 setInterval(() => {

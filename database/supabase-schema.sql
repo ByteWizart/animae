@@ -1,7 +1,7 @@
 -- Animaê · tabelas do Supabase
 -- Como usar: Supabase > SQL Editor > New query > cole tudo > Run. Pode rodar de novo sem problema.
 -- Cada pessoa só enxerga e altera as próprias linhas (RLS ligado).
--- Este é o ÚNICO arquivo SQL do projeto: inclui também a configuração da IA (tabela ai_config, no final).
+-- Este é o ÚNICO arquivo SQL do projeto: inclui também as configurações do painel Admin (tabela admin_config).
 
 -- Vídeos gerados (histórico de cada usuário)
 create table if not exists public.videos (
@@ -50,26 +50,42 @@ create policy "stories: dono insere" on public.stories for insert with check (au
 create policy "stories: dono altera" on public.stories for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "stories: dono apaga"  on public.stories for delete using (auth.uid() = user_id);
 
--- Configuração da IA (provedor padrão + modelo de cada provedor), salva pelo painel Admin.
--- Uma única linha (id = 1). Guarda só o que não é segredo: provedor principal, reservas, modelo, modelos de reserva,
--- TPM e o endereço do provedor "Outro". As CHAVES de API não vão para o banco (variável de ambiente ou painel).
--- Sem nenhuma policy: só o servidor, com a chave service_role, lê e grava. Visitantes e usuários logados não têm acesso.
-create table if not exists public.ai_config (
+-- Configurações do painel Admin (TODAS): formato da tela e legendas, IA (provedor, reservas, modelos, TPM, limites, chaves),
+-- voz, créditos (cota e custos), senha do painel (só o hash), 2FA, endereço secreto do painel e opções de login.
+-- Uma única linha (id = 1) com tudo num JSON. O servidor cria a linha sozinho na primeira conexão (com a configuração que
+-- já estiver valendo) e depois envia cada mudança feita no painel. Reiniciar ou trocar de servidor não perde nada.
+-- Contém segredos (chaves de API, hash da senha): sem NENHUMA policy, só o servidor, com a chave service_role, lê e grava.
+-- Visitantes e usuários logados não têm acesso. (Defina DATA_KEY no servidor para as chaves irem cifradas também aqui.)
+create table if not exists public.admin_config (
   id          int primary key default 1 check (id = 1),
-  provider    text  not null default 'gemini',
-  fallback    jsonb not null default '[]'::jsonb,
-  providers   jsonb not null default '{}'::jsonb,
+  data        jsonb not null default '{}'::jsonb,
   updated_at  timestamptz not null default now()
 );
-alter table public.ai_config enable row level security;
-revoke all on public.ai_config from anon, authenticated;
--- A linha id = 1 é criada pelo próprio servidor na primeira vez que ele conectar (com a configuração que já estiver valendo).
+alter table public.admin_config enable row level security;
+revoke all on public.admin_config from anon, authenticated;
+-- A tabela ai_config das versões anteriores não é mais usada; se existir, o servidor lê o que ela tem uma única vez e a migra para cá.
+
+-- Saldos diários de créditos (uma linha por pessoa que usou hoje ou tem créditos de presente). Sem isso, reiniciar o servidor
+-- (ou trocar de hospedagem) devolveria a cota cheia a todo mundo. Mesma proteção: sem policy, só o servidor (service_role) acessa.
+--   key = u:<id da conta> ou ip:<hash do IP>;  d = dia (fuso de Brasília);  u = usado hoje;  b = presente (não expira);
+--   w = e-mail (para o painel);  t = último uso (ms). Linhas de dias antigos sem presente são apagadas pelo servidor.
+create table if not exists public.credit_balances (
+  key         text primary key check (char_length(key) <= 80),
+  d           text   not null default '',
+  u           int    not null default 0,
+  b           int    not null default 0,
+  w           text   not null default '',
+  t           bigint not null default 0,
+  updated_at  timestamptz not null default now()
+);
+alter table public.credit_balances enable row level security;
+revoke all on public.credit_balances from anon, authenticated;
 
 -- Permissões das tabelas (necessárias em projetos que não concedem acesso automático ao schema public).
--- service_role (chave secret): o servidor grava ai_config, vídeos e histórias.
+-- service_role (chave secret): o servidor grava admin_config, vídeos e histórias.
 -- authenticated (usuário logado): só videos e stories, e o RLS acima limita a cada pessoa as próprias linhas.
 grant usage on schema public to service_role, authenticated;
-grant all on public.ai_config, public.videos, public.stories to service_role;
+grant all on public.admin_config, public.credit_balances, public.videos, public.stories to service_role;
 grant select, insert, update, delete on public.videos, public.stories to authenticated;
 grant usage, select on all sequences in schema public to service_role, authenticated;
 
