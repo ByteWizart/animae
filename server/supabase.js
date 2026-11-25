@@ -28,10 +28,16 @@ async function call(c, method, path, { token, body, extra, timeout = 10e3 } = {}
 }
 
 // Confere o token com o Supabase. Devolve { id, email, name } ou null.
-async function verify(c, token) {
-  if (!token || token.length > 4000) return null;
+const pending = new Map(); // token -> promessa em andamento (a página dispara vários pedidos ao mesmo tempo: uma só conferência)
+function verify(c, token) {
+  if (!token || token.length > 4000) return Promise.resolve(null);
   const hit = cache.get(token);
-  if (hit && hit.exp > Date.now()) return hit.user;
+  if (hit && hit.exp > Date.now()) return Promise.resolve(hit.user);
+  let p = pending.get(token);
+  if (!p) { p = verifyNow(c, token).finally(() => pending.delete(token)); pending.set(token, p); }
+  return p;
+}
+async function verifyNow(c, token) {
   try {
     const r = await call(c, 'GET', '/auth/v1/user', { token });
     if (!r.ok || !r.json || !r.json.id) { cache.delete(token); return null; }

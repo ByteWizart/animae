@@ -126,8 +126,9 @@ footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;t
 <textarea id="idea" maxlength="6000" placeholder="Ex.: por que esquecemos o que íamos fazer quando passamos por uma porta, em tom bem-humorado."></textarea>
 <div class="muted" id="aist">Descreva o tema, o tom e o público.</div>
 <div class="row"><div class="fld" id="aspfld">Formato<div class="seg" id="aspseg" role="radiogroup" aria-label="Formato da tela"><button type="button" role="radio" data-a="9:16" aria-checked="true"><i class="ar v"></i>Vertical <small>9:16</small></button><button type="button" role="radio" data-a="16:9" aria-checked="false"><i class="ar h"></i>Horizontal <small>16:9</small></button></div><select id="aspect" hidden aria-hidden="true" tabindex="-1"><option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select></div>
-<label class="fld">Duração<select id="aisec"><option value="20">~20 s</option><option value="30" selected>~30 s</option><option value="45">~45 s</option><option value="60">~60 s</option></select></label>
+<label class="fld">Duração<select id="aisec"><option value="20">20 s</option><option value="30" selected>30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></label>
 <button class="go push" id="aigo" data-cost="generate">Gerar roteiro</button></div>
+<label class="chk" id="exactl" title="A voz é acelerada ou desacelerada (sem mudar o tom) e as cenas são alinhadas a ela, para o vídeo e o áudio terminarem juntos na duração escolhida."><input type="checkbox" id="exact" checked>Vídeo e voz com exatamente a duração escolhida, sincronizados</label>
 <details class="more" id="aiopt"><summary>Mais opções</summary><div class="in">
 <div class="grid3"><label class="fld">Tipo de conteúdo<select id="aifmt"></select></label><label class="fld">Tom<select id="aitone"></select></label><label class="fld">Idioma<select id="ailang"></select></label>
 <label class="fld">Estilo visual<select id="ailook"><option value="">A IA escolhe</option></select></label><label class="fld">Trilha<select id="aimusic"><option value="">A IA escolhe</option></select></label><label class="fld">Personagens<select id="aicast"><option value="0">A IA escolhe</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></div>
@@ -1057,8 +1058,20 @@ const readStory=()=>{try{aNote='';let o=JSON.parse($('story').value);
 show();drawFrame(story,2.5);
 $('look').onchange=()=>{if(!readStory())return;story.style=story.style||{};story.style.look=$('look').value;show();drawFrame(story,Math.min(2.5,story.total-.1))};
 $('jf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('story').value=await f.text();if(readStory()){drawFrame(story,.5);log('História carregada.'+WARN)}};
+/* Duração exata: a voz original fica em voiceRaw e voiceBuf é sempre derivada dela (esticada sem mudar o tom para
+   TARGET() s). Assim trocar a duração ou desligar a opção nunca degrada o áudio com esticadas em cadeia. */
+let voiceRaw=null,FITV=null;
+const exactOn=()=>{const e=$('exact');return !e||e.checked},TARGET=()=>+$('aisec').value||30;
+function applyExact(){ // devolve o aviso a mostrar ('' se não há nada a dizer)
+  if(!voiceRaw)return '';
+  if(!exactOn()){if(voiceBuf!==voiceRaw){voiceBuf=voiceRaw;VOICE=analyzeVoice(voiceBuf);FITV=null}return ''}
+  if(voiceBuf&&voiceBuf!==voiceRaw&&voiceBuf._exact===TARGET())return '';
+  const r=fitVoiceExact(ac,voiceRaw,TARGET());
+  if(!r.buf){voiceBuf=voiceRaw;VOICE=analyzeVoice(voiceBuf);return r.msg}
+  r.buf._exact=TARGET();voiceBuf=r.buf;VOICE=analyzeVoice(voiceBuf);FITV=null;return r.msg}
 async function setVoice(ab,label){ac=new(window.AudioContext||window.webkitAudioContext)({sampleRate:SR});
-  try{voiceBuf=await ac.decodeAudioData(ab);VOICE=analyzeVoice(voiceBuf);log((label||'Áudio')+`: ${voiceBuf.duration.toFixed(1)} s`);return true}catch(x){log('Áudio inválido: '+x.message);return false}}
+  try{voiceRaw=await ac.decodeAudioData(ab);voiceBuf=voiceRaw;VOICE=analyzeVoice(voiceBuf);FITV=null;const m=applyExact();log((label||'Áudio')+`: ${voiceRaw.duration.toFixed(1)} s`+(m?'\n'+m:''));return true}catch(x){log('Áudio inválido: '+x.message);return false}}
+$('aisec').onchange=$('exact').onchange=()=>{if(!voiceRaw)return;const m=applyExact();if(m)log(m)};
 $('audio').onchange=async e=>{const f=e.target.files[0];if(!f)return;await setVoice(await f.arrayBuffer())};
 const openAdv=()=>{const d=$('advanced');d.open=true;d.scrollIntoView({behavior:'smooth',block:'center'})};
 /* ---- voz com IA (TTS no servidor): texto do roteiro -> MP3 -> mesmo caminho do áudio enviado ---- */
@@ -1077,39 +1090,71 @@ $('ttsgo').onclick=async()=>{if(busy||!ttsOk)return;const text=$('script').value
   try{const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:$('ttsvoice').value,rate:+$('ttsrate').value,pitch:+$('ttspitch').value})});
     credHdr(r);if(!r.ok){let m='Falha ao gerar a voz.';try{m=(await r.json()).error||m}catch{}throw new Error(m)}
     const blob=await r.blob();if(ttsUrl)URL.revokeObjectURL(ttsUrl);ttsUrl=URL.createObjectURL(blob);
-    if(await setVoice(await blob.arrayBuffer(),'Voz com IA pronta')){st.textContent='Pronto. Agora clique em \"Ajustar ao áudio\", depois em \"Prévia\" e \"Gerar vídeo\".';$('ttsplay').disabled=false;$('ttsdl').href=ttsUrl;$('ttsdl').hidden=false}}
+    if(await setVoice(await blob.arrayBuffer(),'Voz com IA pronta')){st.textContent=exactOn()?`Pronto: a voz já está com exatos ${TARGET()} s. Clique em \"Prévia\" ou \"Gerar vídeo\" (as cenas se ajustam à voz sozinhas).`:'Pronto. Agora clique em \"Ajustar ao áudio\", depois em \"Prévia\" e \"Gerar vídeo\".';$('ttsplay').disabled=false;$('ttsdl').href=ttsUrl;$('ttsdl').hidden=false}}
   catch(e){st.textContent=e.message;log(e.message)}finally{b.disabled=false}};
 $('ttsplay').onclick=()=>{if(!ttsUrl)return;if(window._ttsA){window._ttsA.pause();window._ttsA=null;$('ttsplay').textContent='Ouvir';return}
   const a=new Audio(ttsUrl);window._ttsA=a;$('ttsplay').textContent='Parar';a.onended=()=>{window._ttsA=null;$('ttsplay').textContent='Ouvir'};a.play()};
-$('fit').onclick=()=>{if(!readStory())return;{const tc=$('usetc')&&$('usetc').checked?parseTimecodes($('script').value):[];if(tc.length){const m=strictFit(story,tc,voiceBuf,$('autotalk')?$('autotalk').checked:true);show();return log(m)}}if(!voiceBuf)return log('Falta a voz: gere a voz no passo 2 ou envie sua gravação em Avançado.');if(story.scenes.some(s=>s&&s.caption)){const m=smartFit(story,voiceBuf,$('autotalk')?$('autotalk').checked:true);show();return log(m)}const f=voiceBuf.duration/story.total,r=v=>+(v*f).toFixed(2);
-  story.scenes.forEach(s=>{s.t0=r(s.t0);s.t1=r(s.t1)});(story.sfx||[]).forEach(x=>x.t=r(x.t));story.total=+voiceBuf.duration.toFixed(2);show();log('Tempos ajustados (fator '+f.toFixed(2)+'). Marque as falas dos personagens (talk) à mão se precisar.')};
+/* Ajuste das cenas à voz. Com "duração exata" ligada, o total da história é travado na duração escolhida (forceTotal). */
+function forceTotal(st,T,autoTalk){
+  const sc=st.scenes;if(!sc.length||!(st.total>0))return;
+  if(Math.abs(st.total-T)<.005){st.total=+T.toFixed(2);sc[sc.length-1].t1=st.total;return}
+  const old=sc.map(x=>({t0:x.t0,t1:x.t1})),oldSfx=arr(st.sfx).map(x=>({...x})),f=T/st.total,b=sc.map(x=>+(x.t0*f).toFixed(3));b.push(T);
+  applyBounds(st,b,voiceBuf?analyzeVoice(voiceBuf).speech:[],old,oldSfx,autoTalk);st.total=+T.toFixed(2);sc[sc.length-1].t1=st.total}
+function doFit(){
+  if(!readStory())return '';
+  const at=$('autotalk')?$('autotalk').checked:true;let m;
+  const tc=$('usetc')&&$('usetc').checked?parseTimecodes($('script').value):[];
+  if(tc.length)m=strictFit(story,tc,voiceBuf,at);
+  else if(!voiceBuf)return 'Falta a voz: gere a voz no passo 2 ou envie sua gravação em Avançado.';
+  else if(story.scenes.some(s=>s&&s.caption))m=smartFit(story,voiceBuf,at);
+  else{const f=voiceBuf.duration/story.total,r=v=>+(v*f).toFixed(2);
+    story.scenes.forEach(s=>{s.t0=r(s.t0);s.t1=r(s.t1)});(story.sfx||[]).forEach(x=>x.t=r(x.t));story.total=+voiceBuf.duration.toFixed(2);
+    m='Tempos ajustados (fator '+f.toFixed(2)+'). Marque as falas dos personagens (talk) à mão se precisar.'}
+  if(exactOn()&&voiceBuf&&!/^Não achei fala/.test(m)){forceTotal(story,TARGET(),at);m+='\nDuração final travada em '+TARGET()+' s, igual à da voz.'}
+  show();FITV=voiceBuf;return m}
+$('fit').onclick=()=>{const m=doFit();if(m)log(m)};
 $('pauses').onclick=()=>{if(!voiceBuf)return log('Falta a voz: gere a voz no passo 2 ou envie sua gravação em Avançado.');log('Pausas (s):\n'+detectPauses(voiceBuf).map(p=>p.join(' – ')).join('\n'))};
 const pickMime=()=>['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));
+/* Mede a duração real do arquivo gravado (o MediaRecorder não grava a duração no WebM: o truque do seek a descobre). */
+function probeDur(blob){return new Promise(res=>{let v=document.createElement('video'),u=URL.createObjectURL(blob),to;
+  const end=d=>{clearTimeout(to);v.removeAttribute('src');URL.revokeObjectURL(u);res(isFinite(d)&&d>0?d:0)};
+  to=setTimeout(()=>end(0),4000);v.preload='metadata';v.muted=true;v.onerror=()=>end(0);
+  v.onloadedmetadata=()=>{if(isFinite(v.duration))return end(v.duration);v.ontimeupdate=()=>{v.ontimeupdate=null;end(v.duration)};v.currentTime=1e7};v.src=u})}
 async function run(rec_){try{await run0(rec_)}catch(e){console.error(e);busy=false;$('gen').disabled=$('prev').disabled=false;log('Erro ao gerar: '+e.message)}}
 async function run0(rec_){ENGERR.clear();
   if(rec_&&window.Auth&&Auth.required&&!Auth.user){Auth.open('login','Entre na sua conta para gerar e baixar o vídeo.');return log('Entre na sua conta para gerar vídeos.')}
   if(busy||!readStory())return;if(!voiceBuf)return log('Falta a voz: clique em Gerar voz (passo 2) ou envie sua gravação em Avançado.');
+  const EX=exactOn(),T=TARGET();
+  if(EX){const am=applyExact(); // garante voz e cenas travadas na duração escolhida antes de gravar
+    if(FITV!==voiceBuf||Math.abs(story.total-T)>.02){const fm=doFit();if(fm)log((am?am+'\n':'')+fm)}
+    if(!readStory())return
+    if(Math.abs(story.total-T)>.02){forceTotal(story,T,true);show()}} // se o ajuste à voz não deu certo, ainda assim trava a duração
   if(!(Math.min(story.total,voiceBuf.duration+.5)>.5))return log('Duração inválida (história: '+story.total+' s, voz: '+voiceBuf.duration.toFixed(1)+' s). Gere a voz ou carregue um áudio com som e confira o "total" da história.');
   busy=true;$('gen').disabled=$('prev').disabled=true;sizeCanvas();await ac.resume();await preloadIcons(story);
-  const total=Math.min(story.total,voiceBuf.duration+.5),bd=synthBed({...story,total}),bed=ac.createBuffer(1,bd.length,SR);bed.copyToChannel(bd,0);
+  const total=EX?T:Math.min(story.total,voiceBuf.duration+.5),bd=synthBed({...story,total}),bed=ac.createBuffer(1,bd.length,SR);bed.copyToChannel(bd,0);
   const gain=.5*rms(voiceBuf.getChannelData(0),Math.floor(total*voiceBuf.sampleRate))/Math.max(1e-6,rms(bd,bd.length));
   const dest=ac.createMediaStreamDestination(),vs=ac.createBufferSource(),gv=ac.createGain(),bs=ac.createBufferSource(),gb=ac.createGain();
   vs.buffer=voiceBuf;bs.buffer=bed;gb.gain.value=gain;vs.connect(gv);bs.connect(gb);gv.connect(dest);gb.connect(dest);
   if(!rec_){gv.connect(ac.destination);gb.connect(ac.destination)}
-  const start=ac.currentTime+.15;gv.gain.setValueAtTime(1,start+total-.5);gv.gain.linearRampToValueAtTime(0,start+total);
   let rec=null,chunks=[],mime='';
   if(rec_){mime=pickMime();if(!mime){busy=false;$('gen').disabled=$('prev').disabled=false;return log('Navegador sem gravação. Use Chrome/Edge.')}
     const st=cv.captureStream(+$('fps').value||30);dest.stream.getAudioTracks().forEach(t=>st.addTrack(t));
     rec=new MediaRecorder(st,{mimeType:mime,videoBitsPerSecond:(+$('res').value>720?14e6:8e6),audioBitsPerSecond:160e3});rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);rec.start(500)}
+  /* No modo exato, o relógio e o áudio começam no mesmo instante em que o gravador liga (sem os 0,15 s de espera que
+     deixavam o arquivo mais longo e a voz atrasada em relação à imagem). Na prévia, desconta a latência da saída de som. */
+  const start=ac.currentTime+(EX?.02:.15),lat=rec_?0:(+ac.outputLatency||+ac.baseLatency||0),fade=EX?.05:.5;
+  gv.gain.setValueAtTime(1,start+total-fade);gv.gain.linearRampToValueAtTime(0,start+total);
   vs.start(start);bs.start(start);let n=0;
   let fatal=null;
-  await new Promise(done=>{const tick=()=>{const t=ac.currentTime-start;try{drawFrame(story,clamp(t,0,total-.001))}catch(e){fatal=e;console.error(e);return done()}$('bar').value=clamp(t/total)*100;
+  await new Promise(done=>{const tick=()=>{const t=ac.currentTime-start-lat;try{drawFrame(story,clamp(t,0,total-.001))}catch(e){fatal=e;console.error(e);return done()}$('bar').value=clamp(t/total)*100;
     if(++n%6===0)log(`${rec_?'Gravando':'Prévia'}: ${Math.max(0,t).toFixed(0)} de ${total.toFixed(0)} s. Deixe a aba visível.`);
     if(t>=total)return done();requestAnimationFrame(tick)};tick()});
   vs.stop();bs.stop();
   if(fatal){if(rec_&&rec.state!=='inactive')rec.stop();$('bar').value=0;busy=false;$('gen').disabled=$('prev').disabled=false;return log('Não foi possível desenhar o vídeo: '+fatal.message+'. Algum campo do JSON está inválido; corrija ou gere a história de novo.')}
   if(rec_){await new Promise(r=>{rec.onstop=r;rec.stop()});const ext=mime.includes('mp4')?'mp4':'webm',a=document.createElement('a');
-    const blob=new Blob(chunks,{type:mime.split(';')[0]});a.href=URL.createObjectURL(blob);a.download='short.'+ext;document.body.appendChild(a);a.click();a.remove();log('Pronto: short.'+ext+(ENGERR.size?'\nAviso: alguns elementos do JSON tinham dados inválidos e foram ignorados ('+[...ENGERR].slice(0,2).join('; ')+').':''));
+    const blob=new Blob(chunks,{type:mime.split(';')[0]});a.href=URL.createObjectURL(blob);a.download='short.'+ext;document.body.appendChild(a);a.click();a.remove();
+    const rd=await probeDur(blob),dm=rd?`\nDuração do arquivo: ${rd.toFixed(2)} s`+(EX?` (alvo ${T} s).`:'.'):'';
+    log('Pronto: short.'+ext+dm+(ENGERR.size?'\nAviso: alguns elementos do JSON tinham dados inválidos e foram ignorados ('+[...ENGERR].slice(0,2).join('; ')+').':''));
     registerHistory({name:storyName||'Sem título',duration:total,look:(story.style||{}).look||'cartoon',res:$('res').value,fps:+$('fps').value,format:ext,bytes:blob.size,scenes:(story.scenes||[]).length})}
   else log('Prévia terminada.');
   $('bar').value=0;busy=false;$('gen').disabled=$('prev').disabled=false;
@@ -1243,16 +1288,31 @@ function paintCred(){const p=$('cred');if(!p)return;
   $('credr').textContent=(CRED.left<=0||low)?'renovam em '+waitTxt(CRED.resetIn):'';
   p.title='Você ganha '+CRED.daily+' créditos por dia. Eles não acumulam e renovam à meia-noite (em '+waitTxt(CRED.resetIn)+').'+(CRED.bonus?' Presente: '+CRED.bonus+'.':'');
   document.querySelectorAll('[data-cost]').forEach(b=>{const c=CRED.costs&&CRED.costs[b.dataset.cost];if(c>0){const e=document.createElement('span');e.className='cost';e.textContent=c;e.title=c+(c===1?' crédito':' créditos');b.appendChild(e)}})}
-async function loadCred(){try{const r=await fetch('/api/credits',{cache:'no-store'});if(!r.ok)return;CRED=await r.json();paintCred();
-  clearTimeout(credT);if(CRED.enabled)credT=setTimeout(loadCred,Math.min(2147e3,(CRED.resetIn+3)*1000))}catch{}}
-function credHdr(r){if(!CRED)return;const l=r.headers.get('X-Credits-Left');if(l===null)return;CRED.left=+l;const rs=+r.headers.get('X-Credits-Reset');if(rs)CRED.resetIn=rs;paintCred()}
-loadCred();document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadCred()});
+/* Os créditos aparecem NA HORA: o último saldo fica guardado no navegador (por conta) e é pintado antes de qualquer
+   pedido ao servidor; a resposta real chega logo depois e corrige o número. Antes, a barra ficava escondida até o
+   servidor responder (e o servidor ainda conferia o login no Supabase), e o 1º pedido saía antes do login carregar. */
+const CRK='animae.cred',sessUid=()=>{try{const j=JSON.parse(localStorage.getItem('animae.session'));return j&&j.access_token&&j.user?j.user.id:'anon'}catch{return 'anon'}};
+function credCache(){try{const j=JSON.parse(localStorage.getItem(CRK));if(!j||j.uid!==sessUid()||!j.d||!j.d.enabled)return null;
+  const left=j.d.resetIn-Math.round((Date.now()-j.at)/1000);return left>1?{...j.d,resetIn:left}:null}catch{return null}}
+function saveCred(){try{localStorage.setItem(CRK,JSON.stringify({uid:sessUid(),at:Date.now(),d:CRED}))}catch{}}
+let credSeq=0;
+async function loadCred(tries=0){const my=++credSeq;
+  try{const r=await fetch('/api/credits',{cache:'no-store'});if(my!==credSeq)return;if(!r.ok)throw 0;const d=await r.json();if(my!==credSeq)return;
+    CRED=d;paintCred();saveCred();clearTimeout(credT);if(CRED.enabled)credT=setTimeout(loadCred,Math.min(2147e3,(CRED.resetIn+3)*1000))}
+  catch{if(my===credSeq&&tries<3)setTimeout(()=>loadCred(tries+1),1500*(tries+1))}}
+function credHdr(r){if(!CRED)return;const l=r.headers.get('X-Credits-Left');if(l===null)return;CRED.left=+l;const rs=+r.headers.get('X-Credits-Reset');if(rs)CRED.resetIn=rs;paintCred();saveCred()}
+{const c=credCache();if(c){CRED=c;paintCred()}}
+// Quem já tinha sessão espera o login carregar (para o saldo ser o da conta, não o do visitante); os demais pedem já.
+{const go=()=>loadCred(),A=window.Auth;if(sessUid()!=='anon'&&A&&A.ready)A.ready.then(go,go);else go()}
+if(window.Auth)Auth.onChange(()=>{const c=credCache();if(c){CRED=c;paintCred()}loadCred()}); // entrou ou saiu da conta: troca o saldo
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadCred()});
 async function aiCall(btn,label,path,data){if(busy)return null;btn.disabled=true;const t0=Date.now(),tm=setInterval(()=>log(label+'… '+Math.round((Date.now()-t0)/1000)+' s'),500);log(label+'…');
   try{const r=await jpost(path,data);credHdr(r);const j=await r.json();if(!r.ok)throw new Error(j.error||('Erro '+r.status));return j}catch(e){log('IA: '+e.message);return null}finally{clearInterval(tm);btn.disabled=!aiOk}}
 $('aigo').onclick=async()=>{const idea=$('idea').value.trim();if(idea.length<8)return log('Descreva melhor a ideia do vídeo.');
   const j=await aiCall($('aigo'),'Gerando roteiro e história com a IA','/api/ai/generate',{idea,...aiOpts()});if(!j)return;
+  if([20,30,45,60].includes(+j.seconds))$('aisec').value=String(j.seconds); // o servidor pode ter reduzido a duração: a seleção acompanha
   applyAI(j);showPub(j);
-  log(`Pronto: "${j.title}" (${Math.round(j.story.total)} s, ${j.story.scenes.length} cenas).\nAgora gere a voz no passo 2 (ou envie a sua em Avançado), clique em "Ajustar ao áudio" e depois em "Prévia".`+(j.issues&&j.issues.length?`\n(${j.issues.length} aviso(s) leve(s) no JSON)`:'')+(j.notice?'\n'+j.notice:''))};
+  log(`Pronto: "${j.title}" (${+j.story.total.toFixed(1)} s, ${j.story.scenes.length} cenas).\n`+(exactOn()?`Agora gere a voz no passo 2: ela e o vídeo ficam com exatos ${TARGET()} s e sincronizados. Depois clique em "Prévia" ou "Gerar vídeo".`:'Agora gere a voz no passo 2 (ou envie a sua em Avançado), clique em "Ajustar ao áudio" e depois em "Prévia".')+(j.issues&&j.issues.length?`\n(${j.issues.length} aviso(s) leve(s) no JSON)`:'')+(j.notice?'\n'+j.notice:''))};
 $('aiideas').onclick=async()=>{const topic=$('idea').value.trim().slice(0,300)||'curiosidades do dia a dia';
   const j=await aiCall($('aiideas'),'Pensando em ideias','/api/ai/ideas',{topic,count:6,...aiOpts()});if(!j)return;
   $('ideas').innerHTML='<div class="muted" style="margin-top:8px">Clique em "Usar" para preencher a ideia e as opções.</div>'+j.ideas.map((i,n)=>`<div class="lib-item"><div><b>${esc2(i.title)}</b><small>${esc2(i.hook)}</small><small>${esc2(FMTL[i.format]||'')} · ${esc2(+i.seconds||30)} s</small></div><button class="sec" data-n="${n}">Usar</button></div>`).join('');

@@ -103,12 +103,12 @@ SAÍDA: exatamente estas chaves, NESTA ORDEM (primeiro planeje, depois escreva):
 
   const roteiro = `ROTEIRO
 - Idioma: ${lang}${opts.lang ? '' : ' (ou o mesmo idioma da ideia, se for outro)'}. Texto de narrador, natural, frases curtas, pensado para ser falado em voz alta. Não use emojis, indicações de palco nem aspas desnecessárias.
-- Duração alvo: ${target} s (cerca de ${Math.round(target * 2.5)} palavras, 2,5 palavras por segundo). Cada cena deve ter no máximo 3 palavras por segundo.
+- Duração alvo EXATA: ${target} s. A narração falada deve ter entre ${Math.round(target * 2.3)} e ${Math.round(target * 2.6)} palavras (cerca de ${Math.round(target * 2.45)}; a voz lê ~2,5 palavras por segundo): confira a contagem antes de responder. "total" deve ser exatamente ${target}. Cada cena deve ter no máximo 3 palavras por segundo.
 - Primeiros 3 s: gancho (pergunta, contradição, número chocante ou promessa). Último trecho: fecho forte (surpresa, piada, frase memorável) ou chamada para comentar. Cada cena entrega UMA ideia nova.
 - Não invente estatísticas, datas, nomes ou estudos. Se não tiver certeza de um dado, use formulação aproximada e liste em aviso_fatos.${tone.guide ? '\n- Tom: ' + tone.guide : ''}${fmt.guide ? '\n- Formato "' + fmt.label + '": ' + fmt.guide : ''}`;
 
   const story = `STORY (gerador 2D com personagens-palito expressivos; tempos em segundos; posições em px numa tela 1080x1920)
-- Use cerca de ${nScenes} cenas de 3,5 a 7 s. "total" = soma. t0 de cada cena = t1 da anterior; a primeira começa em 0.
+- Use cerca de ${nScenes} cenas de 3,5 a 7 s. "total" = soma = ${target}. t0 de cada cena = t1 da anterior; a primeira começa em 0.
 - Cada cena tem "caption" = trecho EXATO do roteiro falado nela; juntas formam o roteiro inteiro, na ordem.
 - Campos de cena: t0, t1, scenery, bg, ground, wall, floor, tex, tr, fx, tint, shake, look, caption, cam, props[], actors[] e os recursos de cena do catálogo.
 - Em todas as cenas: todos os tempos "at","t","end","move","dur" são relativos ao início da cena e menores que a duração dela. Mantenha tudo dentro da tela. A região y 1250–1450 fica livre de sign/text: a legenda do vídeo fica ali.
@@ -240,6 +240,15 @@ function fixStory(st, look, ctx) {
   else if (!SET.music.has(mu)) st.style.music = (ctx && ctx.toneMusic) || LOOK_MUSIC[st.style.look] || 'calm';
   st.sfx = asArr(st.sfx).filter(x => x && typeof x.t === 'number' && x.t >= 0 && x.t <= st.total && SET.sfx.has(x.type));
   st.sfx.forEach(x => { if (x.type === 'ping' && !(x.f > 0)) x.f = 880; if (x.type === 'thud' && !(x.f > 0)) x.f = 70; if (x.type === 'rumble' && !(x.len > 0)) x.len = 1.5; });
+  return st;
+}
+
+// Deixa a história com EXATAMENTE a duração pedida (a IA erra por alguns segundos, e autoDirect pode alongar cenas).
+// Escala a duração de todas as cenas na mesma proporção; o ajuste fino à voz acontece depois, no navegador.
+function fitTotal(st, T) {
+  if (!st || !Array.isArray(st.scenes) || !st.scenes.length || !(st.total > 0)) return st;
+  if (Math.abs(st.total - T) > .05) { const f = T / st.total; retime(st, st.scenes.map(s => (s.t1 - s.t0) * f)); }
+  st.total = T; st.scenes[st.scenes.length - 1].t1 = T;
   return st;
 }
 
@@ -435,7 +444,8 @@ async function generate({ llm, maxTokens, tpm, idea, extra, ...raw }) {
   const messages = [{ role: 'system', content: b.sys }, { role: 'user', content: user }];
   const ctx = { music: o.music, toneMusic: (TONES[o.tone] || {}).music || '', aspect: o.aspect };
   const { out, issues, script } = await runStory({ llm, maxTokens: b.out, messages, look: o.look, ctx, tpm });
-  return { title: cleanStr(out.titulo || 'Sem título', 80), script, story: out.story, issues, plan: cleanPlan(out.plano), publish: cleanPublish(out.publicacao), notice };
+  fitTotal(out.story, o.seconds);
+  return { title: cleanStr(out.titulo || 'Sem título', 80), script, story: out.story, issues, plan: cleanPlan(out.plano), publish: cleanPublish(out.publicacao), notice, seconds: o.seconds };
 }
 
 // Edita uma história existente seguindo uma instrução ("deixe mais dinâmico", "troque para noite"...).
@@ -523,4 +533,4 @@ async function ping({ llm }) {
   return raw.trim();
 }
 
-module.exports = { ping, generate, refine, ideas, review, translate, fixStory, autoDirect, systemPrompt, FORMATS, TONES, LANGS };
+module.exports = { ping, generate, refine, ideas, review, translate, fixStory, autoDirect, fitTotal, systemPrompt, FORMATS, TONES, LANGS };

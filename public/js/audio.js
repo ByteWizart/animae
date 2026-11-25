@@ -180,3 +180,56 @@ function detectPauses(buf, thr, minDur = 0.2) {
   if (A.dur - prev >= minDur) out.push([+prev.toFixed(2), +A.dur.toFixed(2)]);
   return out;
 }
+
+/* ---------- Voz com duração EXATA (build 15) ----------
+   wsolaStretch: estica ou encolhe o áudio no tempo SEM mudar o tom (WSOLA: janelas de 40 ms com sobreposição,
+   escolhendo o ponto de corte que melhor "encaixa" na onda anterior). Devolve exatamente outLen amostras.
+   fitVoiceExact: corta o silêncio das pontas, acelera/desacelera a fala (no máximo 33% mais rápida / 23% mais lenta) e devolve um áudio
+   com EXATAMENTE T segundos (completa com silêncio no fim se a fala ficou curta; se ficou longa, avisa). */
+function wsolaStretch(x, sr, outLen) {
+  const n = x.length;
+  if (!n || !(outLen > 0)) return new Float32Array(Math.max(0, outLen | 0));
+  if (outLen === n) return Float32Array.from(x);
+  const N = Math.max(256, Math.round(sr * 0.04)) & ~1, Hs = N >> 1, tol = N >> 2, alpha = outLen / n, Ha = Hs / alpha;
+  const P = tol + N, xp = new Float32Array(n + 2 * P + N); xp.set(x, P);
+  const win = new Float32Array(N); for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+  const out = new Float32Array(outLen + 2 * N), step = Math.max(1, Math.round(N / 256)), frames = Math.ceil(outLen / Hs) + 2;
+  let prev = 0;
+  for (let k = 0; k < frames; k++) {
+    const nominal = Math.round(k * Ha); let pos = Math.min(nominal, n + tol);
+    if (k > 0) {
+      const want = prev + Hs, lo = Math.max(-tol, nominal - tol), hi = Math.min(n + tol, nominal + tol);
+      const score = c => { let s = 0, e = 1e-9; for (let i = 0; i < N; i += step) { const a = xp[P + c + i]; s += a * xp[P + want + i]; e += a * a; } return s / Math.sqrt(e); };
+      let best = -Infinity, bp = Math.min(Math.max(nominal, lo), hi);
+      for (let c = lo; c <= hi; c += 2) { const v = score(c); if (v > best) { best = v; bp = c; } }
+      for (let c = bp - 1; c <= bp + 1; c += 2) if (c >= lo && c <= hi) { const v = score(c); if (v > best) { best = v; bp = c; } }
+      pos = bp;
+    }
+    const o0 = k * Hs; if (o0 >= outLen + N) break;
+    for (let i = 0; i < N; i++) { const o = o0 + i; if (o >= out.length) break; out[o] += xp[P + pos + i] * (k === 0 && i < Hs ? 1 : win[i]); }
+    prev = pos;
+  }
+  return out.subarray(0, outLen);
+}
+
+function fitVoiceExact(ac, buf, T) {
+  const sr = buf.sampleRate, outN = Math.round(T * sr), A = analyzeVoice(buf);
+  if (!A.speech.length) return { buf: null, msg: 'Não achei fala no áudio para ajustar a duração (volume muito baixo ou arquivo vazio).' };
+  const mono = new Float32Array(buf.length), nch = buf.numberOfChannels;
+  for (let c = 0; c < nch; c++) { const d = buf.getChannelData(c); for (let i = 0; i < mono.length; i++) mono[i] += d[i] / nch; }
+  const LEAD = 0.05, TAIL = 0.25, MIN = 0.75, MAX = 1.3;
+  const s0 = Math.max(0, A.speech[0][0] - 0.03), s1 = Math.min(buf.duration, A.speech[A.speech.length - 1][1] + 0.12);
+  const core = mono.subarray(Math.round(s0 * sr), Math.round(s1 * sr)), room = T - LEAD - TAIL, want = room / (core.length / sr);
+  const used = Math.min(MAX, Math.max(MIN, want));
+  const stretched = Math.abs(used - 1) < 0.004 ? core : wsolaStretch(core, sr, Math.round(core.length * used));
+  const res = new Float32Array(outN), lead = Math.round(LEAD * sr), len = Math.min(stretched.length, outN - lead);
+  res.set(stretched.subarray(0, len), lead);
+  let cut = false;
+  if (stretched.length > outN - lead) { cut = true; const f = Math.min(len, Math.round(0.08 * sr)); for (let i = 0; i < f; i++) res[lead + len - 1 - i] *= i / f; }
+  const out = ac.createBuffer(1, outN, sr); out.copyToChannel(res, 0);
+  const speed = 1 / used, pct = Math.round((speed - 1) * 100);
+  let msg = `Voz ajustada para ${T} s exatos` + (Math.abs(pct) >= 1 ? ` (fala ${Math.abs(pct)}% mais ${pct > 0 ? 'rápida' : 'lenta'}, mesmo tom)` : ' (sem mudar a velocidade)') + '.';
+  if (cut) msg += `\nAtenção: o roteiro é longo demais para ${T} s mesmo com a fala ${Math.round((1 / MIN - 1) * 100)}% mais rápida, e o final foi cortado. Encurte o roteiro ou escolha uma duração maior.`;
+  else if (want > MAX) msg += `\nAtenção: o roteiro é curto para ${T} s; completei com silêncio no fim (${(room - core.length / sr * MAX).toFixed(1)} s). Acrescente texto ou escolha uma duração menor.`;
+  return { buf: out, msg, speed, cut };
+}
