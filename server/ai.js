@@ -39,6 +39,11 @@ const LOOK_MUSIC = { noir: 'mystery', neon: 'retro', retro: 'retro', pixel: 'ret
 /* ------------------------------------------------------------------ prompt ------------------------------------------------------------------ */
 // Estimativa grosseira de tokens (português + JSON ~ 3 caracteres por token).
 const estTok = t => Math.ceil(String(t).length / 3);
+// Quantas palavras a narração precisa ter para a VOZ, falando na velocidade natural, ocupar ~94% do tempo (o resto são pausas e pontas).
+// wps = palavras por segundo medidas na voz escolhida (o navegador mede e manda; sem medida, usa um valor típico de voz neural em pt-BR).
+const WPS_DEF = 2.7, clampWps = v => Math.min(4.2, Math.max(1.8, +v || WPS_DEF));
+const wordsFor = (T, wps) => Math.max(8, Math.round(T * 0.94 * clampWps(wps)));
+const wordRange = (N, tol) => [Math.max(4, Math.round(N * (1 - tol))), Math.round(N * (1 + tol))];
 const msgTok = m => m.reduce((n, x) => n + estTok(x.content) + 8, 0);
 // Escolhe o nível de compactação do prompt e o teto de saída para caber no limite de tokens por minuto (TPM) do provedor.
 function budget({ build, user, maxTokens, tpm, minOut }) {
@@ -103,7 +108,7 @@ SAÍDA: exatamente estas chaves, NESTA ORDEM (primeiro planeje, depois escreva):
 
   const roteiro = `ROTEIRO
 - Idioma: ${lang}${opts.lang ? '' : ' (ou o mesmo idioma da ideia, se for outro)'}. Texto de narrador, natural, frases curtas, pensado para ser falado em voz alta. Não use emojis, indicações de palco nem aspas desnecessárias.
-- Duração alvo EXATA: ${target} s. A narração falada deve ter entre ${Math.round(target * 2.3)} e ${Math.round(target * 2.6)} palavras (cerca de ${Math.round(target * 2.45)}; a voz lê ~2,5 palavras por segundo): confira a contagem antes de responder. "total" deve ser exatamente ${target}. Cada cena deve ter no máximo 3 palavras por segundo.
+- Duração alvo EXATA: ${target} s. A voz lê ~${clampWps(opts.wps).toFixed(1).replace('.', ',')} palavras por segundo, SEM acelerar: por isso a narração falada (o campo \"roteiro\") deve ter entre ${wordRange(wordsFor(target, opts.wps), 0.04)[0]} e ${wordRange(wordsFor(target, opts.wps), 0.04)[1]} palavras (alvo: ${wordsFor(target, opts.wps)}). CONTE as palavras antes de responder e ajuste o texto até cair nessa faixa: é o que faz o vídeo fechar exatamente em ${target} s. \"total\" deve ser exatamente ${target}. As captions das cenas, juntas, formam o roteiro inteiro.
 - Primeiros 3 s: gancho (pergunta, contradição, número chocante ou promessa). Último trecho: fecho forte (surpresa, piada, frase memorável) ou chamada para comentar. Cada cena entrega UMA ideia nova.
 - Não invente estatísticas, datas, nomes ou estudos. Se não tiver certeza de um dado, use formulação aproximada e liste em aviso_fatos.${tone.guide ? '\n- Tom: ' + tone.guide : ''}${fmt.guide ? '\n- Formato "' + fmt.label + '": ' + fmt.guide : ''}`;
 
@@ -426,7 +431,7 @@ const optClean = o => ({
   look: SCHEMA.SET.look.has(o.look) ? o.look : '',
   format: FORMATS[o.format] ? o.format : 'auto', tone: TONES[o.tone] ? o.tone : 'auto',
   lang: LANGS[o.lang] ? o.lang : '', music: SCHEMA.SET.music.has(o.music) ? o.music : '',
-  cast: [1, 2, 3].includes(+o.cast) ? +o.cast : 0, extra: o.extra || '',
+  cast: [1, 2, 3].includes(+o.cast) ? +o.cast : 0, extra: o.extra || '', wps: clampWps(o.wps),
 });
 
 /* ------------------------------------------------------------------ operações ------------------------------------------------------------------ */
@@ -445,7 +450,12 @@ async function generate({ llm, maxTokens, tpm, idea, extra, ...raw }) {
   const ctx = { music: o.music, toneMusic: (TONES[o.tone] || {}).music || '', aspect: o.aspect };
   const { out, issues, script } = await runStory({ llm, maxTokens: b.out, messages, look: o.look, ctx, tpm });
   fitTotal(out.story, o.seconds);
-  return { title: cleanStr(out.titulo || 'Sem título', 80), script, story: out.story, issues, plan: cleanPlan(out.plano), publish: cleanPublish(out.publicacao), notice, seconds: o.seconds };
+  let fScript = script, fStory = out.story, wordsNote = '';
+  const want = wordsFor(o.seconds, o.wps), got = nWords(script); // a IA costuma errar a contagem: se passou de 12%, reescreve já no tamanho certo
+  if (Math.abs(got - want) / want > 0.12) {
+    try { const f = await fit({ llm, maxTokens, tpm, story: out.story, script, want, seconds: o.seconds }); fScript = f.script; fStory = f.story; fitTotal(fStory, o.seconds); wordsNote = `Roteiro ajustado de ${got} para ${f.words} palavras (alvo ${want}) para caber em ${o.seconds} s na velocidade natural da voz.`; } catch { /* mantém o roteiro original; o ajuste fino acontece com a voz real */ }
+  }
+  return { title: cleanStr(out.titulo || 'Sem título', 80), script: fScript, story: fStory, issues, plan: cleanPlan(out.plano), publish: cleanPublish(out.publicacao), notice: [notice, wordsNote].filter(Boolean).join(' '), seconds: o.seconds, words: nWords(fScript), wantWords: want };
 }
 
 // Edita uma história existente seguindo uma instrução ("deixe mais dinâmico", "troque para noite"...).
@@ -526,6 +536,43 @@ async function translate({ llm, maxTokens, tpm, story, script, lang }) {
   return { script: String(o.itens[0] || '').trim(), story: st };
 }
 
+// Reescreve o roteiro (as legendas das cenas, que juntas SÃO o roteiro) para ter ~"want" palavras, mantendo ideia, tom, gancho e fecho.
+// É o que faz a duração fechar sem mexer na velocidade da voz: em vez de esticar o áudio, o texto muda de tamanho.
+async function fit({ llm, maxTokens, tpm, story, script, want, seconds }) {
+  tpm = tpm || 8000;
+  const st = JSON.parse(JSON.stringify(story)), sc = asArr(st.scenes);
+  const idx = []; sc.forEach((s, i) => { if (s && typeof s.caption === 'string' && s.caption.trim()) idx.push(i); });
+  if (!idx.length) throw httpErr(400, 'As cenas não têm "caption" (o trecho do roteiro de cada cena) para a IA ajustar.');
+  const caps = idx.map(i => sc[i].caption.trim().replace(/\s+/g, ' ')), cur = nWords(caps.join(' '));
+  want = Math.round(Math.min(1200, Math.max(8, +want || 0)));
+  const [lo, hi] = wordRange(want, 0.03), accept = [Math.round(want * 0.93), Math.round(want * 1.07)];
+  const perScene = caps.map(c => Math.max(1, Math.round(nWords(c) * want / Math.max(1, cur))));
+  const sys = `Você edita narrações de vídeos curtos (${seconds || ''} s). Reescreva a narração para ter entre ${lo} e ${hi} palavras NO TOTAL (alvo: ${want}), hoje tem ${cur}. `
+    + (want < cur ? 'Corte o que for menos importante (detalhes, repetições, adjetivos), sem perder o gancho do começo nem o fecho do final.' : 'Acrescente detalhes, exemplos ou um comentário curto onde couber, sem enrolar, mantendo o gancho do começo e o fecho do final.')
+    + ' Mantenha o idioma, o tom, as frases curtas faladas e os fatos (não invente dados). Sem emojis. '
+    + `A narração é dividida em ${caps.length} trechos, um por cena, na mesma ordem; cada trecho deve ficar perto da quantidade indicada em "palavras_por_trecho" e continuar sobre o mesmo assunto da cena. `
+    + `CONTE as palavras antes de responder. Responda SOMENTE JSON: {"legendas":["...", ...]} com exatamente ${caps.length} itens.`;
+  const messages = [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify({ roteiro_atual: script || caps.join(' '), legendas_atuais: caps, palavras_por_trecho: perScene }) }];
+  const room = Math.max(1200, Math.min(maxTokens || 8000, tpm - msgTok(messages) - 400));
+  let best = null, bestErr = Infinity;
+  for (let round = 0; round < 3; round++) {
+    if (round > 0 && msgTok(messages) + room > tpm) break;
+    const raw = await callLLM({ llm, maxTokens: room, temperature: 0.3, messages });
+    const o = parseModelJson(raw), arr = o && Array.isArray(o.legendas) ? o.legendas.map(x => cleanStr(x, 600)) : null;
+    if (!arr || arr.length !== caps.length || arr.some(x => !x)) {
+      messages.push({ role: 'assistant', content: String(raw).slice(0, 4000) }, { role: 'user', content: `A resposta precisa ser {"legendas":[...]} com exatamente ${caps.length} textos não vazios. Responda de novo.` });
+      continue;
+    }
+    const w = nWords(arr.join(' ')), err = Math.abs(w - want);
+    if (err < bestErr) { best = arr; bestErr = err; }
+    if (w >= accept[0] && w <= accept[1]) break;
+    messages.push({ role: 'assistant', content: JSON.stringify({ legendas: arr }) }, { role: 'user', content: `Sua versão tem ${w} palavras e preciso de ${lo} a ${hi} (alvo ${want}). ${w > want ? 'Corte ' + (w - want) : 'Acrescente ' + (want - w)} palavras e devolva o JSON completo de novo, contando por trecho.` });
+  }
+  if (!best) throw httpErr(502, 'A IA não conseguiu reescrever o roteiro agora. Tente de novo.');
+  idx.forEach((si, k) => { sc[si].caption = best[k]; });
+  return { script: best.join(' '), story: st, words: nWords(best.join(' ')), want };
+}
+
 // Pedido mínimo para testar uma chave/modelo no painel.
 async function ping({ llm }) {
   const raw = await callLLM({ llm, maxTokens: 300, temperature: 0, messages: [{ role: 'user', content: 'Responda somente com este JSON: {"ok":true}' }] });
@@ -533,4 +580,4 @@ async function ping({ llm }) {
   return raw.trim();
 }
 
-module.exports = { ping, generate, refine, ideas, review, translate, fixStory, autoDirect, fitTotal, systemPrompt, FORMATS, TONES, LANGS };
+module.exports = { ping, generate, fit, wordsFor, refine, ideas, review, translate, fixStory, autoDirect, fitTotal, systemPrompt, FORMATS, TONES, LANGS };

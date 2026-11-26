@@ -38,6 +38,11 @@ Como usar: `DATA_KEY=uma-frase-longa node server.js` (guarde essa frase: sem ela
 
 Cupons valiosos: defina sempre **usos totais** e **validade**, e ative *Confirm email* no Supabase. Com `TRUST_PROXY` ligado, os limites por IP dependem de o servidor estar mesmo atrás do proxy; exposto direto na internet, deixe `TRUST_PROXY` desligado (senão o IP pode ser forjado).
 
+## Quarta rodada (ajuste de duração da voz)
+| # | Gravidade | Onde | O que foi feito |
+|---|-----------|------|-----------------|
+| 23 | Baixa | `server.js` (`fitTokens`) | **O ajuste automático não vira IA ou voz grátis ilimitada.** `/api/ai/fit` só responde com uma ficha (`X-Fit-Token`) emitida por uma voz **paga**, da mesma conta/IP, válida por 20 min e com 3 reescritas e 3 regerações de voz. Ficha inventada, de outra pessoa, vencida ou esgotada: 403 no ajuste e, no TTS, a voz é cobrada normalmente. Testado. |
+
 ## Limitações que continuam
 - Sem Supabase configurado, o site é aberto a qualquer visitante (só há limites por IP e globais).
 - Com `DATA_KEY` na mesma máquina/painel de hospedagem do `dados.json`, a proteção é contra vazamento do arquivo (backup, repositório), não contra quem já controla o servidor.

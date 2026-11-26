@@ -181,55 +181,81 @@ function detectPauses(buf, thr, minDur = 0.2) {
   return out;
 }
 
-/* ---------- Voz com duração EXATA (build 15) ----------
-   wsolaStretch: estica ou encolhe o áudio no tempo SEM mudar o tom (WSOLA: janelas de 40 ms com sobreposição,
-   escolhendo o ponto de corte que melhor "encaixa" na onda anterior). Devolve exatamente outLen amostras.
-   fitVoiceExact: corta o silêncio das pontas, acelera/desacelera a fala (no máximo 33% mais rápida / 23% mais lenta) e devolve um áudio
-   com EXATAMENTE T segundos (completa com silêncio no fim se a fala ficou curta; se ficou longa, avisa). */
-function wsolaStretch(x, sr, outLen) {
-  const n = x.length;
-  if (!n || !(outLen > 0)) return new Float32Array(Math.max(0, outLen | 0));
-  if (outLen === n) return Float32Array.from(x);
-  const N = Math.max(256, Math.round(sr * 0.04)) & ~1, Hs = N >> 1, tol = N >> 2, alpha = outLen / n, Ha = Hs / alpha;
-  const P = tol + N, xp = new Float32Array(n + 2 * P + N); xp.set(x, P);
-  const win = new Float32Array(N); for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
-  const out = new Float32Array(outLen + 2 * N), step = Math.max(1, Math.round(N / 256)), frames = Math.ceil(outLen / Hs) + 2;
-  let prev = 0;
-  for (let k = 0; k < frames; k++) {
-    const nominal = Math.round(k * Ha); let pos = Math.min(nominal, n + tol);
-    if (k > 0) {
-      const want = prev + Hs, lo = Math.max(-tol, nominal - tol), hi = Math.min(n + tol, nominal + tol);
-      const score = c => { let s = 0, e = 1e-9; for (let i = 0; i < N; i += step) { const a = xp[P + c + i]; s += a * xp[P + want + i]; e += a * a; } return s / Math.sqrt(e); };
-      let best = -Infinity, bp = Math.min(Math.max(nominal, lo), hi);
-      for (let c = lo; c <= hi; c += 2) { const v = score(c); if (v > best) { best = v; bp = c; } }
-      for (let c = bp - 1; c <= bp + 1; c += 2) if (c >= lo && c <= hi) { const v = score(c); if (v > best) { best = v; bp = c; } }
-      pos = bp;
-    }
-    const o0 = k * Hs; if (o0 >= outLen + N) break;
-    for (let i = 0; i < N; i++) { const o = o0 + i; if (o >= out.length) break; out[o] += xp[P + pos + i] * (k === 0 && i < Hs ? 1 : win[i]); }
-    prev = pos;
-  }
-  return out.subarray(0, outLen);
+/* ---------- Voz com duração EXATA, na velocidade NATURAL (build 17) ----------
+   A fala NUNCA é acelerada nem desacelerada. A duração fecha em T segundos mexendo só no SILÊNCIO:
+     - sobrou tempo: as pausas entre frases e vírgulas crescem um pouco (as mais longas, que são fim de frase, ganham mais);
+     - faltou tempo: as pausas encolhem até um mínimo natural e as pontas são aparadas;
+     - se nem assim cabe (roteiro longo ou curto demais), NADA é cortado nem esticado: devolve o diagnóstico
+       (over/short) para o roteiro ser reajustado (a IA reescreve com o tamanho certo) em vez de mexer na voz. */
+const NAT = { LEAD: 0.06, TAIL: 0.3, MINGAP: 0.16, GUARD: 0.04, GAPCAP: 1.0, TOL: 0.3 };
+// Quanto silêncio a mais (ou a menos) ainda soa natural: ~12% da duração para pausas maiores, ~7% para pausas menores.
+// Além disso o roteiro está curto/longo demais e o certo é reescrevê-lo, não encher a fala de buracos nem apertá-la.
+const comfortPad = T => Math.max(1.5, 0.12 * T), comfortCut = T => Math.max(0.8, 0.07 * T);
+
+// Mede a fala sem alterar nada: trechos de fala, pausas entre eles e o tamanho "natural" (pontas mínimas + pausas como vieram).
+function voiceMeasure(buf) {
+  const A = analyzeVoice(buf), sp = A.speech;
+  if (!sp.length) return null;
+  const gaps = []; for (let i = 1; i < sp.length; i++) gaps.push(sp[i][0] - sp[i - 1][1]);
+  const first = Math.max(0, sp[0][0] - 0.03), last = Math.min(buf.duration, sp[sp.length - 1][1] + 0.12);
+  const core = last - first; // da primeira à última sílaba, com as pausas originais
+  return { A, sp, gaps, first, last, core, natural: NAT.LEAD + core + NAT.TAIL, gapSum: gaps.reduce((a, b) => a + b, 0) };
 }
 
-function fitVoiceExact(ac, buf, T) {
-  const sr = buf.sampleRate, outN = Math.round(T * sr), A = analyzeVoice(buf);
-  if (!A.speech.length) return { buf: null, msg: 'Não achei fala no áudio para ajustar a duração (volume muito baixo ou arquivo vazio).' };
+// Reparte "total" entre as pausas respeitando o limite de cada uma (proporcional ao tamanho da pausa). Devolve [partes, sobra].
+function spreadPad(gaps, total) {
+  const cap = gaps.map(g => Math.min(NAT.GAPCAP, 2.2 * g + 0.25)), add = gaps.map(() => 0);
+  let left = total, open = gaps.map((_, i) => i);
+  for (let it = 0; it < 8 && left > 1e-6 && open.length; it++) {
+    const wsum = open.reduce((a, i) => a + gaps[i], 0) || 1; let used = 0; const next = [];
+    for (const i of open) {
+      const want = left * gaps[i] / wsum, give = Math.min(want, cap[i] - add[i]);
+      add[i] += give; used += give; if (cap[i] - add[i] > 1e-6) next.push(i);
+    }
+    left -= used; open = next;
+  }
+  return [add, Math.max(0, left)];
+}
+
+function fitVoiceNatural(ac, buf, T) {
+  const M = voiceMeasure(buf);
+  if (!M) return { buf: null, ok: false, msg: 'Não achei fala no áudio para ajustar a duração (volume muito baixo ou arquivo vazio).' };
+  const sr = buf.sampleRate, outN = Math.round(T * sr), { sp, gaps } = M;
   const mono = new Float32Array(buf.length), nch = buf.numberOfChannels;
   for (let c = 0; c < nch; c++) { const d = buf.getChannelData(c); for (let i = 0; i < mono.length; i++) mono[i] += d[i] / nch; }
-  const LEAD = 0.05, TAIL = 0.25, MIN = 0.75, MAX = 1.3;
-  const s0 = Math.max(0, A.speech[0][0] - 0.03), s1 = Math.min(buf.duration, A.speech[A.speech.length - 1][1] + 0.12);
-  const core = mono.subarray(Math.round(s0 * sr), Math.round(s1 * sr)), room = T - LEAD - TAIL, want = room / (core.length / sr);
-  const used = Math.min(MAX, Math.max(MIN, want));
-  const stretched = Math.abs(used - 1) < 0.004 ? core : wsolaStretch(core, sr, Math.round(core.length * used));
-  const res = new Float32Array(outN), lead = Math.round(LEAD * sr), len = Math.min(stretched.length, outN - lead);
-  res.set(stretched.subarray(0, len), lead);
-  let cut = false;
-  if (stretched.length > outN - lead) { cut = true; const f = Math.min(len, Math.round(0.08 * sr)); for (let i = 0; i < f; i++) res[lead + len - 1 - i] *= i / f; }
-  const out = ac.createBuffer(1, outN, sr); out.copyToChannel(res, 0);
-  const speed = 1 / used, pct = Math.round((speed - 1) * 100);
-  let msg = `Voz ajustada para ${T} s exatos` + (Math.abs(pct) >= 1 ? ` (fala ${Math.abs(pct)}% mais ${pct > 0 ? 'rápida' : 'lenta'}, mesmo tom)` : ' (sem mudar a velocidade)') + '.';
-  if (cut) msg += `\nAtenção: o roteiro é longo demais para ${T} s mesmo com a fala ${Math.round((1 / MIN - 1) * 100)}% mais rápida, e o final foi cortado. Encurte o roteiro ou escolha uma duração maior.`;
-  else if (want > MAX) msg += `\nAtenção: o roteiro é curto para ${T} s; completei com silêncio no fim (${(room - core.length / sr * MAX).toFixed(1)} s). Acrescente texto ou escolha uma duração menor.`;
-  return { buf: out, msg, speed, cut };
+  let E = T - M.natural, tail = NAT.TAIL, lead = NAT.LEAD, newGap = gaps.slice(), short = 0, over = 0, long = 0;
+  if (E >= 0) { // sobra tempo: pausas maiores; o resto vai para a ponta final (e um pouco para a inicial)
+    const keepTail = Math.min(E * 0.2, 1.0), [add, rest0] = spreadPad(gaps, E - keepTail); newGap = gaps.map((g, i) => g + add[i]);
+    const rest = rest0 + keepTail, tailMax = Math.max(1.2, 0.06 * T), toTail = Math.min(rest, tailMax);
+    tail += toTail; const hard = Math.max(0, rest - toTail);
+    if (hard > 0) tail += hard; // para fechar T mesmo assim (o diagnóstico "short" avisa que o roteiro está curto)
+    short = Math.max(hard, E - comfortPad(T));
+  } else { // falta tempo: pausas encolhem até o mínimo natural
+    const D = -E, room = gaps.map(g => Math.max(0, g - NAT.MINGAP)), cap = room.reduce((a, b) => a + b, 0);
+    const take = Math.min(D, cap); newGap = gaps.map((g, i) => g - (cap ? take * room[i] / cap : 0)); over = Math.max(0, D - cap);
+    long = Math.max(over, D - comfortCut(T));
+  }
+  const res = []; let len = 0; const push = a => { res.push(a); len += a.length; };
+  const zeros = sec => new Float32Array(Math.max(0, Math.round(sec * sr)));
+  const slice = (a, b) => { const s0 = Math.max(0, Math.round(a * sr)), s1 = Math.min(mono.length, Math.round(b * sr)), x = mono.slice(s0, Math.max(s0, s1)), f = Math.min(x.length >> 1, Math.round(0.004 * sr)); for (let i = 0; i < f; i++) { x[i] *= i / f; x[x.length - 1 - i] *= i / f; } return x; };
+  push(zeros(lead));
+  for (let k = 0; k < sp.length; k++) {
+    const gPrev = k ? gaps[k - 1] : 1, gNext = k < gaps.length ? gaps[k] : 1;
+    const a = k ? sp[k][0] - Math.min(NAT.GUARD, gPrev / 2) : M.first, b = k < sp.length - 1 ? sp[k][1] + Math.min(NAT.GUARD * 1.5, gNext / 2) : M.last;
+    push(slice(a, b));
+    if (k < gaps.length) {
+      const keep = Math.min(NAT.GUARD * 1.5, gNext / 2) + Math.min(NAT.GUARD, gNext / 2); // pedaços de silêncio que já vieram junto da fala
+      push(zeros(Math.max(0, newGap[k] - keep)));
+    }
+  }
+  push(zeros(tail));
+  const res1 = new Float32Array(Math.max(outN, over > 0 ? len : 0)); let o = 0; for (const a of res) { if (o < res1.length) res1.set(a.subarray(0, res1.length - o), o); o += a.length; }
+  const final = over > 0 ? res1.subarray(0, len) : res1.subarray(0, outN); // sem corte de fala: só sobra/falta silêncio
+  const out = ac.createBuffer(1, final.length, sr); out.copyToChannel(final, 0);
+  const ok = over <= 0.005 && long <= NAT.TOL && short <= NAT.TOL;
+  const speech = sp.reduce((a, s) => a + (s[1] - s[0]), 0);
+  let msg = `Voz na velocidade natural (${speech.toFixed(1)} s de fala): ` + (over > 0.005 ? `não cabe em ${T} s (passa ${over.toFixed(1)} s mesmo com as pausas no mínimo)` : E >= 0 ? `pausas e pontas ajustadas (+${E.toFixed(1)} s de silêncio) para fechar ${T} s exatos` : `pausas encurtadas (${E.toFixed(1)} s) para fechar ${T} s exatos`) + '.';
+  if (short > NAT.TOL) msg += `\nO roteiro está curto para ${T} s: ${E.toFixed(1)} s de silêncio extra é mais do que soa natural (cabem uns ${comfortPad(T).toFixed(1)} s).`;
+  else if (long > NAT.TOL && over <= 0.005) msg += `\nO roteiro está longo para ${T} s: as pausas tiveram de ser muito encurtadas.`;
+  return { buf: out, ok, msg, natural: M.natural, core: M.core, speech, over, short, long, pad: E, gaps: gaps.length };
 }

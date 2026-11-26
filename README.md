@@ -50,16 +50,18 @@ public/              tudo o que o navegador recebe
 
 Em **Painel > Padrões > Formato da tela** o administrador escolhe quais formatos o gerador oferece: só vertical 9:16, só horizontal 16:9 ou os dois (com o formato que abre selecionado). Com um só liberado, o seletor some do gerador, a IA monta tudo nesse formato e qualquer história enviada em outro formato é ajustada automaticamente. A regra vale também no servidor (`/api/ai/*`), então não dá para burlá-la pelo navegador. Fica salvo em `settings.aspects` e `settings.aspectDefault`.
 
-## Duração exata e sincronia (build 15)
+## Duração exata na velocidade natural da voz (build 17)
 
-Ao escolher **30 s** (ou 20, 45, 60) em "Duração", a caixa "Vídeo e voz com exatamente a duração escolhida" (ligada por padrão) trava tudo nesse tempo:
+Ao escolher **30 s** (ou 20, 45, 60) em "Duração", a caixa "Vídeo e voz com exatamente a duração escolhida, na velocidade natural da voz" (ligada por padrão) trava tudo nesse tempo **sem acelerar nem desacelerar a voz**. Quem muda de tamanho é o roteiro:
 
-- a IA escreve o roteiro com o número de palavras certo e o servidor deixa a história com o `total` exato (`fitTotal` em `server/ai.js`);
-- a voz (gerada ou enviada) é esticada ou encolhida **sem mudar o tom** (`wsolaStretch` e `fitVoiceExact` em `public/js/audio.js`: no máximo 33% mais rápida ou 23% mais lenta) e fica com exatamente a duração escolhida; se o roteiro for longo ou curto demais, o gerador avisa;
-- as cenas e as legendas são alinhadas a essa voz automaticamente ao clicar em Prévia ou Gerar vídeo (o botão "Ajustar ao áudio" continua existindo);
-- na gravação, o áudio começa junto com o gravador (sem pré-roll) e o gerador mede e mostra a duração real do arquivo. A gravação acontece em tempo real no navegador, então o arquivo costuma sair com 30,00 a 30,05 s (nos testes: 30,01 s).
+- **A IA escreve com o tamanho certo.** O navegador mede quantas palavras por segundo a voz escolhida lê de verdade (guarda em `localStorage`, chave `animae.wps`) e manda para a IA (`wps`). O servidor calcula a faixa de palavras (`wordsFor` em `server/ai.js`, voz ocupando ~94% do tempo) e, se a IA errar a contagem em mais de 12%, reescreve na hora (`fit`), sem custo extra.
+- **A voz é medida de verdade.** Em "Gerar voz", o navegador mede a duração natural da fala (`voiceMeasure` em `public/js/audio.js`). Se o roteiro não cabe, a IA reescreve o roteiro e as legendas das cenas (`POST /api/ai/fit`) com a quantidade de palavras certa e a voz é gerada de novo, até 3 vezes. Há o botão "Desfazer ajuste do roteiro".
+- **A duração fecha só com silêncio.** `fitVoiceNatural` aumenta ou encurta as pausas entre frases e vírgulas e apara as pontas: a fala nunca é esticada (o antigo `fitVoiceExact`, com `wsolaStretch`, foi removido). Só aceita o que soa natural (cerca de 12% de pausa a mais ou 7% a menos); acima disso o roteiro é reescrito em vez de encher a fala de buracos.
+- **Custo e segurança.** A primeira voz custa o normal (`tts`) e devolve uma ficha (`X-Fit-Token`) com direito a 3 regerações da voz e 3 reescritas do roteiro por 20 minutos, sem custo e sem contar no limite por hora. A ficha é amarrada à mesma conta/IP e se esgota sozinha; sem ficha o `/api/ai/fit` responde 403.
+- **Sem IA ou com áudio próprio:** a voz continua natural e fecha a duração com pausas; se o roteiro for curto ou longo demais, o gerador avisa quantas palavras faltam ou sobram. Se a fala não couber nem com as pausas no mínimo, nada é cortado e o vídeo acompanha a fala.
+- **Gravação.** O áudio começa junto com o gravador e uma fonte de silêncio mantém a faixa de áudio viva até o fim (antes ela parava ~60 ms antes). O arquivo sai com a duração escolhida com erro de até ~0,03 s (medido: 20,00 s e 30,03 s). O gerador mostra a duração real do arquivo.
 
-Desmarque a caixa para voltar ao comportamento antigo (duração = a da voz enviada).
+Desmarque a caixa para a voz sair crua (duração = a da voz).
 
 ## Créditos (cota por pessoa, renovação configurável)
 

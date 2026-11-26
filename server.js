@@ -598,6 +598,11 @@ function logAi(op, who, ok, ms, err) {
 const aiHits = new Map(); // ip -> [timestamps]
 const histHits = new Map();
 const creditHits = new Map();
+// Ajuste fino da duração: quem PAGA uma voz ganha, por 20 minutos, até 3 regerações da voz e 3 reescritas do roteiro sem custo extra
+// (para o roteiro caber na duração escolhida sem esticar o áudio). A ficha é amarrada à mesma conta/IP e se esgota sozinha.
+const fitTokens = new Map(); // ficha -> { key, tts, ai, exp }
+const fitIssue = key => { const t = crypto.randomBytes(12).toString('hex'); fitTokens.set(t, { key, tts: 3, ai: 3, exp: Date.now() + 20 * 60e3 }); return t; };
+const fitGet = (req, key) => { const t = String(req.headers['x-fit-token'] || ''), e = fitTokens.get(t); return e && e.exp > Date.now() && e.key === key ? { t, e } : null; };
 const couponHits = new Map(); // ip -> tentativas de cupom por hora
 const couponUserHits = new Map(); // conta -> tentativas de cupom por hora (quem troca de IP não escapa do limite)
 const couponOk = new Map(); // ip -> cupons resgatados COM SUCESSO na última hora (contra criar várias contas para o mesmo cupom)
@@ -816,34 +821,38 @@ async function api(req, res, p) {
       const t = ttsInfo();
       if (!t.enabled) return send(res, 503, { error: 'A voz com IA está desativada neste site.' });
       if (!t.installed) return send(res, 503, { error: 'A voz com IA não está instalada no servidor (rode "npm install" e reinicie).' });
-      const refund = take(ttsHits, lg.user ? 'u:' + lg.user.id : ipOf(req), db.tts.perHour);
+      const fitTk = fitGet(req, credWho(req, lg).key), useFit = !!(fitTk && fitTk.e.tts > 0); // regeração do ajuste fino: sem custo e fora do limite por hora
+      const refund = useFit ? () => {} : take(ttsHits, lg.user ? 'u:' + lg.user.id : ipOf(req), db.tts.perHour);
       if (!refund) return send(res, 429, { error: `Limite de ${db.tts.perHour} vozes por hora atingido. Tente mais tarde.` });
       let done = false, gt = false, busy = false, cr = null;
       try {
         const b = await body(req, 3e4);
         gt = !lg.user; if (gt && !gTake('tts')) { gt = false; return send(res, 429, { error: 'O site atingiu o limite de vozes desta hora. Tente mais tarde ou entre na sua conta.' }); }
         if (ttsBusy >= TTS_MAX_PARALLEL) { if (gt) gRefund('tts'); return send(res, 429, { error: 'O servidor de voz está ocupado. Tente de novo em alguns segundos.' }); }
-        { const cw = credWho(req, lg); cr = CR.charge(cw.key, cw.name, 'tts'); if (!cr.ok) { const c = cr; cr = null; if (gt) gRefund('tts'); return noCredit(res, c); } }
+        if (!useFit) { const cw = credWho(req, lg); cr = CR.charge(cw.key, cw.name, 'tts'); if (!cr.ok) { const c = cr; cr = null; if (gt) gRefund('tts'); return noCredit(res, c); } }
         ttsBusy++; busy = true; // checagem e incremento juntos, sem await no meio
         const mp3 = await TTS.synth({ text: b.text, voice: str(b.voice, 60) || db.tts.voice, rate: +b.rate, pitch: +b.pitch });
         done = true;
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': mp3.length, 'Cache-Control': 'no-store', ...credHeaders(CR.view(credWho(req, lg).key)) });
+        const tkn = useFit ? (fitTk.e.tts--, fitTk.t) : fitIssue(credWho(req, lg).key);
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': mp3.length, 'Cache-Control': 'no-store', 'X-Fit-Token': tkn, ...credHeaders(CR.view(credWho(req, lg).key)) });
         return res.end(mp3);
       } catch (e) { if (gt) gRefund('tts'); throw e; } finally { if (busy) ttsBusy--; if (!done) { refund(); if (cr) cr.refund(); } }
     }
     const aiOp = p.startsWith('/api/ai/') ? p.slice(8) : '';
-    if (m === 'POST' && ['generate', 'refine', 'ideas', 'review', 'translate'].includes(aiOp)) {
+    if (m === 'POST' && ['generate', 'refine', 'ideas', 'review', 'translate', 'fit'].includes(aiOp)) {
       const lg = await needLogin(req, res); if (!lg) return;
       await cfgDbLoad();
       const i = aiInfo();
       if (!i.enabled || !i.hasKey) return send(res, 503, { error: 'A criação com IA não está configurada neste site.' });
-      const refund = take(aiHits, lg.user ? 'u:' + lg.user.id : ipOf(req), db.ai.perHour);
+      const fitTk = aiOp === 'fit' ? fitGet(req, credWho(req, lg).key) : null; // o ajuste do roteiro só existe junto com uma voz paga
+      if (aiOp === 'fit' && !(fitTk && fitTk.e.ai > 0)) return send(res, 403, { error: 'O ajuste automático do roteiro vem junto com a voz: gere a voz primeiro (ou os ajustes dessa voz já acabaram).' });
+      const refund = aiOp === 'fit' ? () => {} : take(aiHits, lg.user ? 'u:' + lg.user.id : ipOf(req), db.ai.perHour);
       if (!refund) return send(res, 429, { error: `Limite de ${db.ai.perHour} usos da IA por hora atingido. Tente mais tarde.` });
       let counted = false;
       try {
       const b = await body(req, aiOp === 'generate' || aiOp === 'ideas' ? 2e4 : 5e5);
       const llm = { chain: aiChain() }, common = { llm, maxTokens: db.ai.maxTokens, extra: db.ai.extra || '', tpm: llm.chain[0].tpm };
-      const opt = { aspect: aspectFor(b.aspect === '16:9' ? '16:9' : '9:16'), seconds: +b.seconds, look: SCHEMA.SET.look.has(b.look) ? b.look : '', format: str(b.format, 20), tone: str(b.tone, 20), lang: str(b.lang, 8), music: str(b.music, 20), cast: +b.cast };
+      const opt = { aspect: aspectFor(b.aspect === '16:9' ? '16:9' : '9:16'), seconds: +b.seconds, look: SCHEMA.SET.look.has(b.look) ? b.look : '', format: str(b.format, 20), tone: str(b.tone, 20), lang: str(b.lang, 8), music: str(b.music, 20), cast: +b.cast, wps: +b.wps };
       const storyOk = v => v && typeof v === 'object' && Array.isArray(v.scenes) && v.scenes.length > 0 && v.scenes.length <= 40;
       let job;
       if (aiOp === 'generate') {
@@ -861,16 +870,18 @@ async function api(req, res, p) {
           if (instruction.length < 5) return send(res, 400, { error: 'Diga o que você quer mudar.' });
           job = () => AI.refine({ ...common, ...opt, story: b.story, script, instruction });
         } else if (aiOp === 'review') job = () => AI.review({ llm, story: b.story, script, tpm: common.tpm });
+        else if (aiOp === 'fit') job = () => AI.fit({ ...common, story: b.story, script, want: +b.want, seconds: +b.seconds });
         else job = () => AI.translate({ ...common, story: b.story, script, lang: str(b.lang, 8) });
       }
-      const cw = credWho(req, lg), cr = CR.charge(cw.key, cw.name, aiOp); // gasta o crédito ANTES de chamar a IA
+      const cw = credWho(req, lg), cr = aiOp === 'fit' ? { ok: true, refund() {} } : CR.charge(cw.key, cw.name, aiOp); // gasta o crédito ANTES de chamar a IA (o ajuste fino não cobra)
       if (!cr.ok) return noCredit(res, cr);
-      const ga = !lg.user; if (ga && !gTake('ai')) { cr.refund(); return send(res, 429, { error: 'O site atingiu o limite de usos da IA desta hora. Tente mais tarde ou entre na sua conta.' }); }
+      const ga = !lg.user && aiOp !== 'fit'; if (ga && !gTake('ai')) { cr.refund(); return send(res, 429, { error: 'O site atingiu o limite de usos da IA desta hora. Tente mais tarde ou entre na sua conta.' }); }
       counted = true;
       const t0 = Date.now();
       try {
         const out = await job();
         if (out && typeof out === 'object') out.provider = llm.lastUsed || ''; // qual IA respondeu (útil quando há reserva)
+        if (fitTk) fitTk.e.ai--;
         db.aiCount = (db.aiCount || 0) + 1; logAi(aiOp, llm.lastUsed, true, Date.now() - t0); save();
         return send(res, 200, out, credHeaders(CR.view(cw.key)));
       } catch (e) { counted = false; cr.refund(); if (ga) gRefund('ai'); logAi(aiOp, llm.lastUsed, false, Date.now() - t0, e && (e.msg || e.message)); save(); throw e; }
@@ -1106,6 +1117,7 @@ process.on('unhandledRejection', e => console.error('Erro não tratado:', e));
 /* ---------- limpeza periódica da memória ---------- */
 setInterval(() => {
   const now = Date.now(), old = a => a.filter(t => now - t < 3600e3);
+  for (const [k, v] of fitTokens) if (v.exp < Date.now()) fitTokens.delete(k);
   for (const m of [aiHits, ttsHits, iconHits, histHits, creditHits, couponHits, couponUserHits, couponOk, verifyHits, supportHits, supportNew, supportPoll]) { for (const [k, v] of m) { const n = old(v); if (n.length) m.set(k, n); else m.delete(k); } if (m.size > 20000) m.clear(); }
   for (const [k, v] of fails) if (v.until < now && now - (v.at || 0) > 3600e3) fails.delete(k);
   for (const [k, v] of iconMiss) if (v < now) iconMiss.delete(k);
