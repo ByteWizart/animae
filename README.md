@@ -63,6 +63,16 @@ Ao escolher **30 s** (ou 20, 45, 60) em "Duração", a caixa "Vídeo e voz com e
 
 Desmarque a caixa para a voz sair crua (duração = a da voz).
 
+## Upgrade do gerador (build 18)
+
+Tudo roda no navegador, sem custo de crédito:
+
+- **Modelos prontos** (8): Curiosidade, Mito ou verdade, Top 5, Dica rápida, História engraçada, Suspense, Motivacional e Diálogo. Cada um ajusta formato, tom, duração e número de personagens e preenche uma ideia com um trecho `[entre colchetes]` já selecionado para você trocar pelo tema. Se você já escreveu a sua ideia, ela é mantida e só as opções mudam.
+- **Medidor do roteiro:** abaixo do roteiro mostra as palavras, quantos segundos a voz leva (com as palavras por segundo medidas na sua voz) e se cabe na duração escolhida ("Cabe em 30 s", "Curto: faltam ~N palavras" ou "Longo: sobram ~N palavras").
+- **Desfazer e refazer** (↶ ↷ no passo 2): cada mudança que a IA aplica (gerar, ajustar o tamanho, editar, traduzir) guarda a versão anterior; até 12 versões.
+- **Rascunho automático:** a ideia, o roteiro, o JSON e as opções são salvos neste navegador (`animae.draft.v1`, até 14 dias). Ao voltar, aparece "Continuar" ou "Descartar".
+- **Legendas em arquivo (.srt)** com os mesmos tempos das legendas do vídeo (alinhadas à voz), em trechos de até 2 linhas, e **capa em PNG** no tamanho escolhido do vídeo, com o título por cima (opcional).
+
 ## Créditos (cota por pessoa, renovação configurável)
 
 O gerador tem um sistema de créditos: **cada pessoa ganha 25 créditos por dia** e cada uso de IA ou de voz gasta créditos. Gravar o vídeo no navegador não gasta nada. Tudo é configurado em **Painel > Créditos**: liga/desliga, créditos por dia (quem tem conta e visitantes sem conta, separados) e o custo de cada ação (padrão: gerar roteiro 5, sugerir ideias 1, editar 2, avaliar 1, traduzir 2, gerar voz 3).

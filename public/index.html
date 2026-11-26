@@ -35,7 +35,13 @@ canvas{display:block;width:100%;aspect-ratio:9/16;height:auto;border-radius:19px
 
 /* passos */
 .step{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:16px;scroll-margin-top:90px}
-.sh{display:flex;align-items:center;gap:12px;min-height:30px}
+.sh{display:flex;align-items:center;gap:12px;min-height:30px;flex-wrap:wrap}
+.hbtns{display:flex;gap:6px;margin-left:auto}.hbtns button{min-width:40px;font-size:16px;line-height:1}
+.tplh{font-size:12.5px;color:var(--muted);font-weight:600;margin:2px 0 -2px}
+.tpls{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}.tpls button{flex:none;white-space:nowrap}
+.draftbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:var(--panel2,#f1effa);font-size:13.5px}.draftbar span{flex:1 1 220px}
+#scriptinfo{min-height:18px}
+.extras{align-items:center}
 .sh h2{font-size:17px;margin:0;letter-spacing:-.01em}
 .n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line2);color:var(--muted);font-weight:700;font-size:12px;display:grid;place-items:center;flex:none}
 .push{margin-left:auto}
@@ -124,7 +130,9 @@ footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;t
 <div class="col">
 <header class="top"><div><h1>Criar um vídeo</h1><p class="lead">Conte a ideia, confira o roteiro e grave o vídeo.</p></div><div class="credbox"><div class="cred" id="cred" hidden role="status" aria-live="polite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><b id="credn">0</b><span>créditos</span><small id="credr"></small></div><button type="button" class="sec sm" id="cupbtn" hidden title="Tenho um cupom">Cupom</button></div></header>
 
+<div class="draftbar" id="draftbar" role="status" hidden><span id="drafttxt"></span><button type="button" class="sec sm" id="draftgo">Continuar</button><button type="button" class="sec sm" id="draftno">Descartar</button></div>
 <section class="step" id="s1"><div class="sh"><span class="n">1</span><h2>Ideia</h2></div>
+<div class="tplh" id="tplh">Comece por um modelo pronto</div><div class="tpls" id="tpls" role="group" aria-labelledby="tplh"></div>
 <textarea id="idea" maxlength="6000" placeholder="Ex.: por que esquecemos o que íamos fazer quando passamos por uma porta, em tom bem-humorado."></textarea>
 <div class="muted" id="aist">Descreva o tema, o tom e o público.</div>
 <div class="row"><div class="fld" id="aspfld">Formato<div class="seg" id="aspseg" role="radiogroup" aria-label="Formato da tela"><button type="button" role="radio" data-a="9:16" aria-checked="true"><i class="ar v"></i>Vertical <small>9:16</small></button><button type="button" role="radio" data-a="16:9" aria-checked="false"><i class="ar h"></i>Horizontal <small>16:9</small></button></div><select id="aspect" hidden aria-hidden="true" tabindex="-1"><option value="9:16">Vertical 9:16</option><option value="16:9">Horizontal 16:9</option></select></div>
@@ -138,8 +146,9 @@ footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;t
 <div class="muted">Dica: cole um texto longo (notícia, artigo) no campo da ideia e a IA resume e transforma em vídeo.</div></div></details>
 <div id="ideas"></div></section>
 
-<section class="step" id="s2"><div class="sh"><span class="n">2</span><h2>Roteiro e voz</h2><button class="sec sm push" id="cpscript">Copiar roteiro</button></div>
+<section class="step" id="s2"><div class="sh"><span class="n">2</span><h2>Roteiro e voz</h2><span class="hbtns"><button type="button" class="sec sm" id="hundo" disabled aria-label="Desfazer a última mudança da IA" title="Desfazer a última mudança da IA">↶</button><button type="button" class="sec sm" id="hredo" disabled aria-label="Refazer" title="Refazer">↷</button></span><button class="sec sm" id="cpscript">Copiar roteiro</button></div>
 <textarea id="script" placeholder="O roteiro aparece aqui. É o texto que a voz vai ler. Você também pode escrever ou editar."></textarea>
+<div class="muted" id="scriptinfo" aria-live="polite"></div>
 <details class="more" id="pubd" hidden><summary>Título, descrição e hashtags para publicar</summary><div class="in"><div id="pub" class="pubbox" hidden></div></div></details>
 <div id="voz" style="display:flex;flex-direction:column;gap:12px">
 <div class="row"><label class="fld grow">Voz<select id="ttsvoice"><option value="">Carregando vozes...</option></select></label>
@@ -160,6 +169,7 @@ footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;t
 <section class="step" id="s3"><div class="sh"><span class="n">3</span><h2>Vídeo</h2></div>
 <div class="row start"><button class="sec" id="fit">Ajustar ao áudio</button><button class="sec" id="prev">Prévia</button><button class="go push" id="gen">Gerar vídeo</button></div>
 <progress id="bar" value="0" max="100"></progress><pre id="log">Gere a voz e clique em Gerar vídeo. Deixe esta aba aberta e visível (Chrome ou Edge).</pre>
+<div class="row extras" id="extras"><button type="button" class="sec sm" id="srtdl">Baixar legendas (.srt)</button><button type="button" class="sec sm" id="covdl">Baixar capa (.png)</button><label class="chk"><input type="checkbox" id="covtitle" checked>Título na capa</label></div>
 <details class="more"><summary>Ajustes do vídeo</summary><div class="in">
 <div class="fld">Estilo visual<div class="lookpick" id="lookpick" role="radiogroup" aria-label="Estilo visual"></div>
 <select id="look" hidden aria-hidden="true" tabindex="-1"><option value="cartoon">Cartoon</option><option value="sketch">Desenho a lápis</option><option value="comic">Quadrinhos</option><option value="noir">Preto e branco</option><option value="neon">Neon</option><option value="retro">Retrô VHS</option><option value="pixel">Pixel art</option><option value="blueprint">Planta azul</option><option value="pastel">Pastel</option><option value="vintage">Filme antigo</option></select></div>
@@ -203,7 +213,7 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
     anim:pop|float|spin|shake|pulse|fall|none, to:{x,y}, dur, front:true
 </pre></div></details></div></div></details>
 </div></main>
-<footer>Animaê · build 16</footer>
+<footer>Animaê · build 18</footer>
 <script src="js/audio.js"></script>
 <script src="js/schema.js"></script>
 <script src="js/auth.js"></script>
@@ -1380,6 +1390,94 @@ $('aireview').onclick=async()=>{if(!readStory())return;const j=await aiCall($('a
 $('aitrgo').onclick=async()=>{if(!readStory())return;const lang=$('aitr').value;const j=await aiCall($('aitrgo'),'Traduzindo','/api/ai/translate',{story,script:$('script').value,lang});if(!j)return;
   applyAI({script:j.script,story:j.story,title:storyName},{keepOpen:true});log('Tradução pronta ('+LANGL[lang]+'). Grave a narração no novo idioma e use "Ajustar ao áudio".')};
 applyDefaults();
+
+/* ===================== Upgrade do gerador (build 18) =====================
+   1) modelos prontos  2) medidor de duração do roteiro  3) desfazer/refazer das mudanças da IA
+   4) rascunho automático  5) legendas em arquivo (.srt) e capa em PNG */
+const TPLS=[
+ {n:'Curiosidade',f:'curiosidade',t:'humor',s:30,c:0,i:'Uma curiosidade que quase ninguém sabe sobre [tema], com um final que faça a pessoa querer compartilhar.'},
+ {n:'Mito ou verdade',f:'mito',t:'serio',s:30,c:0,i:'Mito ou verdade: [afirmação que todo mundo repete]. Mostre o que realmente acontece, de forma rápida e surpreendente.'},
+ {n:'Top 5',f:'lista',t:'humor',s:45,c:0,i:'Top 5 [assunto], do menos ao mais surpreendente, com uma frase curta para cada item.'},
+ {n:'Dica rápida',f:'tutorial',t:'serio',s:20,c:1,i:'Uma dica prática para [problema do dia a dia], em 3 passos simples.'},
+ {n:'História engraçada',f:'historia',t:'humor',s:30,c:2,i:'Uma situação cotidiana engraçada sobre [situação], com uma reviravolta no final.'},
+ {n:'Suspense',f:'terror',t:'sombrio',s:45,c:1,i:'Uma história curta de suspense que se passa em [lugar], com uma reviravolta no último segundo.'},
+ {n:'Motivacional',f:'motivacional',t:'motivacional',s:20,c:1,i:'Uma mensagem motivacional curta sobre [tema] para quem está pensando em desistir.'},
+ {n:'Diálogo',f:'dialogo',t:'humor',s:30,c:2,i:'Dois amigos discutindo sobre [assunto], cada um com uma opinião diferente, e um final inesperado.'}];
+let lastTpl='';
+$('tpls').innerHTML=TPLS.map((t,i)=>`<button type="button" class="sec sm" data-k="${i}">${t.n}</button>`).join('');
+$('tpls').onclick=e=>{const b=e.target.closest('button[data-k]');if(!b)return;const T=TPLS[+b.dataset.k],ta=$('idea');
+  $('aifmt').value=T.f;$('aitone').value=T.t;$('aisec').value=String(T.s);$('aicast').value=String(T.c);$('aisec').dispatchEvent(new Event('change'));
+  const empty=!ta.value.trim()||ta.value===lastTpl;if(empty){ta.value=T.i;lastTpl=T.i}
+  ta.focus();const i=ta.value.indexOf('['),j=ta.value.indexOf(']');if(empty&&i>=0&&j>i)ta.setSelectionRange(i,j+1);
+  $('aist').textContent=empty?`Modelo "${T.n}": troque o trecho [entre colchetes] pelo seu tema e clique em Gerar roteiro.`:`Modelo "${T.n}" aplicado (formato, tom e duração). A sua ideia foi mantida.`;
+  scriptInfo();draftSoon()};
+
+/* 2) Medidor: quantas palavras, quanto tempo a voz leva (com as palavras por segundo MEDIDAS na sua voz) e se cabe na duração escolhida */
+function wpsKnown(){try{const o=JSON.parse(localStorage.getItem(WPSK)||'{}');return !!(o[$('ttsvoice').value]||o._any)}catch{return false}}
+function scriptInfo(){const el=$('scriptinfo');if(!el)return;const w=nW($('script').value);if(!w){el.textContent='';return}
+  const wps=wpsGet(),est=w/wps,T=TARGET();let m=`${w} palavras, cerca de ${est.toFixed(0)} s na velocidade natural da voz (${wps.toFixed(1).replace('.',',')} palavras/s${wpsKnown()?'':', estimativa'})`;
+  if(exactOn()){if(est<.88*T)m+=`. Curto para ${T} s: faltam cerca de ${Math.max(1,Math.round((.94*T-est)*wps))} palavras.`;
+    else if(est>1.07*T)m+=`. Longo para ${T} s: sobram cerca de ${Math.max(1,Math.round((est-.94*T)*wps))} palavras.`;else m+=`. Cabe em ${T} s.`}
+  el.textContent=m}
+$('script').addEventListener('input',scriptInfo);['aisec','exact','ttsvoice'].forEach(id=>$(id).addEventListener('change',scriptInfo));$('ttsrate').addEventListener('input',scriptInfo);
+{const _wl=wpsLearn;wpsLearn=function(){_wl.apply(this,arguments);scriptInfo()}}
+
+/* 3) Desfazer e refazer: cada mudança que a IA aplica (gerar, ajustar, editar, traduzir) guarda a versão anterior */
+const UNDO=[],REDO=[];
+const hsnap=()=>({script:$('script').value,story:$('story').value,name:storyName});
+const hsame=(a,b)=>!!b&&a.script===b.script&&a.story===b.story;
+function hUI(){$('hundo').disabled=!UNDO.length||busy;$('hredo').disabled=!REDO.length||busy}
+function hRestore(x){$('script').value=x.script;$('story').value=x.story;storyName=x.name;if(readStory()){if(story.style&&story.style.look)$('look').value=story.style.look;drawFrame(story,.5)}scriptInfo();draftSoon();hUI()}
+$('hundo').onclick=()=>{if(busy||!UNDO.length)return;REDO.push(hsnap());hRestore(UNDO.pop());log('Mudança desfeita. Se a voz já estava gerada, gere de novo para ela acompanhar o texto.')};
+$('hredo').onclick=()=>{if(busy||!REDO.length)return;UNDO.push(hsnap());hRestore(REDO.pop());log('Mudança refeita. Se a voz já estava gerada, gere de novo para ela acompanhar o texto.')};
+{const _aa=applyAI;applyAI=function(j){if(j&&(j.script!=null||j.story)){const x=hsnap();if(!hsame(x,UNDO[UNDO.length-1])&&(x.script.trim()||x.story.trim())){UNDO.push(x);if(UNDO.length>12)UNDO.shift()}REDO.length=0}
+  const r=_aa.apply(this,arguments);hUI();scriptInfo();draftSoon();return r}}
+
+/* 4) Rascunho automático: guarda a ideia, o roteiro e as opções neste navegador e oferece continuar de onde parou */
+const DRK='animae.draft.v1',DRF=['aisec','aifmt','aitone','ailang','ailook','aimusic','aicast'];let drT=null;
+function draftSave(){try{const d={v:1,ts:Date.now(),idea:$('idea').value,script:$('script').value,story:$('story').value,name:storyName,asp:ASP,sel:{}};DRF.forEach(k=>{const e=$(k);if(e)d.sel[k]=e.value});
+  if(d.idea.trim().length<3&&d.script.trim().length<3)return localStorage.removeItem(DRK);if(d.story.length>1.5e6)d.story='';localStorage.setItem(DRK,JSON.stringify(d))}catch{}}
+const draftSoon=()=>{clearTimeout(drT);drT=setTimeout(draftSave,900)};
+['idea','script','story'].forEach(id=>$(id).addEventListener('input',draftSoon));DRF.forEach(k=>$(k)&&$(k).addEventListener('change',draftSoon));
+const ago=ms=>{const m=Math.round(ms/6e4);return m<1?'agora há pouco':m<60?`há ${m} min`:m<1440?`há ${Math.round(m/60)} h`:`há ${Math.round(m/1440)} dia(s)`};
+function draftOffer(){let d=null;try{d=JSON.parse(localStorage.getItem(DRK)||'null')}catch{}
+  if(!d||d.v!==1||Date.now()-d.ts>14*864e5||(!(d.idea||'').trim()&&!(d.script||'').trim())||$('idea').value.trim()||$('script').value.trim())return;
+  const t=(d.idea||d.script||'').trim().replace(/\s+/g,' ');$('drafttxt').textContent=`Você tem um rascunho salvo ${ago(Date.now()-d.ts)}: “${t.slice(0,70)}${t.length>70?'…':''}”`;$('draftbar').hidden=false;
+  $('draftgo').onclick=()=>{DRF.forEach(k=>{if(d.sel&&d.sel[k]!=null&&$(k))$(k).value=d.sel[k]});
+    if(d.asp&&d.asp!==ASP){const b=document.querySelector(`#aspseg button[data-a="${d.asp}"]`);if(b)b.click()}
+    $('idea').value=d.idea||'';$('script').value=d.script||'';if(d.story){$('story').value=d.story;storyName=d.name||'';if(readStory())drawFrame(story,.5)}
+    $('aisec').dispatchEvent(new Event('change'));scriptInfo();$('draftbar').hidden=true;log('Rascunho restaurado. Se havia voz, gere a voz de novo.')};
+  $('draftno').onclick=()=>{try{localStorage.removeItem(DRK)}catch{}$('draftbar').hidden=true}}
+setTimeout(draftOffer,400);
+
+/* 5) Legendas em arquivo (.srt) e capa (.png) */
+const dlBlob=(b,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
+const slug=t=>String(t||'animae').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,50)||'animae';
+// momento em que cada grupo de palavras aparece na tela (o mesmo cálculo do desenho das legendas, para o arquivo bater com o vídeo)
+function capTimes(s){const gs=capGroups(s.caption);if(!gs.length)return[];const t0=+s.t0||0,dur=(+s.t1||t0+1)-t0,a=s.capStart??0,b=dur-(s.capEnd??.15),tot=gs.reduce((q,g)=>q+g.length+1,0),st=[];
+  if(Array.isArray(s.capT)&&s.capT.length===gs.length)gs.forEach((g,k)=>st.push(+s.capT[k]));else{let acc=a;gs.forEach(g=>{st.push(acc);acc+=(b-a)*(g.length+1)/tot})}
+  return gs.map((g,k)=>({g,a:t0+st[k],b:t0+Math.min(dur,k+1<gs.length?st[k+1]:Math.max(st[k]+.4,Array.isArray(s.capT)?st[k]+1.2:b))}))}
+function srtCues(st){const out=[];let cur=null;const flush=()=>{if(cur&&cur.t)out.push(cur);cur=null};
+  for(const s of st.scenes){const gt=capTimes(s);for(const x of gt){if(!cur)cur={a:x.a,b:x.b,t:'',w:0};cur.t+=(cur.t?' ':'')+x.g;cur.b=x.b;cur.w+=x.g.split(' ').length;
+      if(/[.!?…]["')»”]*$/.test(x.g)||cur.w>=7||cur.t.length>=40||(/[,;:]$/.test(x.g)&&cur.w>=3))flush()}flush()}
+  for(let i=0;i<out.length;i++){const c=out[i];if(c.b-c.a<.5)c.b=c.a+.5;if(out[i+1]&&c.b>out[i+1].a)c.b=Math.max(c.a+.2,out[i+1].a-.02);
+    if(c.t.length>24){const m=Math.floor(c.t.length/2);let k=c.t.lastIndexOf(' ',m),k2=c.t.indexOf(' ',m);if(k<0||(k2>=0&&k2-m<m-k))k=k2;if(k>0)c.t=c.t.slice(0,k)+'\n'+c.t.slice(k+1)}}
+  return out}
+const srtT=v=>{v=Math.max(0,v);const h=Math.floor(v/3600),m=Math.floor(v%3600/60),s=Math.floor(v%60),ms=Math.round((v-Math.floor(v))*1000);return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')},${String(Math.min(999,ms)).padStart(3,'0')}`};
+$('srtdl').onclick=()=>{if(busy)return;if(!readStory())return;
+  if(!story.scenes.some(s=>s&&s.caption))return log('As cenas não têm legendas (campo "caption"). Gere o roteiro com a IA ou escreva as legendas no JSON.');
+  let note='';if(voiceBuf&&FITV!==voiceBuf){const m=doFit();if(m)note='\n'+m.split('\n')[0]}  // alinha as cenas à voz antes, como na hora de gerar o vídeo
+  const cues=srtCues(story),txt=cues.map((c,i)=>`${i+1}\n${srtT(c.a)} --> ${srtT(c.b)}\n${c.t}\n`).join('\n');
+  dlBlob(new Blob(['\ufeff'+txt],{type:'application/x-subrip;charset=utf-8'}),slug(storyName)+'.srt');log(`Legendas salvas: ${cues.length} trechos em ${slug(storyName)}.srt (formato aceito pelo YouTube, CapCut e a maioria dos editores).`+note)};
+function coverTitle(txt){const W0=cv.width,H0=cv.height,land=W0>H0;let size=Math.round((land?H0:W0)*(land?.11:.085)),lines;c.save();c.setTransform(1,0,0,1,0,0);c.textAlign='center';c.textBaseline='top';
+  const words=txt.toUpperCase().split(/\s+/).filter(Boolean),maxW=W0*.88;
+  for(;;){c.font=`900 ${size}px "Arial Black",Impact,sans-serif`;lines=[];let cur='';for(const w of words){const t=cur?cur+' '+w:w;if(c.measureText(t).width>maxW&&cur){lines.push(cur);cur=w}else cur=t}if(cur)lines.push(cur);if(lines.length<=4||size<24)break;size=Math.round(size*.9)}
+  const lh=size*1.12,y0=Math.round(H0*(land?.08:.1)),h=y0+lines.length*lh+size*.6,g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,'rgba(0,0,0,.6)');g.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=g;c.fillRect(0,0,W0,h);
+  lines.forEach((l,i)=>{const y=y0+i*lh;c.lineJoin='round';c.lineWidth=size*.2;c.strokeStyle='#111';c.strokeText(l,W0/2,y);c.fillStyle=i===lines.length-1?'#ffd93b':'#fff';c.fillText(l,W0/2,y)});c.restore()}
+$('covdl').onclick=()=>{if(busy)return;if(!readStory())return;sizeCanvas();const s0=story.scenes[0],t=Math.max(.05,(+s0.t0||0)+((+s0.t1||2)-(+s0.t0||0))*.55);
+  try{drawFrame(story,t);const ti=($('covtitle').checked?String(storyName||'').trim().slice(0,80):'');if(ti)coverTitle(ti)}catch(e){return log('Não consegui desenhar a capa: '+e.message)}
+  cv.toBlob(b=>{if(!b)return log('O navegador não conseguiu gerar a imagem da capa.');dlBlob(b,slug(storyName)+'-capa.png');log(`Capa salva: ${cv.width}x${cv.height} px (${slug(storyName)}-capa.png).`);try{drawFrame(story,.5)}catch{}},'image/png')};
+scriptInfo();hUI();
 </script>
 <script src="js/motor-extra.js"></script>
 <script src="js/motor-extra2.js"></script>

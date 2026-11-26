@@ -22,7 +22,7 @@ try {
   if (!fs.existsSync(DATA_FILE) && fs.existsSync(OLD)) { fs.copyFileSync(OLD, DATA_FILE); try { fs.chmodSync(DATA_FILE, 0o600); } catch {} }
   for (const f of ['dados.json', 'dados.json.tmp']) try { fs.unlinkSync(path.join(dir, f)); } catch {}
 } catch (e) { console.warn('Aviso: não consegui preparar a pasta de dados (' + e.message + ')'); }
-const BUILD = 16;
+const BUILD = 18;
 const STARTED = Date.now();
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.sql': 'text/plain; charset=utf-8' };
