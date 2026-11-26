@@ -45,7 +45,7 @@
       '.sup-send:disabled{opacity:.55;cursor:default}',
       '.sup-err{color:var(--bad,#c62839);font-size:12.5px}.sup-err:empty{display:none}',
       '.sup-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;opacity:0}',
-      '@media(max-width:480px){.sup-panel{right:8px;left:8px;bottom:80px;width:auto;max-width:none;height:calc(100vh - 100px)}.sup-fab{right:12px;bottom:12px}}',
+      '@media(max-width:480px){.sup-panel{right:8px;left:8px;bottom:80px;width:auto;max-width:none;height:calc(100vh - 100px);height:calc(100dvh - 100px);max-height:none}.sup-fab{right:12px;bottom:12px}.sup-head button{width:40px;height:40px}.sup-form input[type=text],.sup-form textarea{font-size:16px}.sup-send{min-height:44px;padding:8px 20px}}',
       '@media(prefers-reduced-motion:reduce){.sup-fab{transition:none}}'
     ].join('\n');
     document.head.appendChild(s);
@@ -118,12 +118,20 @@
     st.timer = setTimeout(function () { (document.hidden ? Promise.resolve() : fetchNew()).then(schedule); }, st.open ? POLL_OPEN : POLL_IDLE);
   }
 
+  // Celular: com o teclado aberto o painel (position:fixed) ficaria escondido atrás dele. O visualViewport diz quanto sobrou de tela.
+  function fit() {
+    var vv = window.visualViewport; if (!vv || !el.panel) return;
+    var kb = Math.round(window.innerHeight - vv.height - vv.offsetTop);
+    if (!st.open || window.innerWidth > 480 || kb < 80) { el.panel.style.removeProperty('bottom'); el.panel.style.removeProperty('height'); return; }
+    el.panel.style.bottom = (kb + 8) + 'px'; el.panel.style.height = Math.max(220, Math.round(vv.height - 16)) + 'px';
+  }
+  if (window.visualViewport) { window.visualViewport.addEventListener('resize', fit); window.visualViewport.addEventListener('scroll', fit); }
   function open() {
     st.open = true; el.panel.hidden = false; el.fab.setAttribute('aria-expanded', 'true');
     st.read = last(); save(); render(); el.txt.focus();
     fetchNew().then(schedule);
   }
-  function close() { st.open = false; el.panel.hidden = true; el.fab.setAttribute('aria-expanded', 'false'); badge(); schedule(); }
+  function close() { st.open = false; fit(); el.panel.hidden = true; el.fab.setAttribute('aria-expanded', 'false'); badge(); schedule(); }
 
   function submit() {
     if (st.busy) return;
