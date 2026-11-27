@@ -10,7 +10,7 @@
 Configure em Project Settings → Environment Variables, pelo menos as chaves que o projeto utiliza. Recomendações:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (se o código/configuração atual utilizar esse nome; nunca exponha no navegador)
+- `SUPABASE_SERVICE_KEY` ou `SUPABASE_SERVICE_ROLE_KEY` (somente no servidor; nunca exponha no navegador)
 - `ADMIN_PASSWORD`
 - `DATA_KEY` (segredo longo e estável; não troque depois de cifrar dados)
 - `GEMINI_API_KEY` e/ou `GROQ_API_KEY`
@@ -18,7 +18,7 @@ Configure em Project Settings → Environment Variables, pelo menos as chaves qu
 Use os nomes exatos das variáveis que já configurou no projeto. Não coloque segredos em arquivos públicos nem no GitHub.
 
 ## Limitações importantes da Vercel
-A Vercel executa Functions sem servidor persistente. O projeto usa arquivos locais para configurações, suporte e alguns estados; em produção, `/tmp/animae-data` é temporário e pode desaparecer entre instâncias/redeploys. Portanto, configure e teste a sincronização com Supabase antes de disponibilizar publicamente. A configuração e os saldos possuem integração com Supabase no código; o arquivo de suporte e outros dados estritamente locais não ganham persistência automaticamente.
+A Vercel executa Functions sem servidor persistente. O projeto usa arquivos locais para configurações, suporte e alguns estados; em produção, `/tmp/animae-data` é temporário e pode desaparecer entre instâncias/redeploys. Portanto, configure e teste a sincronização com Supabase antes de disponibilizar publicamente. A configuração e os saldos possuem integração com Supabase no código; o arquivo de suporte e outros dados estritamente locais não ganham persistência automaticamente. As sessões do painel administrativo também ficam em memória e podem não sobreviver quando a Vercel direcionar a próxima requisição para outra instância; portanto, não considere esta adaptação pronta para operação administrativa multi-instância sem uma camada compartilhada de sessões.
 
 Também há limites de duração e memória das Functions, e chamadas longas de IA/voz podem atingir esses limites. A Vercel não oferece uma porta TCP fixa: não configure `PORT`; a Function recebe as requisições HTTP diretamente.
 
