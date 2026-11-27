@@ -158,6 +158,7 @@
     if (st.token) { fetchNew().then(schedule); }
     document.addEventListener('visibilitychange', function () { if (!document.hidden && st.token) fetchNew(); });
     window.Suporte = { open: open, close: close };
+    document.addEventListener('click', function (e) { var a = e.target.closest && e.target.closest('a[data-chat]'); if (a) { e.preventDefault(); open(); } }); // "Contato" do rodapé abre o chat (se o dono configurou e-mail/link, o link vai direto para lá)
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

@@ -28,7 +28,7 @@ const STARTED = Date.now();
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.sql': 'text/plain; charset=utf-8' };
 // Só estes arquivos são servidos pela web (lista permitida, sem diferenciar maiúsculas de minúsculas).
 // Tudo o mais (server.js, ai.js, dados, .dados/...) nunca sai daqui, mesmo em Windows e macOS.
-const PUBLIC_NAMES = ['home.html', 'index.html', 'docs.html', 'favicon.svg', 'css/ui.css', 'js/audio.js', 'js/auth.js', 'js/suporte.js', 'js/cupom.js', 'js/schema.js', 'js/guia.js', 'js/motor-extra.js', 'js/motor-extra2.js', 'js/theme.js', 'exemplos/historia-teste.json', 'exemplos/historia-demo-v9.json', 'exemplos/historia-demo-16x9.json'];
+const PUBLIC_NAMES = ['home.html', 'index.html', 'docs.html', 'privacidade.html', 'termos.html', 'og.jpg', 'favicon.svg', 'css/ui.css', 'js/audio.js', 'js/auth.js', 'js/suporte.js', 'js/cupom.js', 'js/schema.js', 'js/guia.js', 'js/motor-extra.js', 'js/motor-extra2.js', 'js/theme.js', 'exemplos/historia-teste.json', 'exemplos/historia-demo-v9.json', 'exemplos/historia-demo-16x9.json'];
 const PUB = path.join(dir, 'public'); // tudo o que é servido pela web fica em public/
 const PUBLIC_MAP = new Map(); // nome em minúsculas -> caminho real
 for (const n of PUBLIC_NAMES) PUBLIC_MAP.set(n, path.join(PUB, n));
@@ -1059,6 +1059,25 @@ async function api(req, res, p) {
 /* ---------- estáticos ---------- */
 // Coloca o nonce do CSP em cada <script> da página (as páginas não usam handlers inline como onclick=).
 const withNonce = (html, n) => html.replace(/<script(?![^>]*\bnonce=)/gi, '<script nonce="' + n + '"');
+/* Endereço público do site, para o preview de link (og:url e og:image precisam ser ABSOLUTOS, senão Discord, WhatsApp etc. não mostram a imagem).
+   Defina PUBLIC_URL (ex.: https://animae.com.br) em produção. Sem ela, usa o Host do pedido, só se ele tiver cara de domínio (nada de aspas ou
+   sinais que pudessem quebrar o HTML) e, atrás de proxy (TRUST_PROXY), o protocolo informado por ele. */
+const PUBLIC_URL = (() => { const u = String(process.env.PUBLIC_URL || '').trim().replace(/\/+$/, ''); return /^https?:\/\/[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/i.test(u) ? u : ''; })();
+const siteOrigin = req => {
+  if (PUBLIC_URL) return PUBLIC_URL;
+  const host = String(req.headers.host || '').toLowerCase(), okHost = host.length <= 255 && /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/.test(host);
+  const xf = TRUST_PROXY ? String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase() : '';
+  return (req.socket.encrypted || xf === 'https' ? 'https' : 'http') + '://' + (okHost ? host : 'localhost');
+};
+/* Contato do rodapé: CONTACT_URL (um link) ou CONTACT_EMAIL. Sem nenhum dos dois, o link abre o chat de suporte do próprio site. */
+const CONTACT_URL = /^https?:\/\/[^\s<>"']+$/i.test(process.env.CONTACT_URL || '') ? process.env.CONTACT_URL.trim() : '';
+const CONTACT_EMAIL = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(process.env.CONTACT_EMAIL || '') ? process.env.CONTACT_EMAIL.trim() : '';
+const escH = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const fillPage = (html, req) => html
+  .replace(/\{\{ORIGIN\}\}/g, siteOrigin(req))
+  .replace(/\{\{CONTACT\}\}/g, CONTACT_URL ? escH(CONTACT_URL) : CONTACT_EMAIL ? 'mailto:' + escH(CONTACT_EMAIL) : '/privacidade#contato')
+  .replace(/\{\{CONTACT_ATTR\}\}/g, CONTACT_URL || CONTACT_EMAIL ? '' : ' data-chat')
+  .replace(/\{\{CONTACT_EXTRA\}\}/g, CONTACT_URL ? ' ou em <a href="' + escH(CONTACT_URL) + '">' + escH(CONTACT_URL.replace(/^https?:\/\//, '')) + '</a>' : CONTACT_EMAIL ? ' ou pelo e-mail <a href="mailto:' + escH(CONTACT_EMAIL) + '">' + escH(CONTACT_EMAIL) + '</a>' : '');
 const server = http.createServer((req, res) => {
   secHeaders(req, res);
   let p;
@@ -1069,6 +1088,8 @@ const server = http.createServer((req, res) => {
   if (p === '/gerar') p = '/index.html';     // o gerador
   if (p === '/ajuda' || p === '/ajuda.html') { res.writeHead(301, { Location: '/docs' }); return res.end(); } // endereço antigo
   if (p === '/docs') p = '/docs.html';
+  if (p === '/privacidade') p = '/privacidade.html';
+  if (p === '/termos') p = '/termos.html';
   if (adminPath() && p === '/' + adminPath()) {
     let d; try { d = fs.readFileSync(path.join(dir, 'admin', 'admin.html'), 'utf8'); } catch { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('não encontrado'); }
     const n = crypto.randomBytes(16).toString('base64');
@@ -1081,7 +1102,8 @@ const server = http.createServer((req, res) => {
   fs.readFile(f, (e, d) => {
     if (e) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('não encontrado'); }
     const ext = path.extname(f).toLowerCase(), h = { 'Content-Type': types[ext] || 'application/octet-stream' };
-    if (ext === '.html') { const n = crypto.randomBytes(16).toString('base64'); h['Content-Security-Policy'] = csp(n); h['Cache-Control'] = 'no-store'; d = withNonce(d.toString('utf8'), n); }
+    if (ext === '.html') { const n = crypto.randomBytes(16).toString('base64'); h['Content-Security-Policy'] = csp(n); h['Cache-Control'] = 'no-store'; d = withNonce(fillPage(d.toString('utf8'), req), n); }
+    else if (ext === '.jpg') h['Cache-Control'] = 'public, max-age=3600';
     res.writeHead(200, h);
     res.end(req.method === 'HEAD' ? undefined : d);
   });

@@ -3,6 +3,22 @@
 <title>Gerador · Animaê</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#7c5cff">
+<meta name="description" content="Conte a ideia, confira o roteiro e grave o short animado: roteiro, voz e vídeo no mesmo lugar.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Animaê">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Gerador · Animaê">
+<meta property="og:description" content="Conte a ideia, confira o roteiro e grave o short animado: roteiro, voz e vídeo no mesmo lugar.">
+<meta property="og:url" content="{{ORIGIN}}/gerar">
+<meta property="og:image" content="{{ORIGIN}}/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Animaê: do texto ao short animado. Dois bonecos conversando em um escritório, com legenda animada.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gerador · Animaê">
+<meta name="twitter:description" content="Conte a ideia, confira o roteiro e grave o short animado: roteiro, voz e vídeo no mesmo lugar.">
+<meta name="twitter:image" content="{{ORIGIN}}/og.jpg">
 <script src="js/theme.js"></script>
 <link rel="stylesheet" href="css/ui.css">
 <style>
@@ -116,6 +132,7 @@ details.box>.in{padding:0 20px 20px;display:flex;flex-direction:column;gap:14px}
 .lib-item small{color:var(--muted);display:block}
 .lib-item button{padding:5px 11px;font-size:12.5px}
 footer{max-width:1120px;margin:36px auto 0;color:var(--muted);font-size:12.5px;text-align:center}
+footer .fl{display:inline-flex;flex-wrap:wrap;justify-content:center;gap:0 14px;margin-left:10px;vertical-align:top}
 
 /* dados de publicação e avaliação da IA */
 .pubbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.55}.pubbox h3{margin:12px 0 4px;font-size:12px;color:var(--muted);font-weight:700}.pubbox h3:first-child{margin-top:0}.pubbox .tg{display:inline-block;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px 11px;margin:2px 4px 2px 0;font-size:12.5px;cursor:pointer}.pubbox .tg:hover{border-color:var(--accent);color:var(--accent)}.pubbox button{padding:4px 11px;font-size:12px;margin:2px 4px 2px 0}.warnb{border-left:3px solid var(--hl);padding-left:10px;color:var(--muted)}#ideas .lib-item b{font-size:14px}.score{font-size:32px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -213,7 +230,7 @@ scenes[]: t0,t1, bg:[topo,base], scenery:hills|city|space|night|none, ground:cor
     anim:pop|float|spin|shake|pulse|fall|none, to:{x,y}, dur, front:true
 </pre></div></details></div></div></details>
 </div></main>
-<footer>Animaê · build 18</footer>
+<footer>Animaê · build 18<span class="fl"><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><a href="{{CONTACT}}"{{CONTACT_ATTR}}>Contato</a></span></footer>
 <script src="js/audio.js"></script>
 <script src="js/schema.js"></script>
 <script src="js/auth.js"></script>

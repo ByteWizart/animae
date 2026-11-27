@@ -73,6 +73,12 @@ Tudo roda no navegador, sem custo de crédito:
 - **Rascunho automático:** a ideia, o roteiro, o JSON e as opções são salvos neste navegador (`animae.draft.v1`, até 14 dias). Ao voltar, aparece "Continuar" ou "Descartar".
 - **Legendas em arquivo (.srt)** com os mesmos tempos das legendas do vídeo (alinhadas à voz), em trechos de até 2 linhas, e **capa em PNG** no tamanho escolhido do vídeo, com o título por cima (opcional).
 
+## Preview de link, privacidade, termos e contato
+
+- **Preview de link (Discord, WhatsApp, Telegram, X):** as páginas `/`, `/gerar`, `/docs`, `/privacidade` e `/termos` têm as tags `og:title`, `og:description`, `og:image` (+ `og:url`, tamanho e `twitter:card`). A imagem é `public/og.jpg` (1200x630, ~88 KB). Essas tags precisam de endereço **absoluto**: o servidor troca `{{ORIGIN}}` pelo endereço do site. **Em produção defina `PUBLIC_URL`** (ex.: `https://animae.com.br`). Sem ela, usa o `Host` do pedido, só se ele tiver cara de domínio (qualquer outro valor vira `localhost`), e atrás de proxy (`TRUST_PROXY`) o protocolo que o proxy informa. Depois de trocar a imagem ou o texto, o Discord guarda o card em cache por um tempo; para forçar, mude a URL (`?v=2`) ou use o depurador de links de cada rede.
+- **Contato no rodapé:** defina `CONTACT_EMAIL` (vira `mailto:`) ou `CONTACT_URL` (um link). Sem nenhuma das duas, o link "Contato" abre o chat de suporte do próprio site. O e-mail ou link configurado também aparece na seção "Contato" das páginas de privacidade e termos.
+- **Privacidade (`/privacidade`) e Termos (`/termos`):** descrevem o que o software faz hoje (o que fica no navegador, o que vai para IA, voz e Supabase, o que o servidor guarda, retenção do suporte). Se você mudar o que o site coleta, atualize a página. São um texto-base, não aconselhamento jurídico: vale uma revisão antes de divulgar.
+
 ## Créditos (cota por pessoa, renovação configurável)
 
 O gerador tem um sistema de créditos: **cada pessoa ganha 25 créditos por dia** e cada uso de IA ou de voz gasta créditos. Gravar o vídeo no navegador não gasta nada. Tudo é configurado em **Painel > Créditos**: liga/desliga, créditos por dia (quem tem conta e visitantes sem conta, separados) e o custo de cada ação (padrão: gerar roteiro 5, sugerir ideias 1, editar 2, avaliar 1, traduzir 2, gerar voz 3).

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacidade · Animaê</title>
+<meta name="description" content="O que o Animaê guarda, o que envia a serviços externos e como pedir a exclusão dos seus dados.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#7c5cff">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Animaê">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Privacidade · Animaê">
+<meta property="og:description" content="O que o Animaê guarda, o que envia a serviços externos e como pedir a exclusão dos seus dados.">
+<meta property="og:url" content="{{ORIGIN}}/privacidade">
+<meta property="og:image" content="{{ORIGIN}}/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script src="js/theme.js"></script>
+<link rel="stylesheet" href="css/ui.css">
+<style>
+.legal{max-width:760px;margin:0 auto;padding:34px 0 8px}
+.legal h1{font-size:clamp(30px,4.6vw,44px);letter-spacing:-.035em;line-height:1.08;margin:0 0 10px}
+.legal .upd{color:var(--muted);font-size:14px;margin:0 0 26px}
+.legal h2{font-size:20px;letter-spacing:-.02em;margin:34px 0 8px;scroll-margin-top:84px}
+.legal p,.legal li{font-size:16px;line-height:1.65}
+.legal p{margin:0 0 12px}.legal ul{margin:0 0 12px;padding-left:22px}.legal li{margin:0 0 6px}
+.legal .sum{border:1px solid var(--line);background:var(--panel2);border-radius:16px;padding:16px 20px;margin:0 0 8px}.legal .sum ul{margin:0}
+footer.f{margin:48px 0 0;padding:18px 72px 0 0;border-top:1px solid var(--line);color:var(--muted);font-size:13px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+footer.f .fl{display:flex;flex-wrap:wrap;gap:0 18px}
+footer.f a{color:var(--muted)}
+@media(pointer:coarse),(max-width:560px){footer.f a{display:inline-block;padding:12px 6px}}
+</style></head><body class="page">
+<nav class="topnav"><a class="brand" href="/"><i></i>Animaê</a><a class="nl" href="/">Início</a><a class="nl" href="/gerar">Gerador</a><a class="nl" href="/docs">Docs</a></nav>
+<main class="shell"><article class="legal">
+<h1>Privacidade</h1>
+<p class="upd">Atualizado em 26 de novembro de 2026.</p>
+<div class="sum"><ul>
+<li>O site não tem anúncios, rastreadores nem ferramentas de análise de visitas.</li>
+<li>O vídeo é desenhado e gravado no seu aparelho. Ele nunca é enviado ao servidor.</li>
+<li>O texto que você escreve (ideia e roteiro) é enviado a serviços externos de IA e de voz, só para virar roteiro e áudio.</li>
+<li>Ter conta é opcional quando o site oferece login.</li>
+</ul></div>
+
+<h2>O que fica só no seu aparelho</h2>
+<p>A biblioteca de histórias (quando você não entrou numa conta), o rascunho automático da ideia e do roteiro, o tema claro ou escuro, a velocidade média da voz que o gerador mede, a sessão da conta e o código da sua conversa de suporte. Tudo isso fica no armazenamento do navegador e some se você limpar os dados do site.</p>
+
+<h2>O que vai para o servidor, e para quê</h2>
+<ul>
+<li><b>Ideia e roteiro:</b> seguem para o provedor de IA para gerar, editar ou traduzir. O servidor não guarda esse texto; guarda só um registro técnico (a operação, o provedor, se deu certo, o tempo e, se falhou, a mensagem de erro).</li>
+<li><b>Voz:</b> o texto do roteiro segue, pelo servidor, para o serviço de leitura do navegador Edge (Microsoft), que devolve o áudio. O áudio não é guardado.</li>
+<li><b>Estatísticas dos vídeos:</b> a cada vídeo gerado guardamos o nome, a duração, o estilo visual, a resolução, os quadros por segundo, o formato, o tamanho do arquivo e o número de cenas, mais o seu e-mail se você estiver numa conta. Servem para o painel do site. O vídeo em si não é enviado.</li>
+<li><b>Ícones:</b> o servidor busca ícones na biblioteca pública Iconify e guarda uma cópia. O seu navegador não conversa com o Iconify.</li>
+<li><b>Endereço IP:</b> serve para limitar abusos (por hora) e, sem conta, para contar os créditos. Os créditos usam um código derivado do IP (um hash com sal), não o IP puro, e os contadores de limite ficam só na memória do servidor.</li>
+<li><b>Cupons:</b> guardamos quem resgatou cada cupom (a sua conta ou o código derivado do IP) para respeitar os limites.</li>
+<li><b>Suporte:</b> a sua mensagem, o nome (se você informar) e o e-mail da conta (se estiver logado). Conversas paradas há mais de 90 dias são apagadas.</li>
+</ul>
+
+<h2>Conta</h2>
+<p>Quando o site oferece login, a conta guarda o seu e-mail (e o nome, se você entrar com o Google). A senha é tratada pelo Supabase; o Animaê não vê a sua senha. Com a conta, as histórias e os roteiros da biblioteca e o histórico de vídeos ficam salvos no banco, ligados a ela.</p>
+
+<h2>Cookies</h2>
+<p>O site não usa cookies de rastreamento. A área administrativa, que só o operador acessa, usa um cookie de sessão.</p>
+
+<h2>Serviços de terceiros</h2>
+<p>O funcionamento depende de serviços externos, cada um com a sua própria política: os provedores de IA que o operador configurou, o serviço de voz da Microsoft, o Iconify (ícones), o Supabase (conta e banco de dados) e o Google, se você entrar com ele.</p>
+
+<h2>Seus direitos</h2>
+<p>Você pode pedir acesso, correção ou exclusão dos seus dados, como prevê a Lei Geral de Proteção de Dados (Lei 13.709/2018). Para apagar a conta e o que está ligado a ela, use o contato abaixo.</p>
+
+<h2 id="contato">Contato</h2>
+<p>Fale com a gente pelo chat de suporte do site (o botão no canto da tela){{CONTACT_EXTRA}}.</p>
+<p>Esta página descreve como o site funciona hoje. Se algo mudar, ela muda junto, e a data no topo mostra a última atualização.</p>
+</article>
+<footer class="f"><span>Animaê · build 18</span><span class="fl"><a href="/gerar">Gerador</a><a href="/docs">Docs</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><a href="{{CONTACT}}"{{CONTACT_ATTR}}>Contato</a></span></footer>
+</main>
+<script src="js/suporte.js"></script>
+</body></html>

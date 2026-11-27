@@ -4,6 +4,21 @@
 <meta name="description" content="Descreva a ideia e o Animaê escreve o roteiro, monta as cenas, gera a voz e grava o short animado em vídeo, no seu navegador.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#7c5cff">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Animaê">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Animaê: do texto ao short animado">
+<meta property="og:description" content="Descreva a ideia e a IA escreve o roteiro, monta as cenas, gera a voz e grava o short animado.">
+<meta property="og:url" content="{{ORIGIN}}/">
+<meta property="og:image" content="{{ORIGIN}}/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Animaê: do texto ao short animado. Dois bonecos conversando em um escritório, com legenda animada.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Animaê: do texto ao short animado">
+<meta name="twitter:description" content="Descreva a ideia e a IA escreve o roteiro, monta as cenas, gera a voz e grava o short animado.">
+<meta name="twitter:image" content="{{ORIGIN}}/og.jpg">
 <script src="js/theme.js"></script>
 <link rel="stylesheet" href="css/ui.css">
 <style>
@@ -98,7 +113,8 @@ html{scroll-behavior:smooth}
 .end p{color:var(--muted);margin:0 0 24px;max-width:46ch;font-size:16px}
 .end .art svg{display:block;width:100%;height:auto}
 .end>div:first-child{padding-bottom:40px}
-footer.f{margin:48px 0 0;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+footer.f{margin:48px 0 0;padding:18px 72px 0 0;border-top:1px solid var(--line);color:var(--muted);font-size:13px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap} /* 72px à direita: o botão do chat de suporte não cobre o último link */
+footer.f .fl{display:flex;flex-wrap:wrap;gap:0 18px}
 footer.f a{color:var(--muted)}
 @media(pointer:coarse),(max-width:560px){footer.f a{display:inline-block;padding:12px 6px}}
 
@@ -159,7 +175,7 @@ footer.f a{color:var(--muted)}
 <section class="block" id="recursos">
   <div class="feat">
     <div>
-      <div class="sec-h"><h2>O que vem dentro</h2><p>Tudo roda no seu navegador e no servidor do site. Você não precisa de editor de vídeo.</p></div>
+      <div class="sec-h"><h2>O que vem dentro</h2><p>A IA e a voz rodam no servidor do site; o desenho e a gravação, no seu aparelho. Você não precisa de editor de vídeo.</p></div>
       <ul class="rows">
         <li><b>IA que dirige o vídeo</b><span>Escreve o roteiro e escolhe cenários, câmera, efeitos e sons. Usa só provedores com plano grátis e, se um deles atingir o limite, passa sozinho para o próximo.</span></li>
         <li><b>Voz com IA</b><span>Vozes neurais sem chave de API. Você escolhe voz, velocidade e tom, e ouve antes de gravar.</span></li>
@@ -228,13 +244,13 @@ footer.f a{color:var(--muted)}
 <section class="block" id="perguntas">
   <div class="sec-h"><h2>Perguntas frequentes</h2></div>
   <div class="faq">
-    <details><summary>Preciso criar uma conta?</summary><div class="a">Depende de como o site foi configurado. Quando o login está ligado, só quem entrou usa a IA, a voz e o botão Gerar vídeo. A prévia continua livre para todos.</div></details>
+    <details><summary>Preciso criar uma conta?</summary><div class="a" id="faq-conta">Não precisa. Dá para usar sem conta. Com uma conta, sua biblioteca de histórias fica salva e acompanha você em qualquer aparelho.</div></details>
     <details><summary>Tem custo?</summary><div class="a">O Animaê usa apenas serviços de IA com plano grátis e vozes que não pedem chave. Cada serviço tem limites, e o site também limita quantas gerações cada pessoa faz por hora.</div></details>
     <details><summary>Por que preciso deixar a aba aberta ao gerar o vídeo?</summary><div class="a">O vídeo é desenhado e gravado no próprio navegador, em tempo real. Navegadores costumam desacelerar abas escondidas, e a gravação pode sair com falhas. Use o Chrome ou o Edge no computador.</div></details>
     <details><summary>Posso usar minha própria voz?</summary><div class="a">Sim. No gerador, abra Avançado e envie sua gravação (mp3, wav ou m4a). Depois é só ajustar ao áudio e gerar o vídeo.</div></details>
     <details><summary>Posso usar o ChatGPT ou o Claude no lugar da IA do site?</summary><div class="a">Pode. Em Mais opções, o botão Copiar prompt para outra IA copia o prompt completo. Cole o JSON da resposta em Avançado e siga normalmente.</div></details>
     <details><summary>Onde ficam meus vídeos e minhas histórias?</summary><div class="a">O vídeo é baixado no seu aparelho. A história (JSON e roteiro) vai para a Minha biblioteca, no navegador ou na sua conta, se você entrou.</div></details>
-    <details><summary>Posso usar os vídeos de forma comercial?</summary><div class="a">Confira antes: alguns ícones online exigem crédito, e a voz com IA usa um serviço não oficial, que pode mudar ou sair do ar. Os Docs explicam cada caso.</div></details>
+    <details><summary>Posso usar os vídeos de forma comercial?</summary><div class="a">Pode, com dois cuidados: alguns ícones online pedem crédito ao autor, e a voz usa o leitor do Edge, que não é uma API pública (pode mudar sem aviso). Para monetizar, grave a sua própria voz.</div></details>
   </div>
 </section>
 
@@ -244,7 +260,7 @@ footer.f a{color:var(--muted)}
   <div class="art"><svg viewBox="0 0 220 260" aria-hidden="true"><g class="fg" data-x="110" data-y="256" data-u="20" data-pose="cheer" data-shirt="#7c5cff" data-hair="swept" data-mood="laugh"></g></svg></div>
 </section>
 
-<footer class="f"><span>Animaê · build 18</span><span><a href="/gerar">Gerador</a> · <a href="/docs">Docs</a></span></footer>
+<footer class="f"><span>Animaê · build 18</span><span class="fl"><a href="/gerar">Gerador</a><a href="/docs">Docs</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><a href="{{CONTACT}}"{{CONTACT_ATTR}}>Contato</a></span></footer>
 </main>
 
 <script src="js/auth.js"></script>
@@ -334,6 +350,12 @@ LOOKS.forEach(([id,n])=>{const d=document.createElement('div');d.className='look
   d.innerHTML=`<img src="looks/${id}.jpg" width="640" height="360" loading="lazy" alt="Exemplo do estilo ${n}"><span>${n}</span>`;
   lk.appendChild(d)});
 })();
+</script>
+<script>
+/* O FAQ "Preciso criar uma conta?" responde conforme o site está configurado de verdade (login desligado, opcional ou obrigatório). */
+(function(){var el=document.getElementById('faq-conta');if(!el||!window.fetch)return;
+fetch('/api/config',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){var a=(j&&j.auth)||{},g=a.google?' ou com o Google':'';
+el.textContent=!a.enabled?'Não. O Animaê não tem login: abra o gerador e use.':a.required?'Sim, para gerar. A prévia é livre, mas a IA, a voz e o botão Gerar vídeo pedem que você entre com uma conta (e-mail'+g+'). Leva um minuto.':'Não precisa. Dá para usar sem conta. Com uma conta, sua biblioteca de histórias fica salva e acompanha você em qualquer aparelho.'}).catch(function(){})})();
 </script>
 <script src="js/suporte.js"></script>
 </body></html>

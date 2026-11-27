@@ -43,6 +43,11 @@ Cupons valiosos: defina sempre **usos totais** e **validade**, e ative *Confirm 
 |---|-----------|------|-----------------|
 | 23 | Baixa | `server.js` (`fitTokens`) | **O ajuste automático não vira IA ou voz grátis ilimitada.** `/api/ai/fit` só responde com uma ficha (`X-Fit-Token`) emitida por uma voz **paga**, da mesma conta/IP, válida por 20 min e com 3 reescritas e 3 regerações de voz. Ficha inventada, de outra pessoa, vencida ou esgotada: 403 no ajuste e, no TTS, a voz é cobrada normalmente. Testado. |
 
+## Quinta rodada (preview de link e rodapé)
+| # | Gravidade | Onde | O que foi feito |
+|---|-----------|------|-----------------|
+| 24 | Baixa | `server.js` (`siteOrigin`) | **O endereço usado nas tags de preview não vem cru do cabeçalho `Host`.** `PUBLIC_URL` tem prioridade; sem ela, o `Host` só é aceito se parecer um domínio (letras, números, `.`, `-` e porta), senão cai em `localhost`; `X-Forwarded-Host` nunca é usado e `X-Forwarded-Proto` só com `TRUST_PROXY`. Um `Host` com aspas ou `<script>` não vira HTML (testado). O e-mail/link de contato é validado e escapado. |
+
 ## Limitações que continuam
 - Sem Supabase configurado, o site é aberto a qualquer visitante (só há limites por IP e globais).
 - Com `DATA_KEY` na mesma máquina/painel de hospedagem do `dados.json`, a proteção é contra vazamento do arquivo (backup, repositório), não contra quem já controla o servidor.
