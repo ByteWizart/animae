@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "functions": {
+    "api/index.js": {
+      "includeFiles": ["server.js", "server/**", "admin/**", "database/**", "public/**"]
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ]
+}

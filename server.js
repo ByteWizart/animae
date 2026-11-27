@@ -14,7 +14,7 @@ const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
 // Os dados (chaves de IA, hash da senha, histórico) ficam numa pasta escondida, fora da lista de arquivos públicos.
 // Para mudar o lugar (ex.: um disco persistente na hospedagem), defina DATA_DIR.
-const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(dir, '.dados');
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : (process.env.VERCEL ? '/tmp/animae-data' : path.join(dir, '.dados'));
 const DATA_FILE = path.join(DATA_DIR, 'dados.json');
 try {
   fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
@@ -1078,7 +1078,7 @@ const fillPage = (html, req) => html
   .replace(/\{\{CONTACT\}\}/g, CONTACT_URL ? escH(CONTACT_URL) : CONTACT_EMAIL ? 'mailto:' + escH(CONTACT_EMAIL) : '/privacidade#contato')
   .replace(/\{\{CONTACT_ATTR\}\}/g, CONTACT_URL || CONTACT_EMAIL ? '' : ' data-chat')
   .replace(/\{\{CONTACT_EXTRA\}\}/g, CONTACT_URL ? ' ou em <a href="' + escH(CONTACT_URL) + '">' + escH(CONTACT_URL.replace(/^https?:\/\//, '')) + '</a>' : CONTACT_EMAIL ? ' ou pelo e-mail <a href="mailto:' + escH(CONTACT_EMAIL) + '">' + escH(CONTACT_EMAIL) + '</a>' : '');
-const server = http.createServer((req, res) => {
+const requestHandler = (req, res) => {
   secHeaders(req, res);
   let p;
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end(); }
@@ -1107,35 +1107,51 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, h);
     res.end(req.method === 'HEAD' ? undefined : d);
   });
-});
-server.headersTimeout = 20e3; server.requestTimeout = 60e3; server.keepAliveTimeout = 5e3; server.maxHeadersCount = 60; // contra conexões lentas (slowloris)
-process.on('unhandledRejection', e => console.error('Erro não tratado:', e));
-// Com Supabase, lê as configurações e os saldos de créditos ANTES de abrir a porta (senão os primeiros visitantes veriam a cota cheia).
-(async () => { if (cfgDbReady()) { await cfgDbLoad(true); await balLoad(); } })().catch(() => {}).then(() => server.listen(PORT, async () => {
-  console.log('Animaê · build ' + BUILD);
-  console.log('  Créditos: ' + (!cfgDbReady() ? 'saldos só neste servidor (dados.json)' : bal.ok ? 'saldos guardados no Supabase (tabela credit_balances)' : 'Supabase com erro nos saldos: ' + bal.error));
-  if (cfgDbReady()) { console.log('  Configurações do painel: ' + (cfgDb.ok ? 'sincronizadas com o Supabase (tabela admin_config)' : 'Supabase com erro: ' + cfgDb.error)); }
-  ensureAdminDefaults(); // com Supabase, só agora (já lemos a senha e o endereço guardados lá)
-  { const c = sbCfg(); console.log('  Login: ' + (c.enabled ? 'Supabase ' + c.url + (c.required ? ' (obrigatório para gerar vídeos)' : ' (opcional)') : 'desligado (configure o Supabase em Admin > Conta e banco ou com SUPABASE_URL e SUPABASE_ANON_KEY)')); }
-  console.log('  Início:  http://localhost:' + PORT);
-  console.log('  Gerador: http://localhost:' + PORT + '/gerar');
-  console.log('  Docs:    http://localhost:' + PORT + '/docs');
-  console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
-  { const c = aiChain(); console.log('  IA: ' + (c.length ? c.map(p => p.label + ' (' + p.model + ')').join(' → ') : 'nenhum provedor configurado (use uma variável como GEMINI_API_KEY / GROQ_API_KEY ou o Admin > IA)')); }
-  if (firstRunPassword) {
-    if (process.stdout.isTTY) console.log('\n  >>> Senha inicial do admin: ' + firstRunPassword + '\n  >>> (aparece só desta vez; troque em Admin > Segurança)\n');
-    else { // logs de hospedagem são guardados: a senha vai para um arquivo protegido, não para o log
-      const f = path.join(DATA_DIR, 'senha-inicial.txt');
-      try { fs.writeFileSync(f, firstRunPassword + '\n', { mode: 0o600 }); console.log('\n  >>> Senha inicial do admin salva em ' + f + ' (leia, troque em Admin > Segurança e apague o arquivo).\n'); }
-      catch { console.log('\n  >>> Defina ADMIN_PASSWORD no ambiente: não consegui gravar a senha inicial.\n'); }
-    }
-  }
-  else if (process.env.ADMIN_PASSWORD) console.log('  Senha do admin vem de ADMIN_PASSWORD.');
-  if (!DATA_KEY) console.log('  DICA: defina DATA_KEY no ambiente para gravar as chaves de API cifradas no dados.json.');
-  if (!totpOn()) console.log('  DICA: ative a verificação em duas etapas em Admin > Segurança.');
-  if (!sbCfg().enabled) console.log('  AVISO: sem login, qualquer visitante usa a IA e a voz (limite global: ' + GLOBAL_MAX.ai + ' IA e ' + GLOBAL_MAX.tts + ' vozes por hora, ajustável por AI_ANON_PER_HOUR e TTS_ANON_PER_HOUR). Para abrir ao público, configure o login com Supabase.');
-}));
+};
 
+// Inicialização compartilhada: no Vercel é executada uma vez por instância quente.
+let initPromise;
+async function initApp() {
+  if (cfgDbReady()) { await cfgDbLoad(true); await balLoad(); }
+  ensureAdminDefaults();
+}
+function vercelHandler(req, res) {
+  if (!initPromise) initPromise = initApp().catch(err => { console.error('Falha ao inicializar Animaê:', err); throw err; });
+  return initPromise.then(() => requestHandler(req, res)).catch(err => {
+    console.error('Falha na requisição:', err);
+    if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+    if (!res.writableEnded) res.end(JSON.stringify({ error: 'Erro interno ao iniciar o Animaê.' }));
+  });
+}
+
+if (process.env.VERCEL) {
+  module.exports = vercelHandler;
+} else {
+  const server = http.createServer(requestHandler);
+  server.headersTimeout = 20e3; server.requestTimeout = 60e3; server.keepAliveTimeout = 5e3; server.maxHeadersCount = 60;
+  process.on('unhandledRejection', e => console.error('Erro não tratado:', e));
+  initApp().catch(() => {}).then(() => server.listen(PORT, async () => {
+    console.log('Animaê · build ' + BUILD);
+    console.log('  Créditos: ' + (!cfgDbReady() ? 'saldos só neste servidor (dados.json)' : bal.ok ? 'saldos guardados no Supabase (tabela credit_balances)' : 'Supabase com erro nos saldos: ' + bal.error));
+    if (cfgDbReady()) console.log('  Configurações do painel: ' + (cfgDb.ok ? 'sincronizadas com o Supabase (tabela admin_config)' : 'Supabase com erro: ' + cfgDb.error));
+    console.log('  Início:  http://localhost:' + PORT);
+    console.log('  Gerador: http://localhost:' + PORT + '/gerar');
+    console.log('  Docs:    http://localhost:' + PORT + '/docs');
+    console.log('  Admin (secreto, sem link no site): http://localhost:' + PORT + '/' + adminPath());
+    const c = aiChain();
+    console.log('  IA: ' + (c.length ? c.map(p => p.label + ' (' + p.model + ')').join(' → ') : 'nenhum provedor configurado'));
+    if (firstRunPassword) {
+      if (process.stdout.isTTY) console.log('\n  >>> Senha inicial do admin: ' + firstRunPassword + '\n  >>> (aparece só desta vez; troque em Admin > Segurança)\n');
+      else {
+        const f = path.join(DATA_DIR, 'senha-inicial.txt');
+        try { fs.writeFileSync(f, firstRunPassword + '\n', { mode: 0o600 }); console.log('\n  >>> Senha inicial salva em ' + f + '\n'); }
+        catch { console.log('\n  >>> Defina ADMIN_PASSWORD no ambiente.\n'); }
+      }
+    }
+    if (!DATA_KEY) console.log('  DICA: defina DATA_KEY para cifrar as chaves gravadas localmente.');
+    if (!totpOn()) console.log('  DICA: ative a verificação em duas etapas em Admin > Segurança.');
+  }));
+}
 /* ---------- limpeza periódica da memória ---------- */
 setInterval(() => {
   const now = Date.now(), old = a => a.filter(t => now - t < 3600e3);
