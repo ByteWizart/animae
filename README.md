@@ -1,7 +1,3 @@
-## Deploy na Vercel
-
-Há uma adaptação inicial para Vercel em `api/index.js`, `vercel.json` e `VERCEL.md`. Leia `VERCEL.md` antes de publicar: a Vercel não mantém arquivos locais permanentemente e algumas operações longas podem atingir limites de Functions.
-
 # Animaê: gerador de vídeos animados, verticais 9:16 ou horizontais 16:9 (no navegador, sem API paga)
 
 Organizado em pastas (veja a estrutura abaixo). A única dependência é a opcional `msedge-tts` (voz com IA): rode `npm install` uma vez. Sem ela, tudo funciona, menos a voz com IA.
