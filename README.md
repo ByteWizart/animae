@@ -1,9 +1,15 @@
 # Animaê: gerador de vídeos animados, verticais 9:16 ou horizontais 16:9 (no navegador, sem API paga)
 
+> **Publicar na Vercel?** Veja [DEPLOY-VERCEL.md](DEPLOY-VERCEL.md). O projeto roda lá como CDN (páginas) + uma função (API), com o Supabase guardando o estado.
+
 Organizado em pastas (veja a estrutura abaixo). A única dependência é a opcional `msedge-tts` (voz com IA): rode `npm install` uma vez. Sem ela, tudo funciona, menos a voz com IA.
 
 ```
-server.js            servidor (ponto de entrada: node server.js)
+server.js            servidor (ponto de entrada: node server.js; na Vercel, importado por api/index.js)
+api/index.js         função serverless da Vercel (chama o server.js)
+scripts/build.js     build estático para a Vercel (public/ -> dist/)
+vercel.json          rotas, cache e cabeçalhos da Vercel
+.env.example         variáveis de ambiente
 package.json         dependências
 server/              código só do servidor: ai.js, providers.js, supabase.js, tts.js, credits.js, cupons.js, suporte.js
 admin/               painel administrativo (admin.html, servido no endereço secreto)

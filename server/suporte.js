@@ -21,14 +21,14 @@ const validToken = t => typeof t === 'string' && /^[0-9a-f]{48}$/.test(t);
 const cleanText = (v, max = MAX_TEXT) => String(v == null ? '' : v).replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ').replace(/\n{3,}/g, '\n\n').replace(/[ \t]+\n/g, '\n').trim().slice(0, max);
 const cleanLine = (v, max) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 
+// file = caminho do arquivo (servidor único) ou null (modo serverless: quem guarda é o chamador, via snapshot()/restore()/isDirty()).
 function create(file) {
   let data = { v: 1, threads: {} };
+  let dirty = false;
   const byHash = new Map(); // hash do token -> id da conversa
   let timer = null;
 
-  function load() {
-    try {
-      const d = JSON.parse(fs.readFileSync(file, 'utf8'));
+  function ingest(d) {
       if (d && typeof d === 'object' && d.threads && typeof d.threads === 'object') {
         for (const [id, t] of Object.entries(d.threads)) {
           if (!/^[0-9a-f]{16}$/.test(id) || !t || typeof t !== 'object' || !/^[0-9a-f]{64}$/.test(t.h || '') || !Array.isArray(t.msgs)) continue;
@@ -38,14 +38,24 @@ function create(file) {
           byHash.set(t.h, id);
         }
       }
-    } catch (e) { if (e.code !== 'ENOENT') console.warn('Aviso: suporte.json ilegível, começando vazio (' + e.message + ')'); }
   }
+  function load() {
+    if (!file) return;
+    try { ingest(JSON.parse(fs.readFileSync(file, 'utf8'))); }
+    catch (e) { if (e.code !== 'ENOENT') console.warn('Aviso: suporte.json ilegível, começando vazio (' + e.message + ')'); }
+  }
+  // Modo serverless: troca tudo pelo que está guardado no banco (só chamar com isDirty() == false, senão perderia o que ainda não foi enviado).
+  function restore(d) { data = { v: 1, threads: {} }; byHash.clear(); ingest(d); }
+  const snapshot = () => data;
+  const isDirty = () => dirty;
+  const markClean = () => { dirty = false; };
   function flush() {
     clearTimeout(timer); timer = null;
+    if (!file) return;
     try { const tmp = file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(data), { mode: 0o600 }); fs.renameSync(tmp, file); }
     catch (e) { console.warn('Aviso: não consegui gravar o suporte (' + e.message + ')'); }
   }
-  const soon = () => { if (timer) return; timer = setTimeout(flush, 1500); timer.unref && timer.unref(); };
+  const soon = () => { dirty = true; if (!file || timer) return; timer = setTimeout(flush, 1500); timer.unref && timer.unref(); };
   load();
 
   const count = () => Object.keys(data.threads).length;
@@ -136,7 +146,7 @@ function create(file) {
   function remove(id) { const ok = drop(id); if (ok) soon(); return ok; }
   function purgeClosed() { let n = 0; for (const t of Object.values(data.threads)) if (t.closed) { drop(t.id); n++; } if (n) soon(); return n; }
 
-  return { send, poll, markReadByUser, unreadForUser, unread, list, get, reply, setClosed, remove, purgeClosed, prune, flush, count, nearFull, MAX_TEXT };
+  return { restore, snapshot, isDirty, markClean, send, poll, markReadByUser, unreadForUser, unread, list, get, reply, setClosed, remove, purgeClosed, prune, flush, count, nearFull, MAX_TEXT };
 }
 
 module.exports = { create, cleanText, cleanLine, validToken, MAX_TEXT };

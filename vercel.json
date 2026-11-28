@@ -1,14 +1,55 @@
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "node scripts/build.js",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "trailingSlash": false,
   "functions": {
     "api/index.js": {
-      "includeFiles": "{server.js,server/**,admin/**,database/**,public/**}"
+      "maxDuration": 300,
+      "includeFiles": "{admin,database}/**"
     }
   },
   "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index" },
+    { "source": "/supabase-schema.sql", "destination": "/api/index" },
+    { "source": "/:admin([A-Za-z0-9_-]+)", "destination": "/api/index" }
+  ],
+  "redirects": [
+    { "source": "/ajuda", "destination": "/docs", "permanent": true },
+    { "source": "/ajuda.html", "destination": "/docs", "permanent": true },
+    { "source": "/home.html", "destination": "/", "permanent": true },
+    { "source": "/index.html", "destination": "/gerar", "permanent": true }
+  ],
+  "headers": [
     {
       "source": "/(.*)",
-      "destination": "/api/index"
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Resource-Policy", "value": "same-origin" }
+      ]
+    },
+    {
+      "source": "/(js|css)/(.*)",
+      "has": [{ "type": "query", "key": "v" }],
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/looks/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800" }]
+    },
+    {
+      "source": "/(og.jpg|favicon.svg)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }]
+    },
+    {
+      "source": "/exemplos/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600, stale-while-revalidate=86400" }]
     }
   ]
 }

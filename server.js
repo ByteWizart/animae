@@ -1,6 +1,6 @@
 // Servidor mínimo, sem dependências. Uso: node server.js  ->  http://localhost:3000
 // Serve os arquivos estáticos e uma pequena API para o painel Admin (dados em dados.json).
-const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
+const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
 const SCHEMA = require('./public/js/schema.js');
 const AI = require('./server/ai.js');
 const PROV = require('./server/providers.js');
@@ -12,9 +12,12 @@ const SUPORTE = require('./server/suporte.js');
 
 const dir = __dirname;
 const PORT = +process.env.PORT || 3000;
+// Na Vercel (ou com SERVERLESS=1) cada pedido pode cair numa instância diferente e o disco some a cada reinício: a memória e os
+// arquivos deixam de ser a fonte da verdade. As configurações, os saldos e o suporte vão para o Supabase (veja DEPLOY-VERCEL.md).
+const SERVERLESS = !!process.env.VERCEL || /^(1|true|yes|sim)$/i.test(process.env.SERVERLESS || '');
 // Os dados (chaves de IA, hash da senha, histórico) ficam numa pasta escondida, fora da lista de arquivos públicos.
 // Para mudar o lugar (ex.: um disco persistente na hospedagem), defina DATA_DIR.
-const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(dir, '.dados');
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : SERVERLESS ? path.join(os.tmpdir(), 'animae-dados') : path.join(dir, '.dados'); // na Vercel só /tmp é gravável (e some)
 const DATA_FILE = path.join(DATA_DIR, 'dados.json');
 try {
   fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
@@ -102,9 +105,11 @@ function load() {
 }
 const cfgHook = { fn: null }; // preenchido mais abaixo (sincronização das configurações com o Supabase)
 function save() {
-  const tmp = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(DATA_KEY ? mapSecrets(JSON.parse(JSON.stringify(db)), encS) : db, null, 1), { mode: 0o600 });
-  fs.renameSync(tmp, DATA_FILE);
+  if (!SERVERLESS) { // na Vercel o disco some a cada reinício: a persistência é o Supabase (cfgHook abaixo)
+    const tmp = DATA_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(DATA_KEY ? mapSecrets(JSON.parse(JSON.stringify(db)), encS) : db, null, 1), { mode: 0o600 });
+    fs.renameSync(tmp, DATA_FILE);
+  }
   if (cfgHook.fn) try { cfgHook.fn(); } catch {}
 }
 load();
@@ -114,7 +119,7 @@ const saveSoon = () => { if (saveTimer) return; saveTimer = setTimeout(() => { s
 const balHook = { fn: null }; // saldos de créditos no Supabase (definido mais abaixo)
 const CR = CRED.create(() => db.credits, () => { saveSoon(); if (balHook.fn) balHook.fn(); });
 const CP = CUPON.create(() => db.coupons, CR, () => saveSoon()); // cupons (usa o CR para dar créditos e vantagens)
-const SP = SUPORTE.create(path.join(DATA_DIR, 'suporte.json')); // chat de suporte: qualquer um escreve, só o admin responde
+const SP = SUPORTE.create(SERVERLESS ? null : path.join(DATA_DIR, 'suporte.json')); // chat de suporte: qualquer um escreve, só o admin responde
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { try { save(); SP.flush(); await Promise.race([Promise.all([cfgDbSave(), balFlush()]), new Promise(r => setTimeout(r, 2500))]); } catch {} process.exit(0); });
 
 /* ---------- senha e sessões ---------- */
@@ -146,6 +151,8 @@ const validPath = v => /^[a-z0-9][a-z0-9_-]{3,39}$/i.test(v) && !['api', 'ajuda'
 // Cria a senha inicial e o endereço secreto do painel se ainda não existirem. Com Supabase, só roda DEPOIS de ler a
 // configuração de lá (senão um servidor novo inventaria uma senha e apagaria a que já está guardada no banco).
 function ensureAdminDefaults() {
+  // Sem disco persistente, uma senha ou um endereço gerados aqui ninguém conseguiria ler: no modo serverless vêm do ambiente (ADMIN_PASSWORD, ADMIN_PATH).
+  if (SERVERLESS) return;
   if (!process.env.ADMIN_PASSWORD && !(db.auth && db.auth.hash)) {
     firstRunPassword = crypto.randomBytes(6).toString('base64url');
     setPassword(firstRunPassword);
@@ -153,12 +160,32 @@ function ensureAdminDefaults() {
   if (!db.adminPath) { db.adminPath = 'painel-' + crypto.randomBytes(5).toString('hex'); save(); }
 }
 const adminPath = () => (process.env.ADMIN_PATH && validPath(process.env.ADMIN_PATH) ? process.env.ADMIN_PATH : db.adminPath) || '';
-const sessions = new Map(); // token -> expira
+const sessions = new Map(); // token -> expira (modo servidor único)
 const SESSION_MS = 8 * 3600e3;
-const newSession = () => { const t = crypto.randomBytes(24).toString('hex'); sessions.set(t, Date.now() + SESSION_MS); return t; };
+// Sessão assinada (sem estado no servidor): obrigatória na Vercel, onde cada pedido pode cair numa instância diferente.
+// Segredo: SESSION_SECRET (recomendado). Na Vercel, se faltar, usa DATA_KEY ou a chave service_role (ambos já são segredos longos do ambiente).
+// Fora da Vercel, sem SESSION_SECRET, continua o modo antigo (sessões na memória do processo).
+const SESS_SECRET = process.env.SESSION_SECRET || (SERVERLESS ? (process.env.DATA_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '') : '');
+const STATELESS = !!SESS_SECRET;
+const hmac = (s, tag) => crypto.createHmac('sha256', SESS_SECRET || 'x').update(tag + '|' + s).digest('base64url');
+// Muda quando a senha muda: derruba as sessões antigas (equivale a "sair de todos os aparelhos").
+const authVer = () => hmac(process.env.ADMIN_PASSWORD || (db.auth && db.auth.hash) || '', 'ver').slice(0, 10);
+function newSession() {
+  if (!STATELESS) { const t = crypto.randomBytes(24).toString('hex'); sessions.set(t, Date.now() + SESSION_MS); return t; }
+  const body = (Date.now() + SESSION_MS) + '.' + crypto.randomBytes(8).toString('hex') + '.' + authVer();
+  return body + '.' + hmac(body, 'sid');
+}
+const sessionCookie = req => `sid=${newSession()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MS / 1000}${isHttps(req) ? '; Secure' : ''}`;
 const cookieOf = req => Object.fromEntries((req.headers.cookie || '').split(';').map(s => s.trim().split('=')).filter(a => a[0]).map(a => [a[0], a.slice(1).join('=')]));
 function isAdmin(req) {
-  const t = cookieOf(req).sid, exp = t && sessions.get(t);
+  const t = cookieOf(req).sid;
+  if (!t) return false;
+  if (STATELESS) {
+    const i = t.lastIndexOf('.'); if (i < 1) return false;
+    const body = t.slice(0, i), [exp, , ver] = body.split('.');
+    return safeEq(hmac(body, 'sid'), t.slice(i + 1)) && +exp > Date.now() && ver === authVer();
+  }
+  const exp = sessions.get(t);
   if (!exp) return false;
   if (exp < Date.now()) { sessions.delete(t); return false; }
   return true;
@@ -167,7 +194,8 @@ const fails = new Map(); // ip -> {n, until}
 const loginFails = []; let loginBusy = 0; // falhas de login de todos os IPs (últimos 10 min) e conferências em andamento
 // Atrás de um proxy/hospedagem (Render, Railway, Nginx...), defina TRUST_PROXY=1 (quantos proxies confiáveis existem na frente).
 // Sem isso, todos os visitantes pareceriam ter o mesmo IP. Com isso ligado, o IP vem do X-Forwarded-For.
-const TRUST_PROXY = /^(true|yes|sim)$/i.test(process.env.TRUST_PROXY || '') ? 1 : Math.max(0, parseInt(process.env.TRUST_PROXY, 10) || 0);
+// Na Vercel o proxy é sempre confiável (ela sobrescreve o X-Forwarded-For com o IP real do visitante): padrão 1.
+const TRUST_PROXY = /^(true|yes|sim)$/i.test(process.env.TRUST_PROXY || '') ? 1 : process.env.TRUST_PROXY === undefined && SERVERLESS ? 1 : Math.max(0, parseInt(process.env.TRUST_PROXY, 10) || 0);
 let warnedProxy = false;
 const ipOf = req => {
   const xff = String(req.headers['x-forwarded-for'] || '').split(',').map(x => x.trim()).filter(Boolean);
@@ -208,6 +236,8 @@ function take(map, key, limit) {
 }
 
 /* ---------- utilidades HTTP ---------- */
+// Respostas públicas (iguais para todo mundo) podem ficar alguns segundos na CDN da Vercel: menos invocações da função.
+const CDN = (s, swr) => ({ 'Cache-Control': `public, max-age=0, s-maxage=${s}, stale-while-revalidate=${swr}` });
 const send = (res, code, obj, headers) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...(headers || {}) }); res.end(JSON.stringify(obj)); };
 function body(req, limit = 2e6) {
   return new Promise((ok, no) => {
@@ -585,9 +615,63 @@ function balSoon() {
   if (!cfgDbReady() || bal.timer) return;
   bal.timer = setTimeout(() => { bal.timer = null; balFlush(); }, 1500); bal.timer.unref && bal.timer.unref();
 }
-balHook.fn = balSoon;
+balHook.fn = () => { bal.dirty = true; balSoon(); };
+/* ---------- modo serverless: o que antes ficava na memória do servidor ---------- */
+// Cada pedido pode cair numa instância diferente: antes de mexer nos créditos de uma pessoa, lê a linha dela no banco (a mais recente vence)
+// e, ao fim do pedido, flushAll() grava o que mudou. Sem service_role (cfgDbReady), os saldos ficam só na instância (veja DEPLOY-VERCEL.md).
+async function balPull(key) {
+  if (!SERVERLESS || !cfgDbReady()) return;
+  bal.loaded = true; // sem leitura completa: só as linhas de quem usa o site agora
+  try {
+    const q = k => BAL + '?key=eq.' + encodeURIComponent(key) + '&select=' + k;
+    let r = await SB.call(sbCfg(), 'GET', q('key,d,u,b,w,t,s,x'));
+    if (balMissingX(r)) { balOldDb(); r = await SB.call(sbCfg(), 'GET', q('key,d,u,b,w,t,s')); }
+    if (!r.ok) { bal.ok = false; bal.error = balErr(r); return; }
+    bal.ok = true; bal.error = '';
+    const x = Array.isArray(r.json) ? r.json[0] : null; if (!x) return;
+    const e = { d: String(x.d || ''), u: Math.max(0, x.u | 0), b: Math.max(0, x.b | 0), w: String(x.w || '').slice(0, 120), t: +x.t || 0, s: +x.s || 0 }, us = db.credits.users, cur = us[key];
+    if (x.x && typeof x.x === 'object') { const pk = CRED.cleanPerks(x.x.p), cp = CRED.cleanUsedCoupons(x.x.c); if (pk.length) e.p = pk; if (Object.keys(cp).length) e.c = cp; }
+    if (!cur || (+cur.t || 0) <= e.t) { us[key] = e; bal.synced.set(key, balSig(e)); }
+  } catch (e) { bal.ok = false; bal.error = cfgDbCatch(e); }
+}
+// Chat de suporte: um único documento no Supabase (tabela support_store), lido no máximo a cada 3 s por instância e gravado ao fim do pedido.
+const SUP = '/rest/v1/support_store', sup = { at: 0, failAt: 0, ok: null, error: '', pruned: 0 };
+async function supLoad() {
+  if (!SERVERLESS || !cfgDbReady() || SP.isDirty() || Date.now() - sup.at < 3e3) return;
+  sup.at = Date.now();
+  try {
+    const r = await SB.call(sbCfg(), 'GET', SUP + '?id=eq.1&select=data');
+    if (!r.ok) { sup.ok = false; sup.error = r.status === 404 || (r.json && /PGRST205|42P01/.test(String(r.json.code || ''))) ? 'A tabela support_store não existe: rode o supabase-schema.sql de novo.' : 'Erro ' + r.status + ' no Supabase.'; return; }
+    const row = Array.isArray(r.json) ? r.json[0] : null;
+    if (row && row.data && typeof row.data === 'object') SP.restore(row.data);
+    sup.ok = true; sup.error = '';
+    if (Date.now() - sup.pruned > 3600e3) { sup.pruned = Date.now(); SP.prune(); }
+  } catch (e) { sup.ok = false; sup.error = cfgDbCatch(e); }
+}
+async function supSave() {
+  if (!SERVERLESS || !cfgDbReady() || !SP.isDirty() || Date.now() - sup.failAt < 15e3) return;
+  try {
+    const r = await SB.call(sbCfg(), 'POST', SUP + '?on_conflict=id', { body: { id: 1, data: SP.snapshot(), updated_at: new Date().toISOString() }, extra: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+    if (r.ok) { SP.markClean(); sup.ok = true; sup.error = ''; } else { sup.ok = false; sup.failAt = Date.now(); sup.error = 'Não consegui gravar o suporte (erro ' + r.status + '): a tabela support_store existe?'; console.warn('Aviso: ' + sup.error); }
+  } catch (e) { sup.ok = false; sup.failAt = Date.now(); sup.error = cfgDbCatch(e); }
+}
+// Início de cada pedido: traz a configuração do painel (cache de 30 s por instância).
+async function ready() {
+  if (!SERVERLESS || !cfgDbReady()) return;
+  if (!cfgDb.loaded && Date.now() - (cfgDb.tried || 0) < 5e3) return; // Supabase fora do ar: não deixa cada pedido esperar o tempo limite
+  cfgDb.tried = Date.now();
+  await cfgDbLoad(false);
+}
+// Fim de cada pedido (antes de responder): grava o que mudou, porque a instância pode congelar assim que a resposta sai.
+async function flushAll() {
+  const jobs = [];
+  if (cfgDb.loaded && cfgDb.dirty) jobs.push(cfgDbSave());
+  if (bal.dirty) { bal.dirty = false; jobs.push(balFlush().then(ok => { if (!ok) bal.dirty = true; })); }
+  jobs.push(supSave());
+  await Promise.allSettled(jobs);
+}
 // Rede de segurança: se o banco estava fora do ar, tenta ler de novo a cada 30 s; se o envio falhou, tenta enviar de novo.
-setInterval(() => { if (!cfgDbReady()) return; if (!cfgDb.loaded && Date.now() - (cfgDb.tried || 0) > 30e3) { cfgDb.tried = Date.now(); cfgDbLoad(true); } if (!bal.loaded) { if (Date.now() - bal.tried > 30e3) balLoad(); } else if (bal.ok === false) balFlush(); }, 10e3).unref();
+if (!SERVERLESS) setInterval(() => { if (!cfgDbReady()) return; if (!cfgDb.loaded && Date.now() - (cfgDb.tried || 0) > 30e3) { cfgDb.tried = Date.now(); cfgDbLoad(true); } if (!bal.loaded) { if (Date.now() - bal.tried > 30e3) balLoad(); } else if (bal.ok === false) balFlush(); }, 10e3).unref();
 
 // Registro de atividade da IA (últimos 200 usos) e totais, mostrados no painel.
 function logAi(op, who, ok, ms, err) {
@@ -600,9 +684,18 @@ const histHits = new Map();
 const creditHits = new Map();
 // Ajuste fino da duração: quem PAGA uma voz ganha, por 20 minutos, até 3 regerações da voz e 3 reescritas do roteiro sem custo extra
 // (para o roteiro caber na duração escolhida sem esticar o áudio). A ficha é amarrada à mesma conta/IP e se esgota sozinha.
-const fitTokens = new Map(); // ficha -> { key, tts, ai, exp }
-const fitIssue = key => { const t = crypto.randomBytes(12).toString('hex'); fitTokens.set(t, { key, tts: 3, ai: 3, exp: Date.now() + 20 * 60e3 }); return t; };
-const fitGet = (req, key) => { const t = String(req.headers['x-fit-token'] || ''), e = fitTokens.get(t); return e && e.exp > Date.now() && e.key === key ? { t, e } : null; };
+// A ficha é ASSINADA (jti.validade.assinatura, amarrada à conta/IP): vale em qualquer instância. Os contadores ficam na memória da instância;
+// na Vercel, outra instância começa a contar do zero (no máximo 20 min de regerações extras, limitadas pela cota do provedor).
+const fitTokens = new Map(); // jti -> { tts, ai, exp }
+const FIT_SECRET = SESS_SECRET || process.env.DATA_KEY || crypto.randomBytes(32).toString('hex');
+const fitMac = (jti, exp, key) => crypto.createHmac('sha256', FIT_SECRET).update('fit|' + jti + '|' + exp + '|' + key).digest('base64url').slice(0, 32);
+const fitIssue = key => { const jti = crypto.randomBytes(8).toString('hex'), exp = Date.now() + 20 * 60e3; fitTokens.set(jti, { tts: 3, ai: 3, exp }); return jti + '.' + exp + '.' + fitMac(jti, exp, key); };
+const fitGet = (req, key) => {
+  const t = String(req.headers['x-fit-token'] || '').slice(0, 120), [jti, exp, mac] = t.split('.');
+  if (!/^[0-9a-f]{16}$/.test(jti || '') || !(+exp > Date.now()) || !mac || !safeEq(mac, fitMac(jti, +exp, key))) return null;
+  let e = fitTokens.get(jti); if (!e) { e = { tts: 3, ai: 3, exp: +exp }; fitTokens.set(jti, e); }
+  return { t, e };
+};
 const couponHits = new Map(); // ip -> tentativas de cupom por hora
 const couponUserHits = new Map(); // conta -> tentativas de cupom por hora (quem troca de IP não escapa do limite)
 const couponOk = new Map(); // ip -> cupons resgatados COM SUCESSO na última hora (contra criar várias contas para o mesmo cupom)
@@ -615,7 +708,7 @@ const ttsInfo = () => ({ installed: TTS.available(), enabled: !!db.tts.enabled, 
 
 function status() {
   const expected = ['server.js', 'package.json', 'README.md', 'admin/admin.html', 'database/supabase-schema.sql', 'server/ai.js', 'server/credits.js', 'server/cupons.js', 'server/suporte.js', 'server/providers.js', 'server/supabase.js', 'server/tts.js', 'public/index.html', 'public/home.html', 'public/docs.html', 'public/favicon.svg', 'public/css/ui.css', 'public/js/audio.js', 'public/js/auth.js', 'public/js/suporte.js', 'public/js/cupom.js', 'public/js/schema.js', 'public/js/guia.js', 'public/js/theme.js', 'public/js/motor-extra.js', 'public/js/motor-extra2.js', 'public/exemplos/historia-teste.json', 'public/exemplos/historia-demo-v9.json', 'public/exemplos/historia-demo-16x9.json'];
-  const files = expected.map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
+  const files = (SERVERLESS ? expected.filter(f => !f.startsWith('public/') && f !== 'README.md') : expected).map(f => { try { const s = fs.statSync(path.join(dir, f)); return { name: f, ok: true, bytes: s.size, mtime: s.mtimeMs }; } catch { return { name: f, ok: false }; } });
   let dataBytes = 0; try { dataBytes = fs.statSync(DATA_FILE).size; } catch {}
   const byLook = {}; let secs = 0;
   db.history.forEach(h => { byLook[h.look] = (byLook[h.look] || 0) + 1; secs += h.duration || 0; });
@@ -626,6 +719,7 @@ function status() {
     build: BUILD, node: process.version, platform: process.platform, port: PORT, uptime: Math.round((Date.now() - STARTED) / 1000),
     passwordFromEnv: !!process.env.ADMIN_PASSWORD, totp: totpOn(), encrypted: !!DATA_KEY, dataBytes, files,
     tts: ttsInfo(), counts: { videos: db.history.length, seconds: Math.round(secs), ideas: db.aiCount || 0 }, byLook,
+    serverless: SERVERLESS, persistent: !SERVERLESS || cfgDbReady(), supportStore: SERVERLESS ? { ok: sup.ok, error: sup.error } : null,
     supabase: { enabled: sbCfg().enabled, required: sbCfg().required }, byDay, aiStats: db.aiStats || { total: 0, ok: 0, fail: 0, ms: 0 }, ai: aiInfo(), adminPath: adminPath(), adminPathFromEnv: !!process.env.ADMIN_PATH,
   };
 }
@@ -634,7 +728,7 @@ function status() {
 /* ---------- ícones online (Iconify, API pública, sem chave) ---------- */
 // Um proxy com cache em disco: o navegador pede /api/icon?q=rocket (ou ?id=noto:rocket) no mesmo endereço do site,
 // então o desenho no canvas não "contamina" a gravação do vídeo, e cada ícone só é baixado uma vez.
-const ICON_DIR = path.join(dir, '.cache-icones');
+const ICON_DIR = SERVERLESS ? path.join(os.tmpdir(), 'animae-icones') : path.join(dir, '.cache-icones'); // na Vercel o cache de verdade é a CDN (veja o Cache-Control abaixo)
 const ICON_API = 'https://api.iconify.design';
 const ICON_MAX = 3000; // máximo de ícones guardados em disco
 const ICON_SETS = ['noto', 'fluent-emoji-flat', 'twemoji', 'openmoji', 'flat-color-icons']; // 1º conjunto = estilo principal
@@ -679,10 +773,12 @@ async function api(req, res, p) {
   const m = req.method;
   try {
     if (m !== 'GET' && m !== 'HEAD' && !sameOrigin(req)) return send(res, 403, { error: 'Origem não permitida.' });
-    if (p === '/api/settings' && m === 'GET') return send(res, 200, publicSettings());
+    if (SERVERLESS && (p.startsWith('/api/support/') || p.startsWith('/api/admin/support'))) await supLoad();
+    if (p === '/api/settings' && m === 'GET') return send(res, 200, publicSettings(), CDN(20, 60));
     if (p === '/api/session' && m === 'GET') return send(res, 200, { admin: isAdmin(req), build: BUILD, totp: totpOn() });
 
     if (p === '/api/login' && m === 'POST') {
+      if (SERVERLESS && !STATELESS) return send(res, 503, { error: 'Defina a variável SESSION_SECRET (um texto longo e aleatório) no ambiente para o login do painel funcionar na Vercel.' });
       const ip = ipOf(req), f = fails.get(ip);
       if (f && f.until > Date.now()) return send(res, 429, { error: `Muitas tentativas. Aguarde ${Math.ceil((f.until - Date.now()) / 1000)} s.` });
       // A tentativa é contada ANTES de conferir a senha: chutes simultâneos não furam o limite.
@@ -702,7 +798,7 @@ async function api(req, res, p) {
       } finally { loginBusy--; }
       if (!okLogin) { loginFails.push(Date.now()); return send(res, 401, { error: totpOn() ? 'Senha ou código incorretos.' : 'Senha incorreta.' }); }
       fails.delete(ip);
-      return send(res, 200, { ok: true }, { 'Set-Cookie': `sid=${newSession()}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MS / 1000}${isHttps(req) ? '; Secure' : ''}` });
+      return send(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie(req) });
     }
     if (p === '/api/logout' && m === 'POST') { sessions.delete(cookieOf(req).sid); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' + (isHttps(req) ? '; Secure' : '') }); }
 
@@ -727,13 +823,14 @@ async function api(req, res, p) {
     }
 
     // IA: as chaves dos provedores ficam só no servidor. Limite por IP para ninguém gastar a cota.
-    if (p === '/api/config' && m === 'GET') { const c = sbCfg(); return send(res, 200, { auth: { enabled: c.enabled, required: c.enabled && c.required, url: c.enabled ? c.url : '', anonKey: c.enabled ? c.anonKey : '', google: c.enabled && c.google } }, { 'Cache-Control': 'no-store' }); }
+    if (p === '/api/config' && m === 'GET') { const c = sbCfg(); return send(res, 200, { auth: { enabled: c.enabled, required: c.enabled && c.required, url: c.enabled ? c.url : '', anonKey: c.enabled ? c.anonKey : '', google: c.enabled && c.google } }, CDN(60, 300)); }
     // Saldo de créditos de quem está perguntando (só leitura; quem decide é sempre o servidor).
     if (p === '/api/credits' && m === 'GET') {
       const c = sbCfg(), user = await authUser(req);
       if (c.enabled && c.required && !user) return send(res, 200, { enabled: false }, { 'Cache-Control': 'no-store' });
       const w = credWho(req, { user });
       if (!take(creditHits, w.key, 240)) return send(res, 429, { error: 'Muitas consultas.' });
+      await balPull(w.key);
       const v = CR.view(w.key);
       return send(res, 200, { enabled: v.enabled, daily: v.daily, used: v.used, bonus: v.bonus, left: v.left, resetIn: v.resetIn, every: v.every, costs: v.costs, perks: v.perks, anon: !user }, { 'Cache-Control': 'no-store', ...credHeaders(v) });
     }
@@ -753,6 +850,8 @@ async function api(req, res, p) {
       // Resgates com SUCESSO por rede: sem isso, uma pessoa criaria várias contas e usaria o mesmo cupom em todas.
       const nowOk = Date.now(), okList = (couponOk.get(ip) || []).filter(t => nowOk - t < 3600e3); couponOk.set(ip, okList);
       if (okList.length >= 10) return send(res, 429, { error: 'Muitos cupons resgatados desta rede na última hora. Tente de novo mais tarde.' });
+      if (SERVERLESS) await cfgDbLoad(true); // cupons e contagem de usos vêm do banco: outra instância pode ter mudado
+      await balPull(credWho(req, lg).key);
       const cw = credWho(req, lg), r = CP.redeem(b.code, { key: cw.key, name: cw.name, hasAccount: !!lg.user }, sbCfg().enabled);
       if (r.error) return send(res, r.login ? 401 : 400, { error: r.error, ...(r.login ? { login: true } : {}) });
       undo(); okList.push(nowOk); // deu certo: não conta como tentativa errada (mas conta no limite de resgates por rede)
@@ -788,11 +887,11 @@ async function api(req, res, p) {
       return send(res, 200, { exists: true, ...r });
     }
 
-    if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.enabled && i.hasKey, perHour: i.perHour }); }
+    if (p === '/api/ai/status' && m === 'GET') { const i = aiInfo(); return send(res, 200, { available: i.enabled && i.hasKey, perHour: i.perHour }, CDN(30, 120)); }
     // Prompt pronto para copiar e usar em outra IA (ChatGPT, Claude...): as mesmas regras que o site usa.
     if (p === '/api/ai/prompt' && m === 'GET') {
       const q = new URL(req.url, 'http://x').searchParams, seconds = [20, 30, 45, 60].includes(+q.get('seconds')) ? +q.get('seconds') : 30;
-      return send(res, 200, { prompt: AI.systemPrompt({ aspect: aspectFor(q.get('aspect') === '16:9' ? '16:9' : '9:16'), seconds, look: SCHEMA.SET.look.has(q.get('look')) ? q.get('look') : '', format: q.get('format') || 'auto', tone: q.get('tone') || 'auto', lang: q.get('lang') || '', music: q.get('music') || '', cast: +q.get('cast') || 0, extra: '' }) }); // as instruções da casa (db.ai.extra) são privadas: não saem neste endpoint público
+      return send(res, 200, { prompt: AI.systemPrompt({ aspect: aspectFor(q.get('aspect') === '16:9' ? '16:9' : '9:16'), seconds, look: SCHEMA.SET.look.has(q.get('look')) ? q.get('look') : '', format: q.get('format') || 'auto', tone: q.get('tone') || 'auto', lang: q.get('lang') || '', music: q.get('music') || '', cast: +q.get('cast') || 0, extra: '' }) }, CDN(300, 3600)); // as instruções da casa (db.ai.extra) são privadas: não saem neste endpoint público
     }
 
 
@@ -809,13 +908,13 @@ async function api(req, res, p) {
         h.push(now); iconHits.set(ip, h);
       }
       const svg = await iconGet(q, id);
-      res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'" });
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'" });
       return res.end(svg);
     }
 
     // Voz com IA (TTS): texto -> MP3. Sem chave de API; limite por IP e poucas gerações ao mesmo tempo.
-    if (p === '/api/tts/status' && m === 'GET') { const t = ttsInfo(); return send(res, 200, { available: t.installed && t.enabled, installed: t.installed, maxChars: t.maxChars, voice: t.voice, perHour: t.perHour }); }
-    if (p === '/api/tts/voices' && m === 'GET') return send(res, 200, { voices: await TTS.voices(), default: db.tts.voice });
+    if (p === '/api/tts/status' && m === 'GET') { const t = ttsInfo(); return send(res, 200, { available: t.installed && t.enabled, installed: t.installed, maxChars: t.maxChars, voice: t.voice, perHour: t.perHour }, CDN(30, 120)); }
+    if (p === '/api/tts/voices' && m === 'GET') return send(res, 200, { voices: await TTS.voices(), default: db.tts.voice }, CDN(3600, 86400));
     if (p === '/api/tts' && m === 'POST') {
       const lg = await needLogin(req, res); if (!lg) return;
       const t = ttsInfo();
@@ -827,6 +926,7 @@ async function api(req, res, p) {
       let done = false, gt = false, busy = false, cr = null;
       try {
         const b = await body(req, 3e4);
+        await balPull(credWho(req, lg).key); // (antes de qualquer checagem de vaga: abaixo, conferir e ocupar a vaga não pode ter await no meio)
         gt = !lg.user; if (gt && !gTake('tts')) { gt = false; return send(res, 429, { error: 'O site atingiu o limite de vozes desta hora. Tente mais tarde ou entre na sua conta.' }); }
         if (ttsBusy >= TTS_MAX_PARALLEL) { if (gt) gRefund('tts'); return send(res, 429, { error: 'O servidor de voz está ocupado. Tente de novo em alguns segundos.' }); }
         if (!useFit) { const cw = credWho(req, lg); cr = CR.charge(cw.key, cw.name, 'tts'); if (!cr.ok) { const c = cr; cr = null; if (gt) gRefund('tts'); return noCredit(res, c); } }
@@ -834,7 +934,9 @@ async function api(req, res, p) {
         const mp3 = await TTS.synth({ text: b.text, voice: str(b.voice, 60) || db.tts.voice, rate: +b.rate, pitch: +b.pitch });
         done = true;
         const tkn = useFit ? (fitTk.e.tts--, fitTk.t) : fitIssue(credWho(req, lg).key);
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': mp3.length, 'Cache-Control': 'no-store', 'X-Fit-Token': tkn, ...credHeaders(CR.view(credWho(req, lg).key)) });
+        // Na Vercel, respostas de função com mais de 4,5 MB só passam em streaming (sem Content-Length): o MP3 vai em pedaços.
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', ...(SERVERLESS ? {} : { 'Content-Length': mp3.length }), 'Cache-Control': 'no-store', 'X-Fit-Token': tkn, ...credHeaders(CR.view(credWho(req, lg).key)) });
+        if (SERVERLESS) { for (let i = 0; i < mp3.length; i += 65536) res.write(mp3.subarray(i, i + 65536)); return res.end(); }
         return res.end(mp3);
       } catch (e) { if (gt) gRefund('tts'); throw e; } finally { if (busy) ttsBusy--; if (!done) { refund(); if (cr) cr.refund(); } }
     }
@@ -873,6 +975,7 @@ async function api(req, res, p) {
         else if (aiOp === 'fit') job = () => AI.fit({ ...common, story: b.story, script, want: +b.want, seconds: +b.seconds });
         else job = () => AI.translate({ ...common, story: b.story, script, lang: str(b.lang, 8) });
       }
+      if (aiOp !== 'fit') await balPull(credWho(req, lg).key);
       const cw = credWho(req, lg), cr = aiOp === 'fit' ? { ok: true, refund() {} } : CR.charge(cw.key, cw.name, aiOp); // gasta o crédito ANTES de chamar a IA (o ajuste fino não cobra)
       if (!cr.ok) return noCredit(res, cr);
       const ga = !lg.user && aiOp !== 'fit'; if (ga && !gTake('ai')) { cr.refund(); return send(res, 429, { error: 'O site atingiu o limite de usos da IA desta hora. Tente mais tarde ou entre na sua conta.' }); }
@@ -1047,7 +1150,7 @@ async function api(req, res, p) {
       if (!(await checkPassword(b.current))) return send(res, 403, { error: 'Senha atual incorreta.' });
       if (String(b.next || '').length < 10) return send(res, 400, { error: 'A nova senha precisa ter pelo menos 10 caracteres.' });
       setPassword(b.next); const keep = cookieOf(req).sid; for (const t of sessions.keys()) if (t !== keep) sessions.delete(t);
-      return send(res, 200, { ok: true });
+      return send(res, 200, { ok: true }, STATELESS ? { 'Set-Cookie': sessionCookie(req) } : undefined); // sessão assinada: a troca da senha invalidou todas, então a atual recebe uma nova
     }
     return send(res, 404, { error: 'Rota não encontrada.' });
   } catch (e) {
@@ -1078,8 +1181,14 @@ const fillPage = (html, req) => html
   .replace(/\{\{CONTACT\}\}/g, CONTACT_URL ? escH(CONTACT_URL) : CONTACT_EMAIL ? 'mailto:' + escH(CONTACT_EMAIL) : '/privacidade#contato')
   .replace(/\{\{CONTACT_ATTR\}\}/g, CONTACT_URL || CONTACT_EMAIL ? '' : ' data-chat')
   .replace(/\{\{CONTACT_EXTRA\}\}/g, CONTACT_URL ? ' ou em <a href="' + escH(CONTACT_URL) + '">' + escH(CONTACT_URL.replace(/^https?:\/\//, '')) + '</a>' : CONTACT_EMAIL ? ' ou pelo e-mail <a href="mailto:' + escH(CONTACT_EMAIL) + '">' + escH(CONTACT_EMAIL) + '</a>' : '');
-const server = http.createServer((req, res) => {
+const handler = async (req, res) => {
   secHeaders(req, res);
+  if (SERVERLESS) {
+    // Antes de responder, grava o que mudou no Supabase (a função pode ser congelada logo depois) e, antes de tratar, traz a configuração.
+    const end = res.end.bind(res); let ended = false;
+    res.end = (...a) => { if (ended) return res; ended = true; flushAll().catch(() => {}).then(() => end(...a)); return res; };
+    await ready().catch(() => {});
+  }
   let p;
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end(); }
   if (p.startsWith('/api/')) return api(req, res, p);
@@ -1107,11 +1216,21 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, h);
     res.end(req.method === 'HEAD' ? undefined : d);
   });
-});
+};
+const server = http.createServer(handler);
 server.headersTimeout = 20e3; server.requestTimeout = 60e3; server.keepAliveTimeout = 5e3; server.maxHeadersCount = 60; // contra conexões lentas (slowloris)
 process.on('unhandledRejection', e => console.error('Erro não tratado:', e));
 // Com Supabase, lê as configurações e os saldos de créditos ANTES de abrir a porta (senão os primeiros visitantes veriam a cota cheia).
-(async () => { if (cfgDbReady()) { await cfgDbLoad(true); await balLoad(); } })().catch(() => {}).then(() => server.listen(PORT, async () => {
+const STANDALONE = require.main === module && !SERVERLESS; // `node server.js`; na Vercel quem chama o handler é api/index.js
+if (SERVERLESS) {
+  const miss = [];
+  if (!cfgDbReady()) miss.push('Supabase com a chave service_role (SUPABASE_URL, SUPABASE_ANON_KEY e SUPABASE_SERVICE_KEY): sem ela, configurações do painel, créditos e suporte não persistem entre instâncias');
+  if (!STATELESS) miss.push('SESSION_SECRET: sem ela o login do painel não funciona');
+  if (!process.env.ADMIN_PASSWORD && !cfgDbReady()) miss.push('ADMIN_PASSWORD');
+  if (!process.env.ADMIN_PATH) miss.push('ADMIN_PATH (endereço secreto do painel; se a configuração já está no Supabase, vale o que estiver lá)');
+  console.log('Animaê · build ' + BUILD + ' (serverless)' + (miss.length ? '\n  AVISO: falta definir: ' + miss.join('; ') : ''));
+}
+if (STANDALONE) (async () => { if (cfgDbReady()) { await cfgDbLoad(true); await balLoad(); } })().catch(() => {}).then(() => server.listen(PORT, async () => {
   console.log('Animaê · build ' + BUILD);
   console.log('  Créditos: ' + (!cfgDbReady() ? 'saldos só neste servidor (dados.json)' : bal.ok ? 'saldos guardados no Supabase (tabela credit_balances)' : 'Supabase com erro nos saldos: ' + bal.error));
   if (cfgDbReady()) { console.log('  Configurações do painel: ' + (cfgDb.ok ? 'sincronizadas com o Supabase (tabela admin_config)' : 'Supabase com erro: ' + cfgDb.error)); }
@@ -1147,3 +1266,5 @@ setInterval(() => {
   for (const [k, v] of sessions) if (v < now) sessions.delete(k);
   if (fails.size > 20000) fails.clear(); if (iconMiss.size > 20000) iconMiss.clear();
 }, 600e3).unref();
+
+module.exports = { handler, server };

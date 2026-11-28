@@ -93,11 +93,22 @@ alter table public.credit_balances add column if not exists x jsonb not null def
 alter table public.credit_balances enable row level security;
 revoke all on public.credit_balances from anon, authenticated;
 
+-- Chat de suporte no modo serverless (Vercel): lá não existe disco, então todas as conversas ficam num único documento (id = 1).
+-- Em servidor próprio (node server.js) essa tabela não é usada: as conversas ficam em .dados/suporte.json.
+-- Mesma proteção das outras: sem policy, só o servidor (service_role) lê e grava.
+create table if not exists public.support_store (
+  id          int primary key default 1 check (id = 1),
+  data        jsonb not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now()
+);
+alter table public.support_store enable row level security;
+revoke all on public.support_store from anon, authenticated;
+
 -- Permissões das tabelas (necessárias em projetos que não concedem acesso automático ao schema public).
 -- service_role (chave secret): o servidor grava admin_config, vídeos e histórias.
 -- authenticated (usuário logado): só videos e stories, e o RLS acima limita a cada pessoa as próprias linhas.
 grant usage on schema public to service_role, authenticated;
-grant all on public.admin_config, public.credit_balances, public.videos, public.stories to service_role;
+grant all on public.admin_config, public.credit_balances, public.support_store, public.videos, public.stories to service_role;
 grant select, insert, update, delete on public.videos, public.stories to authenticated;
 grant usage, select on all sequences in schema public to service_role, authenticated;
 

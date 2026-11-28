@@ -96,7 +96,7 @@ async function health(c) {
     out.auth = true;
     const j = s.json || {};
     out.google = !!(j.external && j.external.google); out.signup = !j.disable_signup; out.autoconfirm = !!j.mailer_autoconfirm;
-    for (const t of ['videos', 'stories', 'admin_config', 'credit_balances']) {
+    for (const t of ['videos', 'stories', 'admin_config', 'credit_balances', 'support_store']) {
       const r = await call(c, 'GET', `/rest/v1/${t}?select=id&limit=1`, { token: c.serviceKey || c.anonKey });
       out.tables[t] = r.ok ? true : (r.status === 401 || r.status === 403) ? 'rls' : false; // 'rls' = existe, mas as regras escondem as linhas (normal com a chave anon)
     }
